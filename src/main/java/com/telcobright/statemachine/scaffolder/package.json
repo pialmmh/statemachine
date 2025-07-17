@@ -1,0 +1,30 @@
+{
+  "name": "statemachine-scaffolder",
+  "version": "1.0.0",
+  "description": "State Machine code generator for Java from DSL specifications",
+  "main": "scaffolder.js",
+  "bin": {
+    "statemachine-scaffolder": "./scaffolder.js"
+  },
+  "scripts": {
+    "test": "node test-scaffolder.js"
+  },
+  "keywords": [
+    "state-machine",
+    "code-generator",
+    "scaffolder",
+    "java"
+  ],
+  "author": "TelcoBright",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "handlebars": "^4.7.8"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
