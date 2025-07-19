@@ -43,7 +43,7 @@ public class CallMachineRehydrationTest {
     @Test
     public void testMachineRehydratesFromDatabaseWhenNotInMemory() throws SQLException {
         // Step 1: Create machine, change state, and persist to database
-        GenericStateMachine originalMachine = new CallMachine(machineId, null, null, null);
+        GenericStateMachine originalMachine = CallMachine.create(machineId);
         
         // Change state to RINGING
         originalMachine.sendEvent(new IncomingCall("555-1234"));
@@ -64,7 +64,7 @@ public class CallMachineRehydrationTest {
         
         // Step 3: Call createOrGet - should load from database
         GenericStateMachine rehydratedMachine = registry.createOrGet(machineId, () -> {
-            return new CallMachine(machineId, null, null, null);
+            return CallMachine.create(machineId);
         });
         
         // Verify machine was rehydrated from database
@@ -90,7 +90,7 @@ public class CallMachineRehydrationTest {
     @Test
     public void testCreateOrGetReturnsExistingMachineFromMemory() throws SQLException {
         // Create machine and add to registry
-        GenericStateMachine machine = new CallMachine(machineId, null, null, null);
+        GenericStateMachine machine = CallMachine.create(machineId);
         registry.register(machineId, machine);
         
         // Change state
@@ -120,7 +120,7 @@ public class CallMachineRehydrationTest {
         
         // Call createOrGet - should create new machine
         GenericStateMachine newMachine = registry.createOrGet(machineId, () -> {
-            return new CallMachine(machineId, null, null, null);
+            return CallMachine.create(machineId);
         });
         
         // Verify new machine is created in initial state
@@ -134,7 +134,7 @@ public class CallMachineRehydrationTest {
     @Test
     public void testRehydrationPreservesContextData() throws SQLException {
         // Create machine with context data
-        GenericStateMachine originalMachine = new CallMachine(machineId, null, null, null);
+        GenericStateMachine originalMachine = CallMachine.create(machineId);
         
         // Send event with specific context
         originalMachine.sendEvent(new IncomingCall("555-CALLER"));
@@ -149,7 +149,7 @@ public class CallMachineRehydrationTest {
         
         // Rehydrate
         GenericStateMachine rehydratedMachine = registry.createOrGet(machineId, () -> {
-            return new CallMachine(machineId, null, null, null);
+            return CallMachine.create(machineId);
         });
         
         // Verify context is preserved

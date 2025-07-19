@@ -33,7 +33,7 @@ public class CallMachineStateTransitionPersistenceTest {
     public void setup() throws SQLException {
         TestDatabaseHelper.cleanupTestData();
         
-        machine = new CallMachine(machineId, null, null, null);
+        machine = CallMachine.create(machineId);
         
         // Verify initial state
         assertEquals("IDLE", machine.getCurrentState());
@@ -180,7 +180,7 @@ public class CallMachineStateTransitionPersistenceTest {
     public void testMultipleMachinesIndependentPersistence() throws SQLException {
         // Create second machine
         String machineId2 = "call-transition-test-002";
-        GenericStateMachine machine2 = new CallMachine(machineId2, null, null, null);
+        GenericStateMachine machine2 = CallMachine.create(machineId2);
         
         // Machine 1: IDLE -> RINGING
         machine.sendEvent(new IncomingCall("555-1111"));

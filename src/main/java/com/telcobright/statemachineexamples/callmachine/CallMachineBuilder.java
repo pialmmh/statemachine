@@ -20,7 +20,7 @@ public class CallMachineBuilder {
 
     private CallMachineBuilder(String machineId) {
         this.machineId = machineId;
-        this.machine = new CallMachine(machineId, null, null, null);
+        this.machine = new CallMachine();
     }
 
     public static CallMachineBuilder create(String machineId) {

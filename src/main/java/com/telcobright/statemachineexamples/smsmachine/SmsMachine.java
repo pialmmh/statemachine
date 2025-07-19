@@ -158,20 +158,4 @@ public class SmsMachine extends GenericStateMachine {
         }
     }
     
-    // ===================== ABSTRACT METHOD IMPLEMENTATIONS =====================
-    
-    @Override
-    public Boolean save(Connection conn, StateMachineSnapshotEntity snapshot) {
-        return saveSmsMachineSnapshot(conn, snapshot);
-    }
-    
-    @Override
-    public StateMachineSnapshotEntity load(Connection conn, String machineId) {
-        return loadSmsMachineSnapshot(conn, machineId);
-    }
-    
-    @Override
-    public Boolean init(Connection conn) {
-        return initSmsMachineTable(conn);
-    }
 }

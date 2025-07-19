@@ -34,7 +34,7 @@ public class CallMachineOfflineStateTest {
         TestDatabaseHelper.cleanupTestData();
         
         // Create call machine
-        machine = new CallMachine(machineId, null, null, null);
+        machine = CallMachine.create(machineId);
         
         // Verify initial state
         assertEquals("IDLE", machine.getCurrentState());

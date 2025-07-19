@@ -22,12 +22,16 @@ import java.io.IOException;
  * Call state machine definition with 3 states: IDLE, RINGING, CONNECTED
  * Defines the structure, transitions, and persistence for call management
  */
-public class CallMachine {
+public class CallMachine extends GenericStateMachine {
+    
+    public CallMachine() {
+        super("call-machine", null, null, null);
+    }
     
     /**
      * Create and configure the call state machine
      */
-    public GenericStateMachine createMachine(String machineId) {
+    public static CallMachine create(String machineId) {
         // Load profile-based configuration
         String activeProfile = loadActiveProfile();
         String configFile = "statemachine-" + activeProfile + ".properties";
@@ -35,24 +39,23 @@ public class CallMachine {
         System.out.println("🔧 Creating CallMachine with profile: " + activeProfile);
         
         // Create state machine with MySQL persistence and stay() API for in-band events
-        return FluentStateMachineBuilder.create(machineId)
-            .withDatabasePersistence(configFile)
-            .withCustomSaveFunction(CallMachine::saveCallSnapshot)
-            .withCustomLoadFunction(CallMachine::loadCallSnapshot)
-            .withCustomInitFunction(CallMachine::initCallTable)
-            .initialState(CallState.IDLE)
-            .state(CallState.IDLE)
-                .on(IncomingCall.class).to(CallState.RINGING)
-                .then()
-            .state(CallState.RINGING).offline()
-                .on(Answer.class).to(CallState.CONNECTED)
-                .on(Hangup.class).to(CallState.IDLE)
-                .stay(SessionProgress.class, OnSessionProgress_Ringing::handle)
-                .then()
-            .state(CallState.CONNECTED)
-                .on(Hangup.class).to(CallState.IDLE)
-                .done()
-            .buildAndStart();
+        CallMachine machine = new CallMachine();
+        
+        // Configure states and transitions
+        machine.initialState(CallState.IDLE.toString());
+        
+        // IDLE state
+        machine.transition(CallState.IDLE.toString(), "IncomingCall", CallState.RINGING.toString());
+        
+        // RINGING state (offline)
+        machine.transition(CallState.RINGING.toString(), "Answer", CallState.CONNECTED.toString());
+        machine.transition(CallState.RINGING.toString(), "Hangup", CallState.IDLE.toString());
+        machine.stayAction(CallState.RINGING.toString(), "SessionProgress", OnSessionProgress_Ringing::handle);
+        
+        // CONNECTED state
+        machine.transition(CallState.CONNECTED.toString(), "Hangup", CallState.IDLE.toString());
+        
+        return machine;
     }
     
     

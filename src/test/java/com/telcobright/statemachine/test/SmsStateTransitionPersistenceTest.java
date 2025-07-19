@@ -35,7 +35,7 @@ public class SmsStateTransitionPersistenceTest {
     public void setup() throws SQLException {
         TestDatabaseHelper.cleanupTestData();
         
-        machine = new SmsMachine(machineId, null, null, null);
+        machine = SmsMachine.create(machineId);
         
         // Verify initial state
         assertEquals("QUEUED", machine.getCurrentState());
