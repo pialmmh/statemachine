@@ -3,9 +3,9 @@
 ## 🔍 Issues Found in Test Code
 
 ### **1. Missing Dependencies in Test Classes**
+
 ```java
 // ISSUE: StateMachineRegistry class doesn't exist yet
-import com.telcobright.statemachine.StateMachineRegistry;  // ❌ Not implemented
 
 // ISSUE: SMS machine classes may not exist
 import com.telcobright.statemachineexamples.smsmachine.SmsMachine;  // ❌ May not exist

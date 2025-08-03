@@ -1,48 +1,47 @@
 package com.telcobright.statemachine.events;
 
-import com.telcobright.statemachineexamples.callmachine.events.CallEventTypeRegistry;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Master registry that delegates to domain-specific registries
- * This allows for organized event management by domain (call, sms, etc.)
+ * Master registry for event types
+ * This provides a pluggable architecture for domain-specific event registries
  */
 public class EventTypeRegistry {
     
+    private static final Map<Class<? extends StateMachineEvent>, String> eventTypeMap = new ConcurrentHashMap<>();
+    
     /**
-     * Get event type string for any event class by delegating to appropriate domain registry
+     * Get event type string for any event class
      */
     public static String getEventType(Class<? extends StateMachineEvent> eventClass) {
-        // Try call events first
-        if (CallEventTypeRegistry.isCallEvent(eventClass)) {
-            return CallEventTypeRegistry.getEventType(eventClass);
+        String eventType = eventTypeMap.get(eventClass);
+        if (eventType != null) {
+            return eventType;
         }
         
-        // Add other domain registries here as they are created:
-        // if (SmsEventTypeRegistry.isSmsEvent(eventClass)) {
-        //     return SmsEventTypeRegistry.getEventType(eventClass);
-        // }
-        
-        // Fallback to class name if not found in any domain registry
+        // Fallback to class name if not found in registry
         return eventClass.getSimpleName().toUpperCase();
     }
     
     /**
-     * Register a new event type in the appropriate domain
-     * This method can be enhanced to auto-detect domain based on package
+     * Register a new event type
      */
     public static void register(Class<? extends StateMachineEvent> eventClass, String eventType) {
-        // Determine domain by package name
-        String packageName = eventClass.getPackage().getName();
-        
-        if (packageName.contains(".call")) {
-            CallEventTypeRegistry.register(eventClass, eventType);
-        }
-        // Add other domain routing here:
-        // else if (packageName.contains(".sms")) {
-        //     SmsEventTypeRegistry.register(eventClass, eventType);
-        // }
-        else {
-            throw new IllegalArgumentException("Unknown event domain for class: " + eventClass.getName());
-        }
+        eventTypeMap.put(eventClass, eventType);
+    }
+    
+    /**
+     * Clear all registered event types
+     */
+    public static void clear() {
+        eventTypeMap.clear();
+    }
+    
+    /**
+     * Check if an event class is registered
+     */
+    public static boolean isRegistered(Class<? extends StateMachineEvent> eventClass) {
+        return eventTypeMap.containsKey(eventClass);
     }
 }

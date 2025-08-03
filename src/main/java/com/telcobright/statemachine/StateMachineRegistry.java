@@ -12,7 +12,7 @@ import com.telcobright.statemachine.timeout.TimeoutManager;
  */
 public class StateMachineRegistry {
     
-    private final Map<String, GenericStateMachine> activeMachines = new ConcurrentHashMap<>();
+    private final Map<String, GenericStateMachine<?>> activeMachines = new ConcurrentHashMap<>();
     private final StateMachineSnapshotRepository repository;
     private final TimeoutManager timeoutManager;
     
@@ -35,7 +35,7 @@ public class StateMachineRegistry {
     /**
      * Register a state machine
      */
-    public void register(String id, GenericStateMachine machine) {
+    public void register(String id, GenericStateMachine<?> machine) {
         activeMachines.put(id, machine);
     }
     
@@ -56,7 +56,7 @@ public class StateMachineRegistry {
     /**
      * Get a machine from memory
      */
-    public GenericStateMachine getActiveMachine(String id) {
+    public GenericStateMachine<?> getActiveMachine(String id) {
         return activeMachines.get(id);
     }
     
@@ -66,16 +66,17 @@ public class StateMachineRegistry {
      * If not, try to load from persistence
      * If not in persistence, create new one
      */
-    public GenericStateMachine createOrGet(String id, Supplier<GenericStateMachine> factory) {
+    public <T> GenericStateMachine<T> createOrGet(String id, Supplier<GenericStateMachine<T>> factory) {
         // Check if already in memory
-        GenericStateMachine existing = activeMachines.get(id);
+        @SuppressWarnings("unchecked")
+        GenericStateMachine<T> existing = (GenericStateMachine<T>) activeMachines.get(id);
         if (existing != null) {
             return existing;
         }
         
         // TODO: Add persistence logic here
         // For now, just create new machine
-        GenericStateMachine machine = factory.get();
+        GenericStateMachine<T> machine = factory.get();
         register(id, machine);
         return machine;
     }
@@ -83,15 +84,16 @@ public class StateMachineRegistry {
     /**
      * Create or get a state machine (legacy method)
      */
-    public GenericStateMachine createOrGet(String id) {
+    public <T> GenericStateMachine<T> createOrGet(String id) {
         // Check if already in memory
-        GenericStateMachine existing = activeMachines.get(id);
+        @SuppressWarnings("unchecked")
+        GenericStateMachine<T> existing = (GenericStateMachine<T>) activeMachines.get(id);
         if (existing != null) {
             return existing;
         }
         
         // Create new machine with default factory
-        GenericStateMachine machine = new GenericStateMachine(id, repository, timeoutManager, this);
+        GenericStateMachine<T> machine = new GenericStateMachine<>(id, repository, timeoutManager, this);
         register(id, machine);
         return machine;
     }
@@ -99,7 +101,7 @@ public class StateMachineRegistry {
     /**
      * Get all active machines
      */
-    public Map<String, GenericStateMachine> getActiveMachines() {
+    public Map<String, GenericStateMachine<?>> getActiveMachines() {
         return new ConcurrentHashMap<>(activeMachines);
     }
     

@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import com.telcobright.statemachine.events.StateMachineEvent;
 import com.telcobright.statemachine.events.TimeoutEvent;
@@ -14,22 +15,23 @@ import com.telcobright.statemachine.timeout.TimeoutManager;
 
 /**
  * Enhanced Generic State Machine with timeout, persistence, and offline support
+ * @param <T> the type of context object this state machine manages
  */
-public class GenericStateMachine {
+public class GenericStateMachine<T> {
     private final String id;
     private String currentState;
     private final Map<String, EnhancedStateConfig> stateConfigs = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> transitions = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, Consumer<StateMachineEvent>>> stayActions = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, BiConsumer<GenericStateMachine<T>, StateMachineEvent>>> stayActions = new ConcurrentHashMap<>();
     private final StateMachineSnapshotRepository snapshotRepository;
     private final TimeoutManager timeoutManager;
     private final StateMachineRegistry registry;
     private ScheduledFuture<?> currentTimeout;
-    private Object context;
+    private T context;
     
     // Callbacks
     private Consumer<String> onStateTransition;
-    private Consumer<GenericStateMachine> onOfflineTransition;
+    private Consumer<GenericStateMachine<T>> onOfflineTransition;
     
     public GenericStateMachine(String id, StateMachineSnapshotRepository snapshotRepository, 
                                TimeoutManager timeoutManager, StateMachineRegistry registry) {
@@ -43,7 +45,7 @@ public class GenericStateMachine {
     /**
      * Define a state with configuration
      */
-    public GenericStateMachine state(String stateId, EnhancedStateConfig config) {
+    public GenericStateMachine<T> state(String stateId, EnhancedStateConfig config) {
         stateConfigs.put(stateId, config);
         return this;
     }
@@ -51,7 +53,7 @@ public class GenericStateMachine {
     /**
      * Define a transition from one state to another on an event
      */
-    public GenericStateMachine transition(String fromState, String event, String toState) {
+    public GenericStateMachine<T> transition(String fromState, String event, String toState) {
         transitions.computeIfAbsent(fromState, k -> new ConcurrentHashMap<>())
                    .put(event, toState);
         return this;
@@ -60,7 +62,7 @@ public class GenericStateMachine {
     /**
      * Set the initial state
      */
-    public GenericStateMachine initialState(String state) {
+    public GenericStateMachine<T> initialState(String state) {
         this.currentState = state;
         return this;
     }
@@ -135,7 +137,8 @@ public class GenericStateMachine {
      */
     public void rehydrate(StateMachineSnapshotEntity snapshot) {
         this.currentState = snapshot.getStateId();
-        this.context = snapshot.getContext();
+        // Note: Context deserialization needs to be handled externally since 
+        // snapshot stores context as String but we need type T
         
         // If not offline, enter the state (without firing entry actions for offline states)
         if (!snapshot.getIsOffline()) {
@@ -156,11 +159,11 @@ public class GenericStateMachine {
                 transitionTo(targetState);
             } else {
                 // Check for stay actions
-                Map<String, Consumer<StateMachineEvent>> stateStayActions = stayActions.get(currentState);
+                Map<String, BiConsumer<GenericStateMachine<T>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
                 if (stateStayActions != null) {
-                    Consumer<StateMachineEvent> action = stateStayActions.get(event.getEventType());
+                    BiConsumer<GenericStateMachine<T>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
                     if (action != null) {
-                        action.accept(event);
+                        action.accept(this, event);
                     }
                 }
             }
@@ -284,7 +287,8 @@ public class GenericStateMachine {
      */
     public void restoreFromSnapshot(StateMachineSnapshotEntity snapshot) {
         this.currentState = snapshot.getStateId();
-        this.context = snapshot.getContext();
+        // Note: Context deserialization needs to be handled externally since 
+        // snapshot stores context as String but we need type T
         
         // If not offline, enter the state (without firing entry actions for offline states)
         if (!snapshot.getIsOffline()) {
@@ -297,7 +301,7 @@ public class GenericStateMachine {
     /**
      * Define a stay action - handle an event within a state without transitioning
      */
-    public GenericStateMachine stayAction(String stateId, String eventType, Consumer<StateMachineEvent> action) {
+    public GenericStateMachine<T> stayAction(String stateId, String eventType, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
         stayActions.computeIfAbsent(stateId, k -> new ConcurrentHashMap<>())
                    .put(eventType, action);
         return this;
@@ -305,14 +309,14 @@ public class GenericStateMachine {
 
     // Getters and setters
     public String getId() { return id; }
-    public Object getContext() { return context; }
-    public void setContext(Object context) { this.context = context; }
+    public T getContext() { return context; }
+    public void setContext(T context) { this.context = context; }
     
     public void setOnStateTransition(Consumer<String> callback) {
         this.onStateTransition = callback;
     }
     
-    public void setOnOfflineTransition(Consumer<GenericStateMachine> callback) {
+    public void setOnOfflineTransition(Consumer<GenericStateMachine<T>> callback) {
         this.onOfflineTransition = callback;
     }
     

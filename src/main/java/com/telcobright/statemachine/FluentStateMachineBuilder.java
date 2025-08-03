@@ -22,10 +22,11 @@ import com.telcobright.statemachine.timeout.TimeoutConfig;
 
 /**
  * Fluent builder for creating state machines with expressive syntax
+ * @param <T> the type of context object for the state machine
  */
-public class FluentStateMachineBuilder {
+public class FluentStateMachineBuilder<T> {
     private final String machineId;
-    private GenericStateMachine stateMachine;
+    private GenericStateMachine<T> stateMachine;
     private String initialState;
     private String finalState;
     private Class<? extends StateMachineEvent> timeoutEventType;
@@ -48,14 +49,14 @@ public class FluentStateMachineBuilder {
     /**
      * Create a new fluent builder
      */
-    public static FluentStateMachineBuilder create(String machineId) {
-        return new FluentStateMachineBuilder(machineId);
+    public static <T> FluentStateMachineBuilder<T> create(String machineId) {
+        return new FluentStateMachineBuilder<>(machineId);
     }
     
     /**
      * Configure custom persistence repository
      */
-    public FluentStateMachineBuilder withPersistence(StateMachineSnapshotRepository repository) {
+    public FluentStateMachineBuilder<T> withPersistence(StateMachineSnapshotRepository repository) {
         this.customRepository = repository;
         return this;
     }
@@ -63,7 +64,7 @@ public class FluentStateMachineBuilder {
     /**
      * Configure database persistence with custom connection parameters
      */
-    public FluentStateMachineBuilder withDatabasePersistence(String jdbcUrl, String username, String password) {
+    public FluentStateMachineBuilder<T> withDatabasePersistence(String jdbcUrl, String username, String password) {
         DatabaseConnectionManager connectionManager = new DatabaseConnectionManager(jdbcUrl, username, password);
         this.customRepository = new DatabaseStateMachineSnapshotRepository(connectionManager);
         return this;
@@ -72,7 +73,7 @@ public class FluentStateMachineBuilder {
     /**
      * Configure database persistence with custom table name
      */
-    public FluentStateMachineBuilder withDatabasePersistence(String jdbcUrl, String username, String password, String tableName) {
+    public FluentStateMachineBuilder<T> withDatabasePersistence(String jdbcUrl, String username, String password, String tableName) {
         DatabaseConnectionManager connectionManager = new DatabaseConnectionManager(jdbcUrl, username, password);
         this.customRepository = new DatabaseStateMachineSnapshotRepository(connectionManager, tableName);
         return this;
@@ -81,7 +82,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set custom save function for database persistence
      */
-    public FluentStateMachineBuilder withCustomSaveFunction(BiFunction<Connection, StateMachineSnapshotEntity, Boolean> saveFunction) {
+    public FluentStateMachineBuilder<T> withCustomSaveFunction(BiFunction<Connection, StateMachineSnapshotEntity, Boolean> saveFunction) {
         this.customSaveFunction = saveFunction;
         return this;
     }
@@ -89,7 +90,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set custom load function for database persistence
      */
-    public FluentStateMachineBuilder withCustomLoadFunction(BiFunction<Connection, String, StateMachineSnapshotEntity> loadFunction) {
+    public FluentStateMachineBuilder<T> withCustomLoadFunction(BiFunction<Connection, String, StateMachineSnapshotEntity> loadFunction) {
         this.customLoadFunction = loadFunction;
         return this;
     }
@@ -97,7 +98,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set custom initialization function for database persistence
      */
-    public FluentStateMachineBuilder withCustomInitFunction(Function<Connection, Boolean> initFunction) {
+    public FluentStateMachineBuilder<T> withCustomInitFunction(Function<Connection, Boolean> initFunction) {
         this.customInitFunction = initFunction;
         return this;
     }
@@ -105,7 +106,7 @@ public class FluentStateMachineBuilder {
     /**
      * Configure database persistence from properties file
      */
-    public FluentStateMachineBuilder withDatabasePersistence() {
+    public FluentStateMachineBuilder<T> withDatabasePersistence() {
         DatabaseConfig config = DatabaseConfigLoader.loadConfig();
         DatabaseConfigLoader.validateAndReport(config);
         this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
@@ -115,7 +116,7 @@ public class FluentStateMachineBuilder {
     /**
      * Configure database persistence from specific properties file
      */
-    public FluentStateMachineBuilder withDatabasePersistence(String configFile) {
+    public FluentStateMachineBuilder<T> withDatabasePersistence(String configFile) {
         DatabaseConfig config = DatabaseConfigLoader.loadConfig(configFile);
         DatabaseConfigLoader.validateAndReport(config);
         this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
@@ -125,7 +126,7 @@ public class FluentStateMachineBuilder {
     /**
      * Configure database persistence from Properties object
      */
-    public FluentStateMachineBuilder withDatabasePersistence(java.util.Properties properties) {
+    public FluentStateMachineBuilder<T> withDatabasePersistence(java.util.Properties properties) {
         DatabaseConfig config = DatabaseConfigLoader.loadConfig(properties);
         DatabaseConfigLoader.validateAndReport(config);
         this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
@@ -135,7 +136,7 @@ public class FluentStateMachineBuilder {
     /**
      * Configure database persistence from DatabaseConfig
      */
-    public FluentStateMachineBuilder withDatabasePersistence(DatabaseConfig config) {
+    public FluentStateMachineBuilder<T> withDatabasePersistence(DatabaseConfig config) {
         DatabaseConfigLoader.validateAndReport(config);
         this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
         return this;
@@ -144,7 +145,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set the timeout event type for all states
      */
-    public FluentStateMachineBuilder withTimeoutEventType(Class<? extends StateMachineEvent> eventType) {
+    public FluentStateMachineBuilder<T> withTimeoutEventType(Class<? extends StateMachineEvent> eventType) {
         this.timeoutEventType = eventType;
         return this;
     }
@@ -152,7 +153,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set the initial state
      */
-    public FluentStateMachineBuilder initialState(String state) {
+    public FluentStateMachineBuilder<T> initialState(String state) {
         this.initialState = state;
         return this;
     }
@@ -160,7 +161,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set the initial state using enum
      */
-    public FluentStateMachineBuilder initialState(Enum<?> state) {
+    public FluentStateMachineBuilder<T> initialState(Enum<?> state) {
         this.initialState = state.toString();
         return this;
     }
@@ -168,7 +169,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set the final state
      */
-    public FluentStateMachineBuilder finalState(String state) {
+    public FluentStateMachineBuilder<T> finalState(String state) {
         this.finalState = state;
         return this;
     }
@@ -176,7 +177,7 @@ public class FluentStateMachineBuilder {
     /**
      * Set the final state using enum
      */
-    public FluentStateMachineBuilder finalState(Enum<?> state) {
+    public FluentStateMachineBuilder<T> finalState(Enum<?> state) {
         this.finalState = state.toString();
         return this;
     }
@@ -244,7 +245,7 @@ public class FluentStateMachineBuilder {
     /**
      * Build and return the configured state machine
      */
-    public GenericStateMachine build() {
+    public GenericStateMachine<T> build() {
         // Ensure state machine is created
         ensureStateMachineCreated();
         
@@ -264,8 +265,8 @@ public class FluentStateMachineBuilder {
     /**
      * Build and start the state machine
      */
-    public GenericStateMachine buildAndStart() {
-        GenericStateMachine machine = build();
+    public GenericStateMachine<T> buildAndStart() {
+        GenericStateMachine<T> machine = build();
         machine.start();
         return machine;
     }
@@ -295,7 +296,7 @@ public class FluentStateMachineBuilder {
         /**
          * Set timeout with specific target state
          */
-        public StateBuilder onTimeout(String targetState, BiConsumer<GenericStateMachine, StateMachineEvent> action) {
+        public StateBuilder onTimeout(String targetState, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
             // Store timeout action - we'll need to enhance the state config to support this
             return this;
         }
@@ -329,14 +330,14 @@ public class FluentStateMachineBuilder {
         /**
          * Continue with next state (same as done())
          */
-        public FluentStateMachineBuilder then() {
+        public FluentStateMachineBuilder<T> then() {
             return done();
         }
         
         /**
          * Finish configuring this state and return to main builder
          */
-        public FluentStateMachineBuilder done() {
+        public FluentStateMachineBuilder<T> done() {
             finishState();
             currentStateBuilder = null;  // Clear current state
             return FluentStateMachineBuilder.this;
@@ -345,7 +346,7 @@ public class FluentStateMachineBuilder {
         /**
          * Define a stay action - handle an event within state without transitioning
          */
-        public StateBuilder stay(Class<? extends StateMachineEvent> eventType, Consumer<StateMachineEvent> action) {
+        public StateBuilder stay(Class<? extends StateMachineEvent> eventType, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
             // Use EventTypeRegistry to avoid reflection
             String eventTypeName = EventTypeRegistry.getEventType(eventType);
             stateMachine.stayAction(stateId, eventTypeName, action);
@@ -355,7 +356,7 @@ public class FluentStateMachineBuilder {
         /**
          * Define a stay action with string event type
          */
-        public StateBuilder stay(String eventType, Consumer<StateMachineEvent> action) {
+        public StateBuilder stay(String eventType, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
             stateMachine.stayAction(stateId, eventType, action);
             return this;
         }
