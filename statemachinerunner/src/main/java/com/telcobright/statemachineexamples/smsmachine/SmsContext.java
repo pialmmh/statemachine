@@ -1,6 +1,5 @@
 package com.telcobright.statemachineexamples.smsmachine;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -10,46 +9,46 @@ import java.util.List;
  * Rich SMS context with comprehensive message data and business logic
  */
 public class SmsContext {
-    @JsonProperty("messageId")
+    
     private String messageId;
     
-    @JsonProperty("fromNumber")
+    
     private String fromNumber;
     
-    @JsonProperty("toNumber")
+    
     private String toNumber;
     
-    @JsonProperty("messageText")
+    
     private String messageText;
     
-    @JsonProperty("attemptCount")
+    
     private int attemptCount;
     
-    @JsonProperty("sentAt")
+    
     private LocalDateTime sentAt;
     
-    @JsonProperty("deliveredAt")
+    
     private LocalDateTime deliveredAt;
     
-    @JsonProperty("queuedAt")
+    
     private LocalDateTime queuedAt;
     
-    @JsonProperty("priority")
+    
     private String priority;
     
-    @JsonProperty("messageStatus")
+    
     private String messageStatus;
     
-    @JsonProperty("failureReason")
+    
     private String failureReason;
     
-    @JsonProperty("deliveryEvents")
+    
     private List<String> deliveryEvents;
     
-    @JsonProperty("maxRetries")
+    
     private int maxRetries;
     
-    @JsonProperty("isHighPriority")
+    
     private boolean isHighPriority;
     
     public SmsContext() {
@@ -109,9 +108,6 @@ public class SmsContext {
         return Duration.ZERO;
     }
     
-    public boolean canRetry() {
-        return attemptCount < maxRetries;
-    }
     
     public boolean isLongMessage() {
         return messageText != null && messageText.length() > 160;
@@ -166,6 +162,17 @@ public class SmsContext {
     
     public boolean isHighPriority() { return isHighPriority; }
     public void setHighPriority(boolean highPriority) { this.isHighPriority = highPriority; }
+    
+    public boolean isEmergencyMessage() {
+        return messageText != null && (messageText.toUpperCase().contains("EMERGENCY") || 
+                                      messageText.toUpperCase().contains("URGENT") ||
+                                      fromNumber != null && fromNumber.contains("911"));
+    }
+    
+    public boolean canRetry() {
+        return attemptCount < maxRetries;
+    }
+    
     
     @Override
     public String toString() {

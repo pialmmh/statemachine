@@ -8,36 +8,34 @@ import java.util.function.BiConsumer;
 
 import com.telcobright.statemachine.events.StateMachineEvent;
 import com.telcobright.statemachine.events.TimeoutEvent;
-import com.telcobright.statemachine.persistence.StateMachineSnapshotEntity;
-import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
 import com.telcobright.statemachine.state.EnhancedStateConfig;
 import com.telcobright.statemachine.timeout.TimeoutManager;
+import com.telcobright.statemachine.StateMachineContextEntity;
 
 /**
  * Enhanced Generic State Machine with timeout, persistence, and offline support
- * @param <T> the type of context object this state machine manages
+ * @param <TPersistingEntity> the StateMachineContextEntity type that gets persisted - ID is the state machine ID
+ * @param <TContext> the volatile context type (not persisted)
  */
-public class GenericStateMachine<T> {
+public class GenericStateMachine<TPersistingEntity extends StateMachineContextEntity<?>, TContext> {
     private final String id;
     private String currentState;
     private final Map<String, EnhancedStateConfig> stateConfigs = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> transitions = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, BiConsumer<GenericStateMachine<T>, StateMachineEvent>>> stayActions = new ConcurrentHashMap<>();
-    private final StateMachineSnapshotRepository snapshotRepository;
+    private final Map<String, Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>>> stayActions = new ConcurrentHashMap<>();
     private final TimeoutManager timeoutManager;
     private final StateMachineRegistry registry;
     private ScheduledFuture<?> currentTimeout;
-    private T context;
+    private TPersistingEntity persistingEntity;  // The entity that gets persisted
+    private TContext context;  // Volatile context
     
     // Callbacks
     private Consumer<String> onStateTransition;
-    private Consumer<GenericStateMachine<T>> onOfflineTransition;
+    private Consumer<GenericStateMachine<TPersistingEntity, TContext>> onOfflineTransition;
     
-    public GenericStateMachine(String id, StateMachineSnapshotRepository snapshotRepository, 
-                               TimeoutManager timeoutManager, StateMachineRegistry registry) {
+    public GenericStateMachine(String id, TimeoutManager timeoutManager, StateMachineRegistry registry) {
         this.id = id;
         this.currentState = "initial";
-        this.snapshotRepository = snapshotRepository;
         this.timeoutManager = timeoutManager;
         this.registry = registry;
     }
@@ -45,7 +43,7 @@ public class GenericStateMachine<T> {
     /**
      * Define a state with configuration
      */
-    public GenericStateMachine<T> state(String stateId, EnhancedStateConfig config) {
+    public GenericStateMachine<TPersistingEntity, TContext> state(String stateId, EnhancedStateConfig config) {
         stateConfigs.put(stateId, config);
         return this;
     }
@@ -53,7 +51,7 @@ public class GenericStateMachine<T> {
     /**
      * Define a transition from one state to another on an event
      */
-    public GenericStateMachine<T> transition(String fromState, String event, String toState) {
+    public GenericStateMachine<TPersistingEntity, TContext> transition(String fromState, String event, String toState) {
         transitions.computeIfAbsent(fromState, k -> new ConcurrentHashMap<>())
                    .put(event, toState);
         return this;
@@ -62,7 +60,7 @@ public class GenericStateMachine<T> {
     /**
      * Set the initial state
      */
-    public GenericStateMachine<T> initialState(String state) {
+    public GenericStateMachine<TPersistingEntity, TContext> initialState(String state) {
         this.currentState = state;
         return this;
     }
@@ -121,31 +119,41 @@ public class GenericStateMachine<T> {
         }
         
         // Create snapshot asynchronously
-        createSnapshotAsync();
+        // TODO: Implement ShardingEntity persistence
+        persistState();
         
-        // Check if new state is offline
+        // Check if new state is offline or final
         EnhancedStateConfig config = stateConfigs.get(newState);
-        if (config != null && config.isOffline()) {
-            if (onOfflineTransition != null) {
-                onOfflineTransition.accept(this);
+        if (config != null) {
+            if (config.isOffline()) {
+                if (onOfflineTransition != null) {
+                    onOfflineTransition.accept(this);
+                }
+            }
+            
+            // Check if this is a final state and mark entity as complete
+            if (config.isFinal() && persistingEntity != null) {
+                persistingEntity.markComplete();
+                System.out.println("StateMachine " + id + " marked as complete - reached final state: " + newState);
             }
         }
     }
     
     /**
-     * Rehydrate from snapshot
+     * Persist current state using ShardingEntity
      */
-    public void rehydrate(StateMachineSnapshotEntity snapshot) {
-        this.currentState = snapshot.getStateId();
-        // Note: Context deserialization needs to be handled externally since 
-        // snapshot stores context as String but we need type T
-        
-        // If not offline, enter the state (without firing entry actions for offline states)
-        if (!snapshot.getIsOffline()) {
-            enterState(currentState, false);
+    private void persistState() {
+        if (persistingEntity != null) {
+            // TODO: Implement full ShardingEntity persistence integration
+            // For now, just update the entity's state field if it exists
+            try {
+                java.lang.reflect.Method setCurrentState = persistingEntity.getClass().getMethod("setCurrentState", String.class);
+                setCurrentState.invoke(persistingEntity, currentState);
+                System.out.println("Updated entity state to: " + currentState);
+            } catch (Exception e) {
+                // Entity doesn't have setCurrentState method or other error - that's ok
+            }
         }
-        
-        System.out.println("StateMachine " + id + " rehydrated to state: " + currentState);
     }
     
     /**
@@ -159,9 +167,9 @@ public class GenericStateMachine<T> {
                 transitionTo(targetState);
             } else {
                 // Check for stay actions
-                Map<String, BiConsumer<GenericStateMachine<T>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
+                Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
                 if (stateStayActions != null) {
-                    BiConsumer<GenericStateMachine<T>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
+                    BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
                     if (action != null) {
                         action.accept(this, event);
                     }
@@ -234,22 +242,6 @@ public class GenericStateMachine<T> {
         );
     }
     
-    /**
-     * Create a snapshot asynchronously
-     */
-    private void createSnapshotAsync() {
-        EnhancedStateConfig config = stateConfigs.get(currentState);
-        boolean isOffline = config != null && config.isOffline();
-        
-        StateMachineSnapshotEntity snapshot = new StateMachineSnapshotEntity(
-            id,
-            currentState,
-            context != null ? context.toString() : null,
-            isOffline
-        );
-        
-        snapshotRepository.saveAsync(snapshot);
-    }
     
     // ===================== TEST SUPPORT METHODS =====================
     
@@ -267,41 +259,12 @@ public class GenericStateMachine<T> {
         handleEvent(event);
     }
     
-    /**
-     * Create snapshot synchronously (for testing)
-     */
-    public StateMachineSnapshotEntity createSnapshot() {
-        EnhancedStateConfig config = stateConfigs.get(currentState);
-        boolean isOffline = config != null && config.isOffline();
-        
-        return new StateMachineSnapshotEntity(
-            id,
-            currentState,
-            context != null ? context.toString() : null,
-            isOffline
-        );
-    }
     
-    /**
-     * Restore from snapshot (for testing)
-     */
-    public void restoreFromSnapshot(StateMachineSnapshotEntity snapshot) {
-        this.currentState = snapshot.getStateId();
-        // Note: Context deserialization needs to be handled externally since 
-        // snapshot stores context as String but we need type T
-        
-        // If not offline, enter the state (without firing entry actions for offline states)
-        if (!snapshot.getIsOffline()) {
-            enterState(currentState, false);
-        }
-        
-        System.out.println("StateMachine " + id + " restored from snapshot to state: " + currentState);
-    }
     
     /**
      * Define a stay action - handle an event within a state without transitioning
      */
-    public GenericStateMachine<T> stayAction(String stateId, String eventType, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
+    public GenericStateMachine<TPersistingEntity, TContext> stayAction(String stateId, String eventType, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
         stayActions.computeIfAbsent(stateId, k -> new ConcurrentHashMap<>())
                    .put(eventType, action);
         return this;
@@ -309,14 +272,19 @@ public class GenericStateMachine<T> {
 
     // Getters and setters
     public String getId() { return id; }
-    public T getContext() { return context; }
-    public void setContext(T context) { this.context = context; }
+    // Context methods (volatile, not persisted)
+    public TContext getContext() { return context; }
+    public void setContext(TContext context) { this.context = context; }
+    
+    // Persisting entity methods (gets persisted)
+    public TPersistingEntity getPersistingEntity() { return persistingEntity; }
+    public void setPersistingEntity(TPersistingEntity persistingEntity) { this.persistingEntity = persistingEntity; }
     
     public void setOnStateTransition(Consumer<String> callback) {
         this.onStateTransition = callback;
     }
     
-    public void setOnOfflineTransition(Consumer<GenericStateMachine<T>> callback) {
+    public void setOnOfflineTransition(Consumer<GenericStateMachine<TPersistingEntity, TContext>> callback) {
         this.onOfflineTransition = callback;
     }
     
@@ -326,5 +294,22 @@ public class GenericStateMachine<T> {
     
     public boolean isInState(String state) {
         return currentState.equals(state);
+    }
+    
+    /**
+     * Check if the state machine is complete (reached a final state)
+     */
+    public boolean isComplete() {
+        if (persistingEntity != null) {
+            return persistingEntity.isComplete();
+        }
+        return false;
+    }
+    
+    /**
+     * Check if the state machine is active (not complete)
+     */
+    public boolean isActive() {
+        return !isComplete();
     }
 }

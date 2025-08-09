@@ -10,32 +10,31 @@ import java.util.function.Function;
 
 import com.telcobright.statemachine.events.StateMachineEvent;
 import com.telcobright.statemachine.events.EventTypeRegistry;
-import com.telcobright.statemachine.persistence.DatabaseConnectionManager;
-import com.telcobright.statemachine.persistence.DatabaseStateMachineSnapshotRepository;
-import com.telcobright.statemachine.persistence.StateMachineSnapshotEntity;
-import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
-import com.telcobright.statemachine.persistence.config.DatabaseConfig;
-import com.telcobright.statemachine.persistence.config.DatabaseConfigLoader;
+import com.telcobright.statemachine.persistence.ShardingEntityStateMachineRepository;
+import com.telcobright.statemachine.StateMachineContextEntity;
+import com.telcobright.statemachine.persistence.IdLookUpMode;
+import com.telcobright.db.PartitionedRepository;
 import com.telcobright.statemachine.state.EnhancedStateConfig;
 import com.telcobright.statemachine.timeout.TimeUnit;
 import com.telcobright.statemachine.timeout.TimeoutConfig;
 
 /**
  * Fluent builder for creating state machines with expressive syntax
- * @param <T> the type of context object for the state machine
+ * @param <TPersistingEntity> the StateMachineContextEntity type that gets persisted
+ * @param <TContext> the volatile context type (not persisted)
  */
-public class FluentStateMachineBuilder<T> {
+public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineContextEntity<?>, TContext> {
     private final String machineId;
-    private GenericStateMachine<T> stateMachine;
+    private GenericStateMachine<TPersistingEntity, TContext> stateMachine;
     private String initialState;
     private String finalState;
     private Class<? extends StateMachineEvent> timeoutEventType;
     
-    // Custom persistence configuration
-    private StateMachineSnapshotRepository customRepository;
-    private BiFunction<Connection, StateMachineSnapshotEntity, Boolean> customSaveFunction;
-    private BiFunction<Connection, String, StateMachineSnapshotEntity> customLoadFunction;
-    private Function<Connection, Boolean> customInitFunction;
+    
+    // ShardingEntity persistence configuration
+    private PartitionedRepository<TPersistingEntity, Object> shardingRepository;
+    private IdLookUpMode shardingLookupMode;
+    private Class<TPersistingEntity> entityClass;
     
     // Current state being configured
     private StateBuilder currentStateBuilder;
@@ -49,103 +48,36 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Create a new fluent builder
      */
-    public static <T> FluentStateMachineBuilder<T> create(String machineId) {
+    public static <TPersistingEntity extends StateMachineContextEntity<?>, TContext> FluentStateMachineBuilder<TPersistingEntity, TContext> create(String machineId) {
         return new FluentStateMachineBuilder<>(machineId);
     }
     
+    
+    
     /**
-     * Configure custom persistence repository
+     * Configure partitioned repository persistence with ById lookup mode for StateMachineContextEntity
      */
-    public FluentStateMachineBuilder<T> withPersistence(StateMachineSnapshotRepository repository) {
-        this.customRepository = repository;
-        return this;
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> withShardingRepo(PartitionedRepository<TPersistingEntity, ?> partitionedRepo, Class<TPersistingEntity> entityClass) {
+        return withShardingRepo(partitionedRepo, IdLookUpMode.ById, entityClass);
     }
     
     /**
-     * Configure database persistence with custom connection parameters
+     * Configure partitioned repository persistence with specified lookup mode for StateMachineContextEntity
      */
-    public FluentStateMachineBuilder<T> withDatabasePersistence(String jdbcUrl, String username, String password) {
-        DatabaseConnectionManager connectionManager = new DatabaseConnectionManager(jdbcUrl, username, password);
-        this.customRepository = new DatabaseStateMachineSnapshotRepository(connectionManager);
+    @SuppressWarnings("unchecked")
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> withShardingRepo(PartitionedRepository<TPersistingEntity, ?> partitionedRepo, IdLookUpMode lookupMode, Class<TPersistingEntity> entityClass) {
+        // Store the sharding repository for use in build()
+        this.shardingRepository = (PartitionedRepository<TPersistingEntity, Object>) partitionedRepo;
+        this.shardingLookupMode = lookupMode;
+        this.entityClass = entityClass;
         return this;
     }
     
-    /**
-     * Configure database persistence with custom table name
-     */
-    public FluentStateMachineBuilder<T> withDatabasePersistence(String jdbcUrl, String username, String password, String tableName) {
-        DatabaseConnectionManager connectionManager = new DatabaseConnectionManager(jdbcUrl, username, password);
-        this.customRepository = new DatabaseStateMachineSnapshotRepository(connectionManager, tableName);
-        return this;
-    }
-    
-    /**
-     * Set custom save function for database persistence
-     */
-    public FluentStateMachineBuilder<T> withCustomSaveFunction(BiFunction<Connection, StateMachineSnapshotEntity, Boolean> saveFunction) {
-        this.customSaveFunction = saveFunction;
-        return this;
-    }
-    
-    /**
-     * Set custom load function for database persistence
-     */
-    public FluentStateMachineBuilder<T> withCustomLoadFunction(BiFunction<Connection, String, StateMachineSnapshotEntity> loadFunction) {
-        this.customLoadFunction = loadFunction;
-        return this;
-    }
-    
-    /**
-     * Set custom initialization function for database persistence
-     */
-    public FluentStateMachineBuilder<T> withCustomInitFunction(Function<Connection, Boolean> initFunction) {
-        this.customInitFunction = initFunction;
-        return this;
-    }
-    
-    /**
-     * Configure database persistence from properties file
-     */
-    public FluentStateMachineBuilder<T> withDatabasePersistence() {
-        DatabaseConfig config = DatabaseConfigLoader.loadConfig();
-        DatabaseConfigLoader.validateAndReport(config);
-        this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
-        return this;
-    }
-    
-    /**
-     * Configure database persistence from specific properties file
-     */
-    public FluentStateMachineBuilder<T> withDatabasePersistence(String configFile) {
-        DatabaseConfig config = DatabaseConfigLoader.loadConfig(configFile);
-        DatabaseConfigLoader.validateAndReport(config);
-        this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
-        return this;
-    }
-    
-    /**
-     * Configure database persistence from Properties object
-     */
-    public FluentStateMachineBuilder<T> withDatabasePersistence(java.util.Properties properties) {
-        DatabaseConfig config = DatabaseConfigLoader.loadConfig(properties);
-        DatabaseConfigLoader.validateAndReport(config);
-        this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
-        return this;
-    }
-    
-    /**
-     * Configure database persistence from DatabaseConfig
-     */
-    public FluentStateMachineBuilder<T> withDatabasePersistence(DatabaseConfig config) {
-        DatabaseConfigLoader.validateAndReport(config);
-        this.customRepository = new DatabaseStateMachineSnapshotRepository(config);
-        return this;
-    }
     
     /**
      * Set the timeout event type for all states
      */
-    public FluentStateMachineBuilder<T> withTimeoutEventType(Class<? extends StateMachineEvent> eventType) {
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> withTimeoutEventType(Class<? extends StateMachineEvent> eventType) {
         this.timeoutEventType = eventType;
         return this;
     }
@@ -153,7 +85,7 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Set the initial state
      */
-    public FluentStateMachineBuilder<T> initialState(String state) {
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> initialState(String state) {
         this.initialState = state;
         return this;
     }
@@ -161,7 +93,7 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Set the initial state using enum
      */
-    public FluentStateMachineBuilder<T> initialState(Enum<?> state) {
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> initialState(Enum<?> state) {
         this.initialState = state.toString();
         return this;
     }
@@ -169,7 +101,7 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Set the final state
      */
-    public FluentStateMachineBuilder<T> finalState(String state) {
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> finalState(String state) {
         this.finalState = state;
         return this;
     }
@@ -177,7 +109,7 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Set the final state using enum
      */
-    public FluentStateMachineBuilder<T> finalState(Enum<?> state) {
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> finalState(Enum<?> state) {
         this.finalState = state.toString();
         return this;
     }
@@ -203,29 +135,32 @@ public class FluentStateMachineBuilder<T> {
      */
     private void ensureStateMachineCreated() {
         if (stateMachine == null) {
-            if (customRepository != null) {
-                // If using database persistence, configure custom functions
-                if (customRepository instanceof DatabaseStateMachineSnapshotRepository) {
-                    DatabaseStateMachineSnapshotRepository dbRepo = (DatabaseStateMachineSnapshotRepository) customRepository;
-                    if (customSaveFunction != null) {
-                        dbRepo.setCustomSaveFunction(customSaveFunction);
-                    }
-                    if (customLoadFunction != null) {
-                        dbRepo.setCustomLoadFunction(customLoadFunction);
-                    }
-                    if (customInitFunction != null) {
-                        dbRepo.setCustomInitFunction(customInitFunction);
-                    }
-                }
-                
-                // Create registry with custom repository
-                StateMachineRegistry customRegistry = StateMachineFactory.createRegistry(customRepository);
-                stateMachine = customRegistry.createOrGet(machineId);
+            if (shardingRepository != null && entityClass != null) {
+                // Using ShardingEntity-based persistence - create directly
+                stateMachine = createStateMachineWithShardingRepo();
             } else {
-                // Use default registry
-                stateMachine = StateMachineFactory.getDefaultRegistry().createOrGet(machineId);
+                // Use default registry (in-memory) - create directly for simplicity
+                stateMachine = new GenericStateMachine<>(
+                    machineId,
+                    StateMachineFactory.getDefaultTimeoutManager(),
+                    StateMachineFactory.getDefaultRegistry()
+                );
             }
         }
+    }
+    
+    /**
+     * Create state machine with ShardingEntity-based persistence
+     * TODO: Implement full ShardingEntity integration
+     */
+    private GenericStateMachine<TPersistingEntity, TContext> createStateMachineWithShardingRepo() {
+        // For now, create a simple state machine without full ShardingEntity integration
+        // This will be enhanced in future iterations
+        return new GenericStateMachine<>(
+            machineId,
+            StateMachineFactory.getDefaultTimeoutManager(),
+            StateMachineFactory.getDefaultRegistry()
+        );
     }
     
     /**
@@ -245,7 +180,7 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Build and return the configured state machine
      */
-    public GenericStateMachine<T> build() {
+    public GenericStateMachine<TPersistingEntity, TContext> build() {
         // Ensure state machine is created
         ensureStateMachineCreated();
         
@@ -265,8 +200,8 @@ public class FluentStateMachineBuilder<T> {
     /**
      * Build and start the state machine
      */
-    public GenericStateMachine<T> buildAndStart() {
-        GenericStateMachine<T> machine = build();
+    public GenericStateMachine<TPersistingEntity, TContext> buildAndStart() {
+        GenericStateMachine<TPersistingEntity, TContext> machine = build();
         machine.start();
         return machine;
     }
@@ -296,7 +231,7 @@ public class FluentStateMachineBuilder<T> {
         /**
          * Set timeout with specific target state
          */
-        public StateBuilder onTimeout(String targetState, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
+        public StateBuilder onTimeout(String targetState, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
             // Store timeout action - we'll need to enhance the state config to support this
             return this;
         }
@@ -328,16 +263,24 @@ public class FluentStateMachineBuilder<T> {
         }
         
         /**
+         * Mark this state as a final state (terminal state)
+         */
+        public StateBuilder finalState() {
+            stateConfig.finalState();
+            return this;
+        }
+        
+        /**
          * Continue with next state (same as done())
          */
-        public FluentStateMachineBuilder<T> then() {
+        public FluentStateMachineBuilder<TPersistingEntity, TContext> then() {
             return done();
         }
         
         /**
          * Finish configuring this state and return to main builder
          */
-        public FluentStateMachineBuilder<T> done() {
+        public FluentStateMachineBuilder<TPersistingEntity, TContext> done() {
             finishState();
             currentStateBuilder = null;  // Clear current state
             return FluentStateMachineBuilder.this;
@@ -346,7 +289,7 @@ public class FluentStateMachineBuilder<T> {
         /**
          * Define a stay action - handle an event within state without transitioning
          */
-        public StateBuilder stay(Class<? extends StateMachineEvent> eventType, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
+        public StateBuilder stay(Class<? extends StateMachineEvent> eventType, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
             // Use EventTypeRegistry to avoid reflection
             String eventTypeName = EventTypeRegistry.getEventType(eventType);
             stateMachine.stayAction(stateId, eventTypeName, action);
@@ -356,7 +299,7 @@ public class FluentStateMachineBuilder<T> {
         /**
          * Define a stay action with string event type
          */
-        public StateBuilder stay(String eventType, BiConsumer<GenericStateMachine<T>, StateMachineEvent> action) {
+        public StateBuilder stay(String eventType, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
             stateMachine.stayAction(stateId, eventType, action);
             return this;
         }

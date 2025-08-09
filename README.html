@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TelcoBright State Machine Library</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 25px;
+        }
+        .toc {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .toc h2 {
+            margin-top: 0;
+            color: #495057;
+            border: none;
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc li {
+            padding: 5px 0;
+        }
+        .toc a {
+            color: #007bff;
+            text-decoration: none;
+            padding-left: 20px;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', Consolas, monospace;
+            font-size: 14px;
+        }
+        .highlight {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .note {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .warning {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .feature-matrix {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .feature-matrix th, .feature-matrix td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        .feature-matrix th {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+        .feature-matrix tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .checkmark {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .cross {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .emoji {
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 TelcoBright State Machine Library</h1>
+        <p><strong>A powerful, registry-based state machine framework with dual generic architecture, persistence support, and high-volume processing capabilities.</strong></p>
+
+        <div class="toc">
+            <h2>📋 Table of Contents</h2>
+            <ul>
+                <li><a href="#overview">🔍 Overview</a></li>
+                <li><a href="#key-features">✨ Key Features</a></li>
+                <li><a href="#architecture">🏗️ Architecture</a></li>
+                <li><a href="#interface-design">🔧 Interface Design</a></li>
+                <li><a href="#getting-started">🚀 Getting Started</a></li>
+                <li><a href="#registry-usage">🏛️ Registry-Based Usage</a></li>
+                <li><a href="#entity-configuration">💾 Entity Configuration</a></li>
+                <li><a href="#comprehensive-testing">🧪 Comprehensive Testing</a></li>
+                <li><a href="#feature-matrix">📊 Feature/Responsibility Matrix</a></li>
+                <li><a href="#performance">⚡ Performance Optimization</a></li>
+                <li><a href="#mysql-integration">🗄️ MySQL Integration</a></li>
+                <li><a href="#examples">📝 Examples</a></li>
+                <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+            </ul>
+        </div>
+
+        <h2 id="overview">🔍 Overview</h2>
+        <p>The TelcoBright State Machine Library provides a robust, enterprise-grade state machine framework designed for high-volume telecom applications. It features a dual generic architecture that separates persistent and volatile data, registry-based lifecycle management, and comprehensive MySQL integration through partitioned repositories.</p>
+
+        <div class="highlight">
+            <strong>🎯 Primary Use Case:</strong> High-volume SMS and call processing with state persistence, retry logic, timeout handling, and completion tracking.
+        </div>
+
+        <h2 id="key-features">✨ Key Features</h2>
+        <ul>
+            <li><strong>🔄 Dual Generic Architecture:</strong> <code>GenericStateMachine&lt;TPersistingEntity, TContext&gt;</code></li>
+            <li><strong>🏛️ Registry-Based Management:</strong> Centralized lifecycle management with performance optimization</li>
+            <li><strong>💾 Unified Interface Design:</strong> <code>StateMachineContextEntity</code> extends <code>ShardingEntity</code></li>
+            <li><strong>🗄️ MySQL Persistence:</strong> Partitioned repository support with ById and ByIdAndDateRange lookup modes</li>
+            <li><strong>⏰ Timeout Handling:</strong> Built-in timeout management with configurable actions</li>
+            <li><strong>🔚 Completion Tracking:</strong> Automatic final state detection and completion marking</li>
+            <li><strong>📈 High-Volume Processing:</strong> Optimized for bulk operations and concurrent processing</li>
+            <li><strong>🧪 Comprehensive Testing:</strong> Human-like test scenarios with detailed validation</li>
+            <li><strong>🎭 Fluent Builder API:</strong> Intuitive state machine configuration</li>
+            <li><strong>🔄 Retry Logic:</strong> Built-in support for retry scenarios and failure handling</li>
+        </ul>
+
+        <h2 id="architecture">🏗️ Architecture</h2>
+        
+        <h3>Dual Generic Design</h3>
+        <div class="code-block">
+GenericStateMachine&lt;TPersistingEntity extends StateMachineContextEntity&lt;?&gt;, TContext&gt;
+
+Where:
+- TPersistingEntity: The entity that gets persisted to database
+- TContext: Volatile runtime context (not persisted)
+        </div>
+
+        <div class="note">
+            <strong>📝 Design Principle:</strong> The ID of the persistingEntity IS the ID of the state machine. This creates a direct 1:1 mapping between business entities and their state machines.
+        </div>
+
+        <h3>Registry-Based Lifecycle Management</h3>
+        <div class="code-block">
+StateMachineRegistry registry = new StateMachineRegistry();
+
+// For NEW entities (performance optimized - skips DB lookup)
+GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
+    registry.create(smsId, () -&gt; SmsMachine.create(smsId));
+
+// For EXISTING entities (checks DB first)
+GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
+    registry.createOrGet(smsId, () -&gt; SmsMachine.create(smsId));
+        </div>
+
+        <h2 id="interface-design">🔧 Interface Design</h2>
+        
+        <h3>Unified StateMachineContextEntity Interface</h3>
+        <div class="code-block">
+public interface StateMachineContextEntity&lt;TKey&gt; extends ShardingEntity&lt;TKey&gt; {
+    // Completion tracking
+    boolean isComplete();
+    void setComplete(boolean complete);
+    
+    // Convenience methods
+    default void markComplete() { setComplete(true); }
+    default boolean isActive() { return !isComplete(); }
+}
+        </div>
+
+        <div class="highlight">
+            <strong>🎯 Simplified Design:</strong> Entities now implement just ONE interface instead of two (<code>ShardingEntity</code> + <code>Completable</code>), providing both persistence and completion capabilities in a unified interface.
+        </div>
+
+        <h3>Example Entity Implementation</h3>
+        <div class="code-block">
+public class SmsEntity implements StateMachineContextEntity&lt;String&gt; {
+    @Id
+    @Column("sms_id")
+    private String smsId;  // This is the state machine ID
+    
+    @Column("current_state")
+    private String currentState;
+    
+    @Column("from_number")
+    private String fromNumber;
+    
+    @Column("to_number") 
+    private String toNumber;
+    
+    @Column("message_text")
+    private String messageText;
+    
+    @Column("attempt_count")
+    private int attemptCount;
+    
+    @ShardingKey
+    @Column("created_at")
+    private LocalDateTime createdAt;
+    
+    @Column("is_complete")
+    private boolean isComplete = false;
+    
+    // StateMachineContextEntity implementation
+    @Override
+    public boolean isComplete() { return isComplete; }
+    
+    @Override
+    public void setComplete(boolean complete) { 
+        this.isComplete = complete; 
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    // ... getters and setters
+}
+        </div>
+
+        <h2 id="getting-started">🚀 Getting Started</h2>
+
+        <h3>1. Create Your Entity</h3>
+        <div class="code-block">
+public class SmsEntity implements StateMachineContextEntity&lt;String&gt; {
+    // Entity fields with JPA-like annotations
+    // Implement StateMachineContextEntity methods
+}
+        </div>
+
+        <h3>2. Create Your Context</h3>
+        <div class="code-block">
+public class SmsContext {
+    private String processingStatus;
+    private List&lt;String&gt; events = new ArrayList&lt;&gt;();
+    // Volatile runtime data
+}
+        </div>
+
+        <h3>3. Build Your State Machine</h3>
+        <div class="code-block">
+public static GenericStateMachine&lt;SmsEntity, SmsContext&gt; create(String smsId) {
+    return FluentStateMachineBuilder.&lt;SmsEntity, SmsContext&gt;create(smsId)
+        .initialState("PENDING")
+        .state("PENDING").done()
+        .state("SENDING").timeout(30000, TimeUnit.MILLISECONDS).done()
+        .state("DELIVERED").finalState().done()
+        .state("FAILED").finalState().done()
+        .build();
+}
+        </div>
+
+        <h3>4. Use Registry for Lifecycle Management</h3>
+        <div class="code-block">
+StateMachineRegistry registry = new StateMachineRegistry();
+
+// Create new SMS (performance optimized)
+GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
+    registry.create(smsId, () -&gt; SmsMachine.create(smsId));
+
+// Set up entity and context
+SmsEntity entity = new SmsEntity(smsId, fromNumber, toNumber, message);
+SmsContext context = new SmsContext(smsId);
+
+machine.setPersistingEntity(entity);
+machine.setContext(context);
+machine.start();
+
+// Process events
+machine.fire(new SendSms());
+machine.fire(new DeliveryConfirmation());
+        </div>
+
+        <h2 id="registry-usage">🏛️ Registry-Based Usage</h2>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This library is intended to be used through a registry ONLY. Do not create state machines directly without the StateMachineRegistry.
+        </div>
+
+        <h3>Registry Methods</h3>
+        <div class="code-block">
+// Create new machine (skips DB lookup for performance)
+registry.create(id, factory);
+
+// Create or get existing machine (checks DB first)
+registry.createOrGet(id, factory);
+
+// Check if machine exists in memory
+registry.isInMemory(id);
+
+// Get registry size
+registry.size();
+
+// Manual eviction (for memory management)
+registry.evict(id);
+        </div>
+
+        <h3>Performance Optimization</h3>
+        <div class="highlight">
+            <strong>🚀 Performance Tip:</strong> Use <code>create()</code> method for thousands of new incoming requests/SMS when you know they're new. This avoids unnecessary DB lookups and significantly improves performance.
+        </div>
+
+        <h2 id="entity-configuration">💾 Entity Configuration</h2>
+
+        <h3>Partitioned Repository Integration</h3>
+        <div class="code-block">
+// MySQL Configuration
+host: 127.0.0.1
+user: root
+password: 123456
+
+// Lookup Modes:
+- ById: Simple ID-based lookup
+- ByIdAndDateRange: High-volume processing with date partitioning
+        </div>
+
+        <h3>Entity Annotations</h3>
+        <div class="code-block">
+@Id                    // Primary key
+@Column("table_field") // Database column mapping
+@ShardingKey          // Partitioning key (usually timestamp)
+        </div>
+
+        <h2 id="comprehensive-testing">🧪 Comprehensive Testing</h2>
+
+        <h3>Human-Like Test Scenarios</h3>
+        <p>The library includes comprehensive human-like tests that simulate real-world scenarios:</p>
+
+        <div class="code-block">
+// Run comprehensive tests
+java -cp "target/classes:target/test-classes:$(mvn dependency:build-classpath -q -Dmdep.outputFile=/dev/stdout)" \
+    com.telcobright.statemachine.test.HumanLikeComprehensiveTest
+        </div>
+
+        <h3>Test Scenarios Included</h3>
+        <ul>
+            <li><strong>📱 Basic SMS Flow:</strong> "Sarah sends 'Happy Birthday!' SMS to her friend"</li>
+            <li><strong>🚨 Emergency Retry Logic:</strong> "Emergency SMS has network issues, needs retries"</li>
+            <li><strong>⏰ Timeout Handling:</strong> "SMS gets stuck due to carrier issues, times out"</li>
+            <li><strong>📈 High Volume Processing:</strong> "Marketing campaign sends 50 promotional SMS messages"</li>
+            <li><strong>🔍 Full Lifecycle Audit:</strong> "Detailed tracking of business-critical SMS with full audit"</li>
+        </ul>
+
+        <h3>Other Test Classes</h3>
+        <div class="code-block">
+// Simple registry tests
+java -cp "..." com.telcobright.statemachine.test.SimpleTestRunner
+
+// Quick demo
+java -cp "..." com.telcobright.statemachine.test.QuickDemo
+
+// Registry-based patterns
+java -cp "..." com.telcobright.statemachine.test.RegistryBasedTest
+        </div>
+
+        <h2 id="feature-matrix">📊 Feature/Responsibility Matrix</h2>
+        
+        <table class="feature-matrix">
+            <thead>
+                <tr>
+                    <th>Feature/Responsibility</th>
+                    <th>StateMachineRegistry</th>
+                    <th>GenericStateMachine</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Lifecycle Management</strong></td>
+                    <td><span class="checkmark">✅</span> Primary responsibility</td>
+                    <td><span class="cross">❌</span> Managed by registry</td>
+                </tr>
+                <tr>
+                    <td><strong>Memory Management</strong></td>
+                    <td><span class="checkmark">✅</span> Tracks active instances</td>
+                    <td><span class="cross">❌</span> No memory tracking</td>
+                </tr>
+                <tr>
+                    <td><strong>Performance Optimization</strong></td>
+                    <td><span class="checkmark">✅</span> create() vs createOrGet()</td>
+                    <td><span class="cross">❌</span> No optimization logic</td>
+                </tr>
+                <tr>
+                    <td><strong>Completion Handling</strong></td>
+                    <td><span class="checkmark">✅</span> Prevents rehydration of completed</td>
+                    <td><span class="cross">❌</span> Reports status only</td>
+                </tr>
+                <tr>
+                    <td><strong>State Transitions</strong></td>
+                    <td><span class="cross">❌</span> No direct involvement</td>
+                    <td><span class="checkmark">✅</span> Core responsibility</td>
+                </tr>
+                <tr>
+                    <td><strong>Event Processing</strong></td>
+                    <td><span class="cross">❌</span> No event handling</td>
+                    <td><span class="checkmark">✅</span> Processes all events</td>
+                </tr>
+                <tr>
+                    <td><strong>Timeout Management</strong></td>
+                    <td><span class="cross">❌</span> No timeout logic</td>
+                    <td><span class="checkmark">✅</span> Handles timeouts</td>
+                </tr>
+                <tr>
+                    <td><strong>Context Management</strong></td>
+                    <td><span class="cross">❌</span> No context handling</td>
+                    <td><span class="checkmark">✅</span> Manages entity + context</td>
+                </tr>
+                <tr>
+                    <td><strong>Final State Detection</strong></td>
+                    <td><span class="cross">❌</span> Uses machine's status</td>
+                    <td><span class="checkmark">✅</span> Detects and marks final states</td>
+                </tr>
+                <tr>
+                    <td><strong>Persistence Integration</strong></td>
+                    <td><span class="cross">❌</span> No persistence logic</td>
+                    <td><span class="checkmark">✅</span> Integrates with entities</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>📝 Design Philosophy:</strong> The registry focuses on lifecycle and performance management, while the state machine focuses on behavior and state transitions. This separation of concerns provides clean architecture and optimal performance.
+        </div>
+
+        <h2 id="performance">⚡ Performance Optimization</h2>
+
+        <h3>Registry Performance Features</h3>
+        <ul>
+            <li><strong>🚀 create() Method:</strong> Skips DB lookup for new entities (thousands of new SMS/calls)</li>
+            <li><strong>🔍 createOrGet() Method:</strong> Checks DB first for existing entities</li>
+            <li><strong>💾 Memory Management:</strong> Tracks active instances to prevent memory leaks</li>
+            <li><strong>🏁 Completion Optimization:</strong> Completed machines are not rehydrated unnecessarily</li>
+        </ul>
+
+        <h3>High Volume Processing</h3>
+        <div class="code-block">
+// Example: Processing 1000 new SMS messages
+for (int i = 0; i &lt; 1000; i++) {
+    String smsId = generateSmsId();
+    
+    // Use create() for performance (skips DB lookup)
+    GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
+        registry.create(smsId, () -&gt; SmsMachine.create(smsId));
+    
+    // Process SMS...
+}
+        </div>
+
+        <h2 id="mysql-integration">🗄️ MySQL Integration</h2>
+
+        <h3>Database Configuration</h3>
+        <div class="code-block">
+# MySQL Test Configuration
+host: 127.0.0.1
+user: root
+password: 123456
+
+# Partitioned Repository Support
+- ById lookup mode
+- ByIdAndDateRange lookup mode (for high-volume processing)
+        </div>
+
+        <h3>Schema Requirements</h3>
+        <div class="code-block">
+CREATE TABLE sms_entities (
+    sms_id VARCHAR(255) PRIMARY KEY,
+    current_state VARCHAR(50),
+    from_number VARCHAR(20),
+    to_number VARCHAR(20),
+    message_text TEXT,
+    attempt_count INT DEFAULT 0,
+    is_complete BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+        </div>
+
+        <h2 id="examples">📝 Examples</h2>
+
+        <h3>Complete SMS Processing Example</h3>
+        <div class="code-block">
+public class SmsProcessingExample {
+    private StateMachineRegistry registry = new StateMachineRegistry();
+    
+    public void processSms(String smsId, String from, String to, String message) {
+        // Create new SMS state machine
+        GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
+            registry.create(smsId, () -&gt; SmsMachine.create(smsId));
+        
+        // Set up persistent entity
+        SmsEntity entity = new SmsEntity(smsId, from, to, message);
+        machine.setPersistingEntity(entity);
+        
+        // Set up volatile context
+        SmsContext context = new SmsContext(smsId);
+        machine.setContext(context);
+        
+        // Start processing
+        machine.start();
+        
+        // Send SMS
+        context.addEvent("SMS processing started");
+        machine.fire(new SendSms());
+        
+        // Handle delivery confirmation
+        machine.fire(new DeliveryConfirmation());
+        
+        // Check completion
+        if (machine.isComplete()) {
+            System.out.println("SMS delivered successfully: " + entity);
+        }
+    }
+}
+        </div>
+
+        <h3>Bulk Processing Example</h3>
+        <div class="code-block">
+public void processBulkSms(List&lt;SmsRequest&gt; requests) {
+    requests.parallelStream().forEach(request -&gt; {
+        String smsId = generateId();
+        
+        // Use create() for performance (new SMS)
+        GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
+            registry.create(smsId, () -&gt; SmsMachine.create(smsId));
+        
+        // Configure and process
+        setupMachine(machine, request);
+        processSmsAsync(machine);
+    });
+}
+        </div>
+
+        <h2 id="troubleshooting">🔧 Troubleshooting</h2>
+
+        <h3>Common Issues</h3>
+        
+        <div class="warning">
+            <strong>Issue:</strong> Machine not transitioning states<br>
+            <strong>Solution:</strong> Ensure proper event firing and state configuration. Check that states are defined with correct transitions.
+        </div>
+
+        <div class="warning">
+            <strong>Issue:</strong> Memory leaks in high-volume scenarios<br>
+            <strong>Solution:</strong> Ensure completed machines are properly marked with final states. The registry will handle memory cleanup for completed machines.
+        </div>
+
+        <div class="warning">
+            <strong>Issue:</strong> Performance issues with many new entities<br>
+            <strong>Solution:</strong> Use <code>registry.create()</code> instead of <code>registry.createOrGet()</code> when you know entities are new.
+        </div>
+
+        <h3>Debug Information</h3>
+        <div class="code-block">
+// Check registry status
+System.out.println("Active machines: " + registry.size());
+System.out.println("Machine in memory: " + registry.isInMemory(machineId));
+
+// Check machine status
+System.out.println("Current state: " + machine.getCurrentState());
+System.out.println("Is complete: " + machine.isComplete());
+System.out.println("Entity: " + machine.getPersistingEntity());
+        </div>
+
+        <h3>Test Validation</h3>
+        <div class="code-block">
+// Run comprehensive tests to validate setup
+mvn test
+
+// Run specific comprehensive test
+java -cp "..." com.telcobright.statemachine.test.HumanLikeComprehensiveTest
+        </div>
+
+        <div class="highlight">
+            <strong>🎯 Success Criteria:</strong> All comprehensive tests should pass with 100% success rate, demonstrating proper functionality across all scenarios including initialization, retry logic, timeout handling, high-volume processing, and lifecycle management.
+        </div>
+
+        <hr style="margin: 40px 0;">
+        <p style="text-align: center; color: #6c757d;">
+            <strong>TelcoBright State Machine Library</strong> - Enterprise-grade state machine framework<br>
+            Built with ❤️ for high-volume telecom applications
+        </p>
+    </div>
+</body>
+</html>

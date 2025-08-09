@@ -14,7 +14,21 @@
 		<maven.compiler.target>17</maven.compiler.target>
 	</properties>
 
+	<repositories>
+		<repository>
+			<id>telcobright-partitioned-repo</id>
+			<url>https://pialmmh.github.io/partitioned-repo</url>
+		</repository>
+	</repositories>
+
 	<dependencies>
+		<!-- Partitioned Repo for State Persistence -->
+		<dependency>
+			<groupId>com.telcobright.db</groupId>
+			<artifactId>partitioned-repo</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+		
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

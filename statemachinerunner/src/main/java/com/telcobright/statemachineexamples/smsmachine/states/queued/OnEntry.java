@@ -8,8 +8,8 @@ import com.telcobright.statemachineexamples.smsmachine.SmsContext;
  * OnEntry handler for QUEUED state
  */
 public class OnEntry {
-    public static void handle(GenericStateMachine<SmsContext> machine, StateMachineEvent event) {
-        SmsContext context = machine.getContext();
+    public static void handle(GenericStateMachine<?, ?> machine, StateMachineEvent event) {
+        SmsContext context = (SmsContext) machine.getContext();
         
         if (context != null) {
             context.setMessageStatus("QUEUED");

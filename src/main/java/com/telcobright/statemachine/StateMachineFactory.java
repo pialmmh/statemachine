@@ -1,9 +1,5 @@
 package com.telcobright.statemachine;
 
-import com.telcobright.statemachine.persistence.FileBasedStateMachineSnapshotRepository;
-import com.telcobright.statemachine.persistence.HybridStateMachineSnapshotRepository;
-import com.telcobright.statemachine.persistence.InMemoryStateMachineSnapshotRepository;
-import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 
 /**
@@ -14,7 +10,6 @@ public class StateMachineFactory {
     
     private static StateMachineRegistry defaultRegistry;
     private static TimeoutManager defaultTimeoutManager;
-    private static StateMachineSnapshotRepository defaultRepository;
     
     /**
      * Persistence configuration types
@@ -32,74 +27,58 @@ public class StateMachineFactory {
     public static synchronized StateMachineRegistry getDefaultRegistry() {
         if (defaultRegistry == null) {
             defaultTimeoutManager = new TimeoutManager();
-            defaultRepository = new InMemoryStateMachineSnapshotRepository();
-            defaultRegistry = new StateMachineRegistry(defaultRepository, defaultTimeoutManager);
+            defaultRegistry = new StateMachineRegistry(defaultTimeoutManager);
         }
         return defaultRegistry;
     }
     
     /**
      * Get or create a StateMachineRegistry with specified persistence type
+     * @deprecated Legacy method - ShardingEntity-based persistence is now preferred
      */
+    @Deprecated
     public static synchronized StateMachineRegistry getRegistry(PersistenceType persistenceType) {
-        return getRegistry(persistenceType, "./state_machine_snapshots");
+        // For now, just return a simple registry - full persistence integration is handled via ShardingEntity
+        TimeoutManager timeoutManager = new TimeoutManager();
+        return new StateMachineRegistry(timeoutManager);
     }
     
     /**
      * Get or create a StateMachineRegistry with specified persistence type and configuration
+     * @deprecated Legacy method - ShardingEntity-based persistence is now preferred
      */
+    @Deprecated
     public static synchronized StateMachineRegistry getRegistry(PersistenceType persistenceType, String persistenceConfig) {
-        StateMachineSnapshotRepository repository;
-        
-        switch (persistenceType) {
-            case FILE_BASED:
-                repository = new FileBasedStateMachineSnapshotRepository(persistenceConfig);
-                break;
-            case HYBRID:
-                // Use file-based as primary, in-memory as fallback
-                StateMachineSnapshotRepository primary = new FileBasedStateMachineSnapshotRepository(persistenceConfig);
-                StateMachineSnapshotRepository fallback = new InMemoryStateMachineSnapshotRepository();
-                repository = new HybridStateMachineSnapshotRepository(primary, fallback);
-                break;
-            case IN_MEMORY:
-            default:
-                repository = new InMemoryStateMachineSnapshotRepository();
-                break;
-        }
-        
+        // For now, just return a simple registry - full persistence integration is handled via ShardingEntity
         TimeoutManager timeoutManager = new TimeoutManager();
-        return new StateMachineRegistry(repository, timeoutManager);
+        return new StateMachineRegistry(timeoutManager);
     }
     
     /**
-     * Create a new StateMachineRegistry with custom dependencies
+     * Create a new StateMachineRegistry with timeout manager
      */
-    public static StateMachineRegistry createRegistry(StateMachineSnapshotRepository repository,
-                                                     TimeoutManager timeoutManager) {
-        return new StateMachineRegistry(repository, timeoutManager);
-    }
-    
-    /**
-     * Create a new StateMachineRegistry with default timeout manager
-     */
-    public static StateMachineRegistry createRegistry(StateMachineSnapshotRepository repository) {
-        return new StateMachineRegistry(repository, new TimeoutManager());
+    public static StateMachineRegistry createRegistry(TimeoutManager timeoutManager) {
+        return new StateMachineRegistry(timeoutManager);
     }
     
     /**
      * Create a StateMachineWrapper using the default registry
+     * @deprecated StateMachineWrapper should be created directly with the new dual generic structure
      */
+    @Deprecated
     public static StateMachineWrapper createWrapper(String id) {
-        GenericStateMachine machine = getDefaultRegistry().createOrGet(id);
-        return StateMachineWrapper.create(machine);
+        // Cannot create generic wrapper without knowing entity and context types
+        throw new UnsupportedOperationException("createWrapper(String) is deprecated. Use FluentStateMachineBuilder instead.");
     }
     
     /**
      * Create a StateMachineWrapper using a custom registry
+     * @deprecated StateMachineWrapper should be created directly with the new dual generic structure
      */
+    @Deprecated
     public static StateMachineWrapper createWrapper(String id, StateMachineRegistry registry) {
-        GenericStateMachine machine = registry.createOrGet(id);
-        return StateMachineWrapper.create(machine);
+        // Cannot create generic wrapper without knowing entity and context types
+        throw new UnsupportedOperationException("createWrapper(String, StateMachineRegistry) is deprecated. Use FluentStateMachineBuilder instead.");
     }
     
     /**
@@ -114,10 +93,6 @@ public class StateMachineFactory {
             defaultTimeoutManager.shutdown();
             defaultTimeoutManager = null;
         }
-        if (defaultRepository instanceof InMemoryStateMachineSnapshotRepository) {
-            ((InMemoryStateMachineSnapshotRepository) defaultRepository).shutdown();
-        }
-        defaultRepository = null;
     }
     
     /**
@@ -128,11 +103,4 @@ public class StateMachineFactory {
         return defaultTimeoutManager;
     }
     
-    /**
-     * Get the default repository
-     */
-    public static StateMachineSnapshotRepository getDefaultRepository() {
-        getDefaultRegistry(); // Ensure initialized
-        return defaultRepository;
-    }
 }

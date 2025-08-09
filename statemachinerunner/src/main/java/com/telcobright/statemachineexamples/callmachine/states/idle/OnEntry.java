@@ -8,8 +8,8 @@ import com.telcobright.statemachineexamples.callmachine.CallContext;
  * Entry handler for IDLE state
  */
 public class OnEntry {
-    public static void handle(GenericStateMachine<CallContext> machine, StateMachineEvent event) {
-        CallContext context = machine.getContext();
+    public static void handle(GenericStateMachine<?, ?> machine, StateMachineEvent event) {
+        CallContext context = (CallContext) machine.getContext();
         
         if (context != null) {
             // Reset call status and log the transition

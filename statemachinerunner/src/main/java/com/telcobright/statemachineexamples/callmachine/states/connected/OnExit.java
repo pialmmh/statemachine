@@ -9,8 +9,8 @@ import com.telcobright.statemachineexamples.callmachine.events.Hangup;
  * Exit handler for CONNECTED state
  */
 public class OnExit {
-    public static void handle(GenericStateMachine<CallContext> machine, StateMachineEvent event) {
-        CallContext context = machine.getContext();
+    public static void handle(GenericStateMachine<?, ?> machine, StateMachineEvent event) {
+        CallContext context = (CallContext) machine.getContext();
         
         if (context != null) {
             // Finalize the call in context

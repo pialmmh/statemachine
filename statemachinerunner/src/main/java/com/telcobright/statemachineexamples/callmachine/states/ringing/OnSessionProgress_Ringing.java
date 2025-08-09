@@ -10,7 +10,7 @@ import com.telcobright.statemachineexamples.callmachine.events.SessionProgress;
  * Handles early media and progress updates during ringing
  */
 public class OnSessionProgress_Ringing {
-    public static void handle(GenericStateMachine<CallContext> machine, StateMachineEvent event) {
+    public static void handle(GenericStateMachine<?, ?> machine, StateMachineEvent event) {
         if (event instanceof SessionProgress) {
             SessionProgress progress = (SessionProgress) event;
             

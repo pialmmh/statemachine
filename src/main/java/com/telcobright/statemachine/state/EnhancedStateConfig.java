@@ -5,11 +5,12 @@ import java.util.function.Consumer;
 import com.telcobright.statemachine.timeout.TimeoutConfig;
 
 /**
- * Enhanced state configuration with timeout, offline support, and entry/exit actions
+ * Enhanced state configuration with timeout, offline support, final state marking, and entry/exit actions
  */
 public class EnhancedStateConfig {
     private final String stateId;
     private boolean isOffline = false;
+    private boolean isFinal = false;  // New: marks this as a final/terminal state
     private TimeoutConfig timeoutConfig;
     private Runnable entryAction;
     private Runnable exitAction;
@@ -32,6 +33,16 @@ public class EnhancedStateConfig {
     
     public EnhancedStateConfig offline(boolean isOffline) {
         this.isOffline = isOffline;
+        return this;
+    }
+    
+    public EnhancedStateConfig finalState() {
+        this.isFinal = true;
+        return this;
+    }
+    
+    public EnhancedStateConfig finalState(boolean isFinal) {
+        this.isFinal = isFinal;
         return this;
     }
     
@@ -58,6 +69,7 @@ public class EnhancedStateConfig {
     // Getters
     public String getStateId() { return stateId; }
     public boolean isOffline() { return isOffline; }
+    public boolean isFinal() { return isFinal; }
     public TimeoutConfig getTimeoutConfig() { return timeoutConfig; }
     public Runnable getEntryAction() { return entryAction; }
     public Runnable getExitAction() { return exitAction; }

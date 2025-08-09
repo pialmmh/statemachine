@@ -1,32 +1,33 @@
 package com.telcobright.statemachineexamples.callmachine;
 
-import com.telcobright.statemachineexamples.callmachine.events.Answer;
-import com.telcobright.statemachineexamples.callmachine.events.Hangup;
-import com.telcobright.statemachineexamples.callmachine.events.IncomingCall;
-import com.telcobright.statemachineexamples.callmachine.events.SessionProgress;
+import com.telcobright.statemachineexamples.callmachine.entity.CallEntity;
+import com.telcobright.statemachineexamples.callmachine.events.*;
 import com.telcobright.statemachine.GenericStateMachine;
 
 /**
- * Comprehensive CallMachine example demonstrating:
- * 1. FluentStateMachineBuilder usage
- * 2. Rich context implementation
- * 3. Real-world call flow scenarios
+ * CallMachine Test Runner demonstrating ById lookup mode
+ * 
+ * Features shown:
+ * - Simple string IDs for call machine instances
+ * - ById lookup mode for straightforward persistence
+ * - Rich CallContext usage throughout state transitions
+ * - Builder syntax with typed context
  */
 public class CallMachineTestRunner {
     
     public static void main(String[] args) {
         try {
-            System.out.println("🎯 === CallMachine: Builder + Context Demo ===\n");
+            System.out.println("📞 === CallMachine: ById Lookup Mode Demo ===\n");
             
-            // Demo 1: Regular call with context
-            System.out.println("📞 === DEMO 1: Regular Call Flow ===");
-            runRegularCall();
+            // Demo 1: Basic call flow
+            System.out.println("📞 === DEMO 1: Incoming Call Flow ===");
+            runIncomingCallFlow();
             
             Thread.sleep(1000);
             
-            // Demo 2: Special caller (toll-free) - shows conditional logic
-            System.out.println("\n📞 === DEMO 2: Special Caller (Recording Enabled) ===");
-            runSpecialCallerFlow();
+            // Demo 2: Call with session progress events
+            System.out.println("\n📞 === DEMO 2: Call with Session Progress ===");
+            runCallWithSessionProgress();
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -34,73 +35,87 @@ public class CallMachineTestRunner {
     }
     
     /**
-     * Regular call demonstration
+     * Demonstrate basic incoming call flow with context
      */
-    private static void runRegularCall() {
+    private static void runIncomingCallFlow() {
         try {
-            // Create rich call context
+            // Create CallContext with call details
             CallContext context = new CallContext("CALL-001", "+1234567890", "+0987654321");
-            context.setCallDirection("INBOUND");
             
-            // Create CallMachine using FluentStateMachineBuilder (see CallMachine.create())
-            CallMachine machine = CallMachine.create("call-machine-001");
+            // Create CallMachine using simple string ID (ById lookup)
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create("call-machine-001");
             machine.setContext(context);
             
             System.out.println("📋 Initial Context: " + context);
-            runCallFlow(machine, context);
-            showCallSummary(context);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    
-    /**
-     * Special caller demo - toll-free number triggers recording
-     */
-    private static void runSpecialCallerFlow() {
-        try {
-            // Toll-free number will trigger recording in RINGING OnEntry
-            CallContext context = new CallContext("CALL-002", "+18005551234", "+0987654321");
-            context.setCallDirection("INBOUND");
-            
-            CallMachine machine = CallMachine.create("call-machine-002");
-            machine.setContext(context);
-            
-            System.out.println("📋 Initial Context: " + context);
-            runCallFlow(machine, context);
-            showCallSummary(context);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    
-    /**
-     * Execute the call flow with context-aware state changes
-     */
-    private static void runCallFlow(GenericStateMachine machine, CallContext context) {
-        try {
             System.out.println("🔄 Initial state: " + machine.getCurrentState());
             
+            // Simulate incoming call
             System.out.println("\n--- Incoming Call ---");
-            machine.fire(new IncomingCall());
+            machine.fire(new IncomingCall("+1234567890"));
             System.out.println("🔄 State: " + machine.getCurrentState());
-            Thread.sleep(1000); // Ring time
+            Thread.sleep(1000);
             
-            System.out.println("\n--- Session Progress (Early Media) ---");
-            machine.fire(new SessionProgress("183 Session Progress", 50));
-            System.out.println("🔄 State: " + machine.getCurrentState() + " (stay event)");
-            Thread.sleep(500);
-            
-            System.out.println("\n--- Call Answered ---");
+            // Answer the call
+            System.out.println("\n--- Answer Call ---");
             machine.fire(new Answer());
             System.out.println("🔄 State: " + machine.getCurrentState());
-            Thread.sleep(2000); // Conversation time
+            Thread.sleep(2000);
             
-            System.out.println("\n--- Call Hangup ---");
+            // Hangup call
+            System.out.println("\n--- Hangup Call ---");
             machine.fire(new Hangup());
             System.out.println("🔄 State: " + machine.getCurrentState());
+            
+            showCallSummary(context);
+            
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    /**
+     * Demonstrate call with session progress events
+     */
+    private static void runCallWithSessionProgress() {
+        try {
+            // Create toll-free call context (will enable recording)
+            CallContext context = new CallContext("CALL-002", "+1800555123", "+0987654321");
+            
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create("call-machine-002");
+            machine.setContext(context);
+            
+            System.out.println("📋 Initial Context: " + context);
+            System.out.println("🔄 Initial state: " + machine.getCurrentState());
+            
+            // Start call
+            System.out.println("\n--- Incoming Call ---");
+            machine.fire(new IncomingCall("+1800555123"));
+            System.out.println("🔄 State: " + machine.getCurrentState());
+            Thread.sleep(500);
+            
+            // Send session progress events while ringing
+            System.out.println("\n--- Session Progress Events ---");
+            machine.fire(new SessionProgress("100", 10));
+            Thread.sleep(300);
+            
+            machine.fire(new SessionProgress("180", 50));
+            Thread.sleep(500);
+            
+            machine.fire(new SessionProgress("183", 75));
+            Thread.sleep(300);
+            
+            // Answer call
+            System.out.println("\n--- Answer Call ---");
+            machine.fire(new Answer());
+            System.out.println("🔄 State: " + machine.getCurrentState());
+            Thread.sleep(1500);
+            
+            // End call
+            System.out.println("\n--- Hangup Call ---");
+            machine.fire(new Hangup());
+            System.out.println("🔄 State: " + machine.getCurrentState());
+            
+            showCallSummary(context);
             
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -113,12 +128,16 @@ public class CallMachineTestRunner {
     private static void showCallSummary(CallContext context) {
         System.out.println("\n📊 === Call Summary ===");
         System.out.println("📋 " + context);
-        System.out.println("⏱️ Ring Duration: " + context.getRingDuration().toSeconds() + "s");
         System.out.println("⏱️ Call Duration: " + context.getCallDuration().toSeconds() + "s");
-        System.out.println("🔔 Ring Count: " + context.getRingCount());
-        System.out.println("🎙️ Recording: " + (context.isRecordingEnabled() ? "Yes" : "No"));
+        System.out.println("🔔 Ring Duration: " + context.getRingDuration().toSeconds() + "s");
+        System.out.println("🔢 Ring Count: " + context.getRingCount());
+        System.out.println("📞 Call Status: " + context.getCallStatus());
+        System.out.println("🎙️ Recording Enabled: " + (context.isRecordingEnabled() ? "Yes" : "No"));
         System.out.println("📈 Long Call: " + (context.isLongCall() ? "Yes" : "No"));
-        System.out.println("💡 Disconnect: " + context.getDisconnectReason());
+        
+        if (context.getDisconnectReason() != null) {
+            System.out.println("💡 Disconnect Reason: " + context.getDisconnectReason());
+        }
         
         System.out.println("\n📝 Session Events:");
         for (String event : context.getSessionEvents()) {

@@ -146,7 +146,22 @@ public class CallContext {
     public LocalDateTime getConnectTime() { return connectTime; }
     public void setConnectTime(LocalDateTime connectTime) { this.connectTime = connectTime; }
     
-    @Override
+    public boolean isCallAnswered() {
+        return connectTime != null;
+    }
+    
+    public boolean isCallEnded() {
+        return endTime != null;
+    }
+    
+    public boolean isTollFreeCall() {
+        return fromNumber != null && fromNumber.startsWith("+1800");
+    }
+    
+    public String getCallerNumber() {
+        return fromNumber;
+    }
+    
     public String toString() {
         return String.format("CallContext{callId='%s', from='%s', to='%s', status='%s', duration=%s}",
                 callId, fromNumber, toNumber, callStatus, 

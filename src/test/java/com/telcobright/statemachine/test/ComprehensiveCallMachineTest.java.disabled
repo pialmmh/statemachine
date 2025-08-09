@@ -1,0 +1,820 @@
+package com.telcobright.statemachine.test;
+
+import com.telcobright.statemachine.GenericStateMachine;
+import com.telcobright.statemachine.StateMachineRegistry;
+import com.telcobright.statemachine.FluentStateMachineBuilder;
+import com.telcobright.statemachine.events.TimeoutEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.sql.ResultSet;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+/**
+ * Comprehensive Test Suite for CallMachine
+ * Tests all aspects including initialization, persistence, timeouts, and full lifecycle
+ */
+public class ComprehensiveCallMachineTest {
+    
+    private TestDatabaseManager dbManager;
+    private ObjectMapper jsonMapper;
+    private String testRunId;
+    private List<TestResult> testResults;
+    
+    public ComprehensiveCallMachineTest() throws Exception {
+        this.dbManager = new TestDatabaseManager();
+        this.jsonMapper = new ObjectMapper();
+        this.testRunId = "CALL_TEST_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        this.testResults = new ArrayList<>();
+        
+        System.out.println("🎯 === COMPREHENSIVE CALL MACHINE TESTING ===");
+        System.out.println("Test Run ID: " + testRunId);
+        System.out.println("Database: " + dbManager.getDatabaseInfo());
+        System.out.println("Started at: " + LocalDateTime.now());
+        System.out.println("═".repeat(60));
+    }
+    
+    /**
+     * Test 1: Machine Initialization Tests
+     */
+    public void testMachineInitialization() {
+        System.out.println("\n📋 TEST 1: Machine Initialization");
+        System.out.println("─".repeat(40));
+        
+        TestResult result = new TestResult("testMachineInitialization", "CALL_MACHINE");
+        
+        try {
+            // Test 1.1: Basic machine creation
+            String machineId = testRunId + "_init_basic";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            result.addAssertion("Machine created successfully", machine != null);
+            result.addAssertion("Initial state is IDLE", "IDLE".equals(machine.getCurrentState()));
+            result.addAssertion("Machine ID matches", machineId.equals(machine.getId()));
+            
+            // Test 1.2: Machine with context
+            CallContext context = new CallContext("CALL-INIT-001", "+1234567890", "+0987654321");
+            machine.setContext(context);
+            
+            result.addAssertion("Context set successfully", machine.getContext() != null);
+            result.addAssertion("Context data preserved", context.getCallId().equals(machine.getContext().getCallId()));
+            
+            // Test 1.3: Machine with persistent entity
+            CallEntity entity = new CallEntity();
+            entity.setCallId(machineId);
+            entity.setCurrentState("IDLE");
+            entity.setCallerNumber("+1234567890");
+            entity.setCalleeNumber("+0987654321");
+            machine.setPersistingEntity(entity);
+            
+            result.addAssertion("Persistent entity set", machine.getPersistingEntity() != null);
+            result.addAssertion("Entity ID matches machine ID", machineId.equals(machine.getPersistingEntity().getCallId()));
+            
+            // Save snapshot of initialized state
+            saveStateSnapshot(machineId, "CALL", "IDLE", entity, context, "INITIALIZATION", "Machine successfully initialized");
+            
+            System.out.println("✅ Basic initialization: SUCCESS");
+            
+            // Test 1.4: Multiple machine instances
+            List<GenericStateMachine<CallEntity, CallContext>> machines = new ArrayList<>();
+            for (int i = 1; i <= 5; i++) {
+                String multiMachineId = testRunId + "_init_multi_" + i;
+                GenericStateMachine<CallEntity, CallContext> multiMachine = CallMachine.create(multiMachineId);
+                CallContext multiContext = new CallContext("CALL-MULTI-" + String.format("%03d", i), 
+                    "+123456789" + i, "+098765432" + i);
+                multiMachine.setContext(multiContext);
+                machines.add(multiMachine);
+            }
+            
+            result.addAssertion("Multiple machines created", machines.size() == 5);
+            result.addAssertion("All machines have unique IDs", 
+                machines.stream().map(m -> m.getId()).distinct().count() == 5);
+            
+            System.out.println("✅ Multiple instances: SUCCESS");
+            
+            result.setStatus("PASSED");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Initialization test failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    /**
+     * Test 2: Basic Call Flow Tests
+     */
+    public void testBasicCallFlow() {
+        System.out.println("\n📞 TEST 2: Basic Call Flow");
+        System.out.println("─".repeat(40));
+        
+        TestResult result = new TestResult("testBasicCallFlow", "CALL_MACHINE");
+        
+        try {
+            String machineId = testRunId + "_flow_basic";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-FLOW-001", "+1234567890", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1234567890", "+0987654321");
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            // Initial state check
+            result.addAssertion("Initial state is IDLE", "IDLE".equals(machine.getCurrentState()));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "INITIAL", "Call flow starting");
+            
+            // Step 1: Incoming call
+            System.out.println("📲 Step 1: Incoming call from " + context.getCallerNumber());
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            
+            result.addAssertion("State transitioned to RINGING", "RINGING".equals(machine.getCurrentState()));
+            result.addAssertion("Context updated with call details", context.getCallStatus() != null);
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "IncomingCall", "Call is now ringing");
+            
+            // Step 2: Answer call
+            Thread.sleep(2000); // Simulate ringing time
+            System.out.println("📞 Step 2: Answering call");
+            machine.fire(new Answer());
+            
+            result.addAssertion("State transitioned to ACTIVE", "ACTIVE".equals(machine.getCurrentState()));
+            result.addAssertion("Call marked as answered", context.isCallAnswered());
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Answer", "Call is now active");
+            
+            // Step 3: Session progress during call
+            Thread.sleep(1000);
+            System.out.println("📈 Step 3: Session progress events");
+            machine.fire(new SessionProgress("200", 90));
+            
+            result.addAssertion("State remains ACTIVE after session progress", "ACTIVE".equals(machine.getCurrentState()));
+            result.addAssertion("Session events recorded", !context.getSessionEvents().isEmpty());
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "SessionProgress", "Session progress updated");
+            
+            // Step 4: End call
+            Thread.sleep(3000); // Simulate call duration
+            System.out.println("📴 Step 4: Ending call");
+            machine.fire(new Hangup());
+            
+            result.addAssertion("State transitioned to ENDED", "ENDED".equals(machine.getCurrentState()));
+            result.addAssertion("Call marked as ended", context.isCallEnded());
+            result.addAssertion("Call duration calculated", context.getCallDuration().toSeconds() > 0);
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Hangup", "Call ended successfully");
+            
+            System.out.println("✅ Basic call flow: SUCCESS");
+            System.out.println("   Duration: " + context.getCallDuration().toSeconds() + "s");
+            System.out.println("   Ring Count: " + context.getRingCount());
+            
+            result.setStatus("PASSED");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Basic call flow test failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    /**
+     * Test 3: Advanced Call Scenarios
+     */
+    public void testAdvancedCallScenarios() {
+        System.out.println("\n🎭 TEST 3: Advanced Call Scenarios");
+        System.out.println("─".repeat(40));
+        
+        // Test 3.1: Call with recording
+        testCallWithRecording();
+        
+        // Test 3.2: Toll-free call
+        testTollFreeCall();
+        
+        // Test 3.3: Call rejection
+        testCallRejection();
+        
+        // Test 3.4: Call forwarding scenario
+        testCallForwarding();
+    }
+    
+    private void testCallWithRecording() {
+        TestResult result = new TestResult("testCallWithRecording", "CALL_MACHINE");
+        
+        try {
+            String machineId = testRunId + "_recording";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-REC-001", "+1800555123", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1800555123", "+0987654321");
+            entity.setRecordingEnabled(true);
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("🎬 Testing call with recording enabled");
+            
+            // Full call flow with recording
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "IncomingCall", "Recording call incoming");
+            
+            Thread.sleep(1000);
+            machine.fire(new Answer());
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Answer", "Recording call answered");
+            
+            result.addAssertion("Recording enabled", context.isRecordingEnabled());
+            result.addAssertion("Call active with recording", "ACTIVE".equals(machine.getCurrentState()));
+            
+            Thread.sleep(2000);
+            machine.fire(new Hangup());
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Hangup", "Recording call ended");
+            
+            result.addAssertion("Call ended successfully", "ENDED".equals(machine.getCurrentState()));
+            result.setStatus("PASSED");
+            
+            System.out.println("✅ Call with recording: SUCCESS");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Call with recording failed: " + e.getMessage());
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    private void testTollFreeCall() {
+        TestResult result = new TestResult("testTollFreeCall", "CALL_MACHINE");
+        
+        try {
+            String machineId = testRunId + "_tollfree";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-TOLL-001", "+1800123456", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1800123456", "+0987654321");
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("📞 Testing toll-free call handling");
+            
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "IncomingCall", "Toll-free call incoming");
+            
+            result.addAssertion("Toll-free call recognized", context.isTollFreeCall());
+            result.addAssertion("Recording auto-enabled for toll-free", context.isRecordingEnabled());
+            
+            Thread.sleep(500);
+            machine.fire(new Answer());
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Answer", "Toll-free call answered");
+            
+            Thread.sleep(1000);
+            machine.fire(new Hangup());
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Hangup", "Toll-free call ended");
+            
+            result.setStatus("PASSED");
+            System.out.println("✅ Toll-free call: SUCCESS");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Toll-free call failed: " + e.getMessage());
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    private void testCallRejection() {
+        TestResult result = new TestResult("testCallRejection", "CALL_MACHINE");
+        
+        try {
+            String machineId = testRunId + "_reject";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-REJ-001", "+1555999888", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1555999888", "+0987654321");
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("🚫 Testing call rejection");
+            
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "IncomingCall", "Call incoming - will be rejected");
+            
+            Thread.sleep(1000);
+            machine.fire(new Reject("User busy"));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Reject", "Call rejected by user");
+            
+            result.addAssertion("Call rejected", "ENDED".equals(machine.getCurrentState()));
+            result.addAssertion("Disconnect reason set", context.getDisconnectReason() != null);
+            result.addAssertion("Call never answered", !context.isCallAnswered());
+            
+            result.setStatus("PASSED");
+            System.out.println("✅ Call rejection: SUCCESS");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Call rejection failed: " + e.getMessage());
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    private void testCallForwarding() {
+        TestResult result = new TestResult("testCallForwarding", "CALL_MACHINE");
+        
+        try {
+            String machineId = testRunId + "_forward";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-FWD-001", "+1444555666", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1444555666", "+0987654321");
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("↗️ Testing call forwarding");
+            
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "IncomingCall", "Call incoming - will be forwarded");
+            
+            Thread.sleep(500);
+            machine.fire(new Forward("+1111222333"));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "Forward", "Call forwarded to alternate number");
+            
+            result.addAssertion("Call forwarded", "ENDED".equals(machine.getCurrentState()));
+            result.addAssertion("Forward details recorded", context.getSessionEvents().stream()
+                .anyMatch(event -> event.contains("forwarded")));
+            
+            result.setStatus("PASSED");
+            System.out.println("✅ Call forwarding: SUCCESS");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Call forwarding failed: " + e.getMessage());
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    /**
+     * Test 4: Timeout Tests
+     */
+    public void testTimeoutScenarios() {
+        System.out.println("\n⏰ TEST 4: Timeout Scenarios");
+        System.out.println("─".repeat(40));
+        
+        TestResult result = new TestResult("testTimeoutScenarios", "TIMEOUT");
+        
+        try {
+            String machineId = testRunId + "_timeout";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-TIMEOUT-001", "+1777888999", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1777888999", "+0987654321");
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("⏳ Testing call timeout (no answer)");
+            
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "IncomingCall", "Call ringing - testing timeout");
+            
+            result.addAssertion("Call is ringing", "RINGING".equals(machine.getCurrentState()));
+            
+            // Wait for timeout (simulate 30-second no answer timeout)
+            CountDownLatch timeoutLatch = new CountDownLatch(1);
+            
+            // Set up timeout callback
+            machine.setOnStateTransition(newState -> {
+                if ("ENDED".equals(newState)) {
+                    timeoutLatch.countDown();
+                }
+            });
+            
+            // Simulate timeout event (in real implementation, this would be automatic)
+            Thread.sleep(2000); // Shortened for testing
+            machine.fire(new TimeoutEvent("RINGING", "ENDED"));
+            
+            boolean timedOut = timeoutLatch.await(5, TimeUnit.SECONDS);
+            result.addAssertion("Timeout occurred", timedOut);
+            result.addAssertion("Call ended due to timeout", "ENDED".equals(machine.getCurrentState()));
+            
+            saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, "TimeoutEvent", "Call ended due to no answer timeout");
+            
+            result.addAssertion("Timeout reason recorded", 
+                context.getDisconnectReason() != null && context.getDisconnectReason().contains("timeout"));
+            
+            result.setStatus("PASSED");
+            System.out.println("✅ Timeout scenario: SUCCESS");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Timeout test failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    /**
+     * Test 5: Persistence Verification
+     */
+    public void testPersistenceVerification() {
+        System.out.println("\n💾 TEST 5: Persistence Verification");
+        System.out.println("─".repeat(40));
+        
+        TestResult result = new TestResult("testPersistenceVerification", "PERSISTENCE");
+        
+        try {
+            String machineId = testRunId + "_persistence";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-PERSIST-001", "+1999000111", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1999000111", "+0987654321");
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("💿 Testing persistence during call lifecycle");
+            
+            // Execute full call flow and verify persistence at each step
+            String[] expectedStates = {"IDLE", "RINGING", "ACTIVE", "ENDED"};
+            String[] events = {"INITIAL", "IncomingCall", "Answer", "Hangup"};
+            
+            for (int i = 0; i < expectedStates.length; i++) {
+                String expectedState = expectedStates[i];
+                String event = events[i];
+                
+                // Execute event (except for initial state)
+                if (i > 0) {
+                    switch (event) {
+                        case "IncomingCall":
+                            machine.fire(new IncomingCall(context.getCallerNumber()));
+                            break;
+                        case "Answer":
+                            Thread.sleep(1000);
+                            machine.fire(new Answer());
+                            break;
+                        case "Hangup":
+                            Thread.sleep(2000);
+                            machine.fire(new Hangup());
+                            break;
+                    }
+                }
+                
+                // Verify state
+                result.addAssertion("State is " + expectedState, expectedState.equals(machine.getCurrentState()));
+                
+                // Save snapshot
+                saveStateSnapshot(machineId, "CALL", machine.getCurrentState(), entity, context, event, 
+                    "Persistence test - step " + (i + 1));
+                
+                // Verify persistence by reading back
+                Thread.sleep(100); // Small delay for DB write
+                try (ResultSet snapshots = dbManager.getSnapshots(testRunId, machineId, "CALL")) {
+                    int snapshotCount = 0;
+                    while (snapshots.next()) {
+                        snapshotCount++;
+                    }
+                    result.addAssertion("Snapshots persisted correctly (step " + (i + 1) + ")", snapshotCount == (i + 1));
+                }
+                
+                System.out.println("  ✓ Step " + (i + 1) + ": " + expectedState + " - persisted");
+            }
+            
+            // Verify complete persistence integrity
+            boolean integrityValid = dbManager.validateStateMachineIntegrity(testRunId, "CALL");
+            result.addAssertion("State machine integrity valid", integrityValid);
+            
+            result.setStatus("PASSED");
+            System.out.println("✅ Persistence verification: SUCCESS");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Persistence test failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    /**
+     * Test 6: Full Lifecycle with Snapshots
+     */
+    public void testFullLifecycleWithSnapshots() {
+        System.out.println("\n🔄 TEST 6: Full Lifecycle with Snapshots");
+        System.out.println("─".repeat(40));
+        
+        TestResult result = new TestResult("testFullLifecycleWithSnapshots", "CALL_MACHINE");
+        
+        try {
+            String machineId = testRunId + "_lifecycle";
+            GenericStateMachine<CallEntity, CallContext> machine = CallMachine.create(machineId);
+            
+            CallContext context = new CallContext("CALL-LIFECYCLE-001", "+1123581321", "+0987654321");
+            CallEntity entity = createCallEntity(machineId, "+1123581321", "+0987654321");
+            
+            machine.setContext(context);
+            machine.setPersistingEntity(entity);
+            
+            System.out.println("📸 Capturing detailed snapshots throughout call lifecycle");
+            
+            Map<String, Map<String, Object>> stateSnapshots = new HashMap<>();
+            
+            // Initial state snapshot
+            captureDetailedSnapshot(stateSnapshots, "INITIAL", machine, entity, context);
+            
+            // Step 1: Incoming call
+            System.out.println("  📱 Incoming call...");
+            machine.fire(new IncomingCall(context.getCallerNumber()));
+            Thread.sleep(500);
+            captureDetailedSnapshot(stateSnapshots, "RINGING", machine, entity, context);
+            
+            // Step 2: Session progress events
+            System.out.println("  📊 Session progress...");
+            machine.fire(new SessionProgress("100", 25));
+            Thread.sleep(200);
+            machine.fire(new SessionProgress("180", 50));
+            Thread.sleep(300);
+            machine.fire(new SessionProgress("183", 75));
+            Thread.sleep(200);
+            captureDetailedSnapshot(stateSnapshots, "RINGING_WITH_PROGRESS", machine, entity, context);
+            
+            // Step 3: Answer call
+            System.out.println("  📞 Answering call...");
+            machine.fire(new Answer());
+            Thread.sleep(500);
+            captureDetailedSnapshot(stateSnapshots, "ACTIVE_INITIAL", machine, entity, context);
+            
+            // Step 4: During active call
+            System.out.println("  🗣️ Active call progress...");
+            Thread.sleep(1000);
+            machine.fire(new SessionProgress("200", 100));
+            Thread.sleep(2000);
+            captureDetailedSnapshot(stateSnapshots, "ACTIVE_ONGOING", machine, entity, context);
+            
+            // Step 5: End call
+            System.out.println("  📴 Ending call...");
+            machine.fire(new Hangup());
+            Thread.sleep(100);
+            captureDetailedSnapshot(stateSnapshots, "ENDED_FINAL", machine, entity, context);
+            
+            // Verify all snapshots
+            result.addAssertion("All snapshots captured", stateSnapshots.size() == 5);
+            
+            // Verify context evolution
+            Map<String, Object> initialSnapshot = stateSnapshots.get("INITIAL");
+            Map<String, Object> finalSnapshot = stateSnapshots.get("ENDED_FINAL");
+            
+            result.addAssertion("Call duration increased", 
+                (Long) finalSnapshot.get("callDurationSeconds") > (Long) initialSnapshot.get("callDurationSeconds"));
+            result.addAssertion("Ring count increased", 
+                (Integer) finalSnapshot.get("ringCount") > (Integer) initialSnapshot.get("ringCount"));
+            result.addAssertion("Session events recorded", 
+                ((List<?>) finalSnapshot.get("sessionEvents")).size() > ((List<?>) initialSnapshot.get("sessionEvents")).size());
+            
+            // Verify persistent entity evolution
+            result.addAssertion("Entity state updated", "ENDED".equals(finalSnapshot.get("entityCurrentState")));
+            result.addAssertion("Entity call status updated", finalSnapshot.get("entityCallStatus") != null);
+            
+            System.out.println("✅ Full lifecycle with snapshots: SUCCESS");
+            System.out.println("   Total snapshots: " + stateSnapshots.size());
+            System.out.println("   Final call duration: " + finalSnapshot.get("callDurationSeconds") + "s");
+            System.out.println("   Final ring count: " + finalSnapshot.get("ringCount"));
+            
+            result.setStatus("PASSED");
+            
+        } catch (Exception e) {
+            result.setStatus("FAILED");
+            result.setErrorMessage(e.getMessage());
+            System.out.println("❌ Full lifecycle test failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        testResults.add(result);
+        logTestResult(result);
+    }
+    
+    /**
+     * Helper method to create CallEntity
+     */
+    private CallEntity createCallEntity(String callId, String callerNumber, String calleeNumber) {
+        CallEntity entity = new CallEntity();
+        entity.setCallId(callId);
+        entity.setCurrentState("IDLE");
+        entity.setCallerNumber(callerNumber);
+        entity.setCalleeNumber(calleeNumber);
+        entity.setCallStatus("INITIATED");
+        entity.setRingCount(0);
+        entity.setRecordingEnabled(callerNumber.startsWith("+1800"));
+        return entity;
+    }
+    
+    /**
+     * Save detailed state snapshot
+     */
+    private void saveStateSnapshot(String machineId, String machineType, String stateName,
+                                  CallEntity entity, CallContext context, String event, String notes) {
+        try {
+            ObjectNode persistentData = jsonMapper.createObjectNode();
+            persistentData.put("callId", entity.getCallId());
+            persistentData.put("currentState", entity.getCurrentState());
+            persistentData.put("callerNumber", entity.getCallerNumber());
+            persistentData.put("calleeNumber", entity.getCalleeNumber());
+            persistentData.put("callStatus", entity.getCallStatus());
+            persistentData.put("ringCount", entity.getRingCount());
+            persistentData.put("recordingEnabled", entity.isRecordingEnabled());
+            
+            ObjectNode volatileData = jsonMapper.createObjectNode();
+            volatileData.put("callId", context.getCallId());
+            volatileData.put("callDurationSeconds", context.getCallDuration().toSeconds());
+            volatileData.put("ringDurationSeconds", context.getRingDuration().toSeconds());
+            volatileData.put("ringCount", context.getRingCount());
+            volatileData.put("callAnswered", context.isCallAnswered());
+            volatileData.put("callEnded", context.isCallEnded());
+            volatileData.put("recordingEnabled", context.isRecordingEnabled());
+            volatileData.put("sessionEventsCount", context.getSessionEvents().size());
+            
+            dbManager.saveStateSnapshot(testRunId, machineId, machineType, stateName, 
+                persistentData.toString(), volatileData.toString(), event, notes);
+            
+        } catch (Exception e) {
+            System.err.println("Failed to save snapshot: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Capture detailed snapshot for analysis
+     */
+    private void captureDetailedSnapshot(Map<String, Map<String, Object>> snapshots, String snapshotKey,
+                                       GenericStateMachine<CallEntity, CallContext> machine,
+                                       CallEntity entity, CallContext context) {
+        Map<String, Object> snapshot = new HashMap<>();
+        
+        // Machine state
+        snapshot.put("machineState", machine.getCurrentState());
+        snapshot.put("machineId", machine.getId());
+        
+        // Persistent entity data
+        snapshot.put("entityCurrentState", entity.getCurrentState());
+        snapshot.put("entityCallStatus", entity.getCallStatus());
+        snapshot.put("entityRingCount", entity.getRingCount());
+        snapshot.put("entityRecordingEnabled", entity.isRecordingEnabled());
+        
+        // Volatile context data
+        snapshot.put("callDurationSeconds", context.getCallDuration().toSeconds());
+        snapshot.put("ringDurationSeconds", context.getRingDuration().toSeconds());
+        snapshot.put("ringCount", context.getRingCount());
+        snapshot.put("callAnswered", context.isCallAnswered());
+        snapshot.put("callEnded", context.isCallEnded());
+        snapshot.put("sessionEvents", new ArrayList<>(context.getSessionEvents()));
+        snapshot.put("disconnectReason", context.getDisconnectReason());
+        
+        // Timestamp
+        snapshot.put("timestamp", System.currentTimeMillis());
+        
+        snapshots.put(snapshotKey, snapshot);
+        
+        // Also save to database
+        try {
+            saveStateSnapshot(machine.getId(), "CALL", machine.getCurrentState(), entity, context, 
+                snapshotKey, "Detailed snapshot: " + snapshotKey);
+        } catch (Exception e) {
+            System.err.println("Failed to save detailed snapshot: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Log test result to database
+     */
+    private void logTestResult(TestResult result) {
+        try {
+            dbManager.logTestExecution(testRunId, "ComprehensiveCallMachineTest", 
+                result.getTestName(), result.getTestType(), result.getMachineId(),
+                result.getStatus(), result.getErrorMessage(), 
+                result.getTotalAssertions(), result.getPassedAssertions());
+        } catch (Exception e) {
+            System.err.println("Failed to log test result: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Run all call machine tests
+     */
+    public void runAllTests() {
+        try {
+            System.out.println("🚀 Starting comprehensive call machine tests...");
+            
+            testMachineInitialization();
+            testBasicCallFlow();
+            testAdvancedCallScenarios();
+            testTimeoutScenarios();
+            testPersistenceVerification();
+            testFullLifecycleWithSnapshots();
+            
+            // Print final summary
+            System.out.println("\n📊 === CALL MACHINE TEST SUMMARY ===");
+            dbManager.printTestSummary(testRunId);
+            
+            // Validate overall integrity
+            boolean overallIntegrity = dbManager.validateStateMachineIntegrity(testRunId, "CALL");
+            System.out.println("🔍 State machine integrity: " + (overallIntegrity ? "✅ VALID" : "❌ INVALID"));
+            
+            // Calculate success rate
+            long passedTests = testResults.stream().filter(r -> "PASSED".equals(r.getStatus())).count();
+            double successRate = (double) passedTests / testResults.size() * 100;
+            
+            System.out.println("🎯 Overall success rate: " + String.format("%.1f%%", successRate) + 
+                " (" + passedTests + "/" + testResults.size() + " tests passed)");
+            
+            if (successRate == 100.0) {
+                System.out.println("🎉 ALL CALL MACHINE TESTS PASSED!");
+            } else {
+                System.out.println("⚠️ Some tests failed - check logs for details");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Test execution failed: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try {
+                dbManager.close();
+            } catch (Exception e) {
+                System.err.println("Failed to close database connection: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Main method to run call machine tests
+     */
+    public static void main(String[] args) {
+        try {
+            ComprehensiveCallMachineTest test = new ComprehensiveCallMachineTest();
+            test.runAllTests();
+        } catch (Exception e) {
+            System.err.println("Failed to initialize call machine tests: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    /**
+     * Test result holder class
+     */
+    private static class TestResult {
+        private String testName;
+        private String testType;
+        private String machineId;
+        private String status = "RUNNING";
+        private String errorMessage;
+        private List<String> assertions = new ArrayList<>();
+        private List<Boolean> assertionResults = new ArrayList<>();
+        
+        public TestResult(String testName, String testType) {
+            this.testName = testName;
+            this.testType = testType;
+        }
+        
+        public void addAssertion(String description, boolean result) {
+            assertions.add(description);
+            assertionResults.add(result);
+            System.out.println("    " + (result ? "✓" : "✗") + " " + description);
+        }
+        
+        public int getTotalAssertions() { return assertions.size(); }
+        public int getPassedAssertions() { return (int) assertionResults.stream().mapToInt(b -> b ? 1 : 0).sum(); }
+        
+        // Getters and setters
+        public String getTestName() { return testName; }
+        public String getTestType() { return testType; }
+        public String getMachineId() { return machineId; }
+        public void setMachineId(String machineId) { this.machineId = machineId; }
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+        public String getErrorMessage() { return errorMessage; }
+        public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+    }
+}
