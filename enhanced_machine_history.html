@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine History - enhanced-machine-001</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 2em;
+    }
+
+    h2 {
+        color: #555;
+        margin-bottom: 15px;
+        font-size: 1.5em;
+    }
+
+    h3 {
+        color: #666;
+        margin-bottom: 15px;
+        font-size: 1.2em;
+    }
+
+    .machine-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .machine-info p {
+        color: #666;
+        margin: 5px 0;
+    }
+
+    .machine-selector {
+        margin-bottom: 30px;
+        padding: 15px;
+        background: #f0f0f0;
+        border-radius: 8px;
+    }
+
+    .machine-selector select {
+        padding: 8px 15px;
+        font-size: 16px;
+        border: 2px solid #667eea;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+    }
+
+    .state-diagram {
+        background: #f0f8ff;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        overflow-x: auto;
+    }
+
+    .flow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px;
+        white-space: nowrap;
+    }
+
+    .state {
+        background: #667eea;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+
+    .state.final {
+        background: #28a745;
+    }
+
+    .event {
+        background: #ffc107;
+        color: #333;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .arrow {
+        color: #999;
+        font-size: 1.5em;
+    }
+
+    .timeline {
+        margin-top: 30px;
+    }
+
+    .timeline-entry {
+        margin-bottom: 20px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .timeline-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .timeline-header:hover {
+        background: #e9ecef;
+    }
+
+    .version {
+        background: #6c757d;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .transition {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .event-badge {
+        background: #17a2b8;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+    }
+
+    .duration {
+        color: #28a745;
+        font-size: 0.9em;
+        margin-left: auto;
+    }
+
+    .timestamp {
+        color: #999;
+        font-size: 0.85em;
+    }
+
+    .timeline-details {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .context-section {
+        margin-bottom: 20px;
+    }
+
+    .context-section h4 {
+        color: #555;
+        margin-bottom: 10px;
+    }
+
+    .json-display {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        overflow-x: auto;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .hash {
+        color: #999;
+        font-size: 0.85em;
+        margin-top: 5px;
+        font-family: monospace;
+    }
+
+    .diff-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .diff-display {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    .diff-add {
+        background: #d4edda;
+        color: #155724;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .diff-remove {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .summary {
+        background: #e8f4f8;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .machine-status, .state-status {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+
+    .status-online {
+        background: #28a745;
+        color: white;
+    }
+
+    .status-offline {
+        background: #dc3545;
+        color: white;
+    }
+
+    .registry-status {
+        background: #6c757d;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+
+    .status-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .status-item {
+        font-size: 0.9em;
+        color: #333;
+    }
+
+    .event-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #fff3cd;
+        border-radius: 6px;
+    }
+
+    .event-section h5 {
+        color: #856404;
+        margin: 10px 0 5px 0;
+        font-size: 1em;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>State Machine Transition History</h1>
+        <div class="machine-info">
+            <h2>Machine: enhanced-machine-001</h2>
+            <p>Total Transitions: 5</p>
+            <p>Type: TestEntity</p>
+            <p>Run ID: comprehensive-snapshot-c86d19e9</p>
+        </div>
+
+        <div class="state-diagram">
+            <h3>State Flow</h3>
+            <div class="flow">
+                <span class="state">INIT</span>
+                <span class="arrow">→</span>
+                <span class="event">[START_PROCESSING]</span>
+                <span class="arrow">→</span>
+                <span class="state">PROCESSING</span>
+                <span class="arrow">→</span>
+                <span class="event">[PAUSE]</span>
+                <span class="arrow">→</span>
+                <span class="state">PAUSED</span>
+                <span class="arrow">→</span>
+                <span class="event">[RESUME]</span>
+                <span class="arrow">→</span>
+                <span class="state">PROCESSING</span>
+                <span class="arrow">→</span>
+                <span class="event">[PROCESSING_COMPLETE]</span>
+                <span class="arrow">→</span>
+                <span class="state">VALIDATING</span>
+                <span class="arrow">→</span>
+                <span class="event">[VALIDATION_SUCCESS]</span>
+                <span class="arrow">→</span>
+                <span class="state final">COMPLETED</span>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <h3>Transition Timeline</h3>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-1')">
+                    <span class="version">v1</span>
+                    <span class="transition">INIT → PROCESSING</span>
+                    <span class="event-badge">START_PROCESSING</span>
+                    <span class="duration">5ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T16:05:56.066948533</span>
+                </div>
+                <div class="timeline-details" id="snapshot-1" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "START_PROCESSING",
+  "payload" : null,
+  "timestamp" : 1754733956054,
+  "userId" : "USER-789",
+  "requestId" : "REQ-001-XYZ",
+  "parameters" : {
+    "retryCount" : 0,
+    "priority" : "HIGH",
+    "timeout" : 30000
+  },
+  "description" : "Generic event: START_PROCESSING"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "START_PROCESSING",
+  "eventClass" : "RichEvent",
+  "timestamp" : 1754733956102,
+  "parameters" : {
+    "requestId" : "REQ-001-XYZ",
+    "userId" : "USER-789",
+    "parameters" : {
+      "retryCount" : 0,
+      "priority" : "HIGH",
+      "timeout" : 30000
+    },
+    "timestamp" : 1754733956054
+  }
+}</pre>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context Before:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : null,
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 0,
+  "pausedTime" : null,
+  "resumedTime" : null,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 0,
+  "processingSteps" : [ ]
+}</pre>
+                        <p class="hash">Hash: e77cef3c24f185d4...</p>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : null,
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 0,
+  "pausedTime" : null,
+  "resumedTime" : null,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 0,
+  "processingSteps" : [ ]
+}</pre>
+                        <p class="hash">Hash: e77cef3c24f185d4...</p>
+                    </div>
+                    <div class="diff-section">
+                        <h4>Context Changes:</h4>
+                        <div class="diff-display" id="diff-1"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-2')">
+                    <span class="version">v2</span>
+                    <span class="transition">PROCESSING → PAUSED</span>
+                    <span class="event-badge">PAUSE</span>
+                    <span class="duration">1ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="state-status status-offline">STATE OFFLINE</span>
+                    <span class="timestamp">2025-08-09T16:05:56.140128931</span>
+                </div>
+                <div class="timeline-details" id="snapshot-2" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-offline">OFFLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "PAUSE",
+  "payload" : null,
+  "timestamp" : 1754733956139,
+  "userId" : "USER-789",
+  "requestId" : "REQ-002-ABC",
+  "parameters" : {
+    "duration" : 5000,
+    "reason" : "USER_REQUESTED"
+  },
+  "description" : "Generic event: PAUSE"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "PAUSE",
+  "eventClass" : "RichEvent",
+  "timestamp" : 1754733956140,
+  "parameters" : {
+    "requestId" : "REQ-002-ABC",
+    "userId" : "USER-789",
+    "parameters" : {
+      "duration" : 5000,
+      "reason" : "USER_REQUESTED"
+    },
+    "timestamp" : 1754733956139
+  }
+}</pre>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context Before:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "PROCESSING",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : null,
+  "resumedTime" : null,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 1,
+  "processingSteps" : [ "Data validation started" ]
+}</pre>
+                        <p class="hash">Hash: b9e894f137dcc68c...</p>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "PROCESSING",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : null,
+  "resumedTime" : null,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 1,
+  "processingSteps" : [ "Data validation started" ]
+}</pre>
+                        <p class="hash">Hash: b9e894f137dcc68c...</p>
+                    </div>
+                    <div class="diff-section">
+                        <h4>Context Changes:</h4>
+                        <div class="diff-display" id="diff-2"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-3')">
+                    <span class="version">v3</span>
+                    <span class="transition">PAUSED → PROCESSING</span>
+                    <span class="event-badge">RESUME</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T16:05:56.143692519</span>
+                </div>
+                <div class="timeline-details" id="snapshot-3" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "RESUME",
+  "payload" : null,
+  "timestamp" : 1754733956143,
+  "userId" : "USER-789",
+  "requestId" : "REQ-003-DEF",
+  "parameters" : {
+    "resumeReason" : "AUTOMATIC"
+  },
+  "description" : "Generic event: RESUME"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "RESUME",
+  "eventClass" : "RichEvent",
+  "timestamp" : 1754733956143,
+  "parameters" : {
+    "requestId" : "REQ-003-DEF",
+    "userId" : "USER-789",
+    "parameters" : {
+      "resumeReason" : "AUTOMATIC"
+    },
+    "timestamp" : 1754733956143
+  }
+}</pre>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context Before:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "PAUSED",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : 1754733956143,
+  "resumedTime" : null,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 2,
+  "processingSteps" : [ "Data validation started", "Processing paused by user" ]
+}</pre>
+                        <p class="hash">Hash: 33317fff8f66fe73...</p>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "PAUSED",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : 1754733956143,
+  "resumedTime" : null,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 2,
+  "processingSteps" : [ "Data validation started", "Processing paused by user" ]
+}</pre>
+                        <p class="hash">Hash: 33317fff8f66fe73...</p>
+                    </div>
+                    <div class="diff-section">
+                        <h4>Context Changes:</h4>
+                        <div class="diff-display" id="diff-3"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-4')">
+                    <span class="version">v4</span>
+                    <span class="transition">PROCESSING → VALIDATING</span>
+                    <span class="event-badge">PROCESSING_COMPLETE</span>
+                    <span class="duration">1ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T16:05:56.146121237</span>
+                </div>
+                <div class="timeline-details" id="snapshot-4" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "PROCESSING_COMPLETE",
+  "payload" : null,
+  "timestamp" : 1754733956145,
+  "userId" : "USER-789",
+  "requestId" : "REQ-004-GHI",
+  "parameters" : {
+    "itemsProcessed" : 150,
+    "success" : true,
+    "processingTime" : 6
+  },
+  "description" : "Generic event: PROCESSING_COMPLETE"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "PROCESSING_COMPLETE",
+  "eventClass" : "RichEvent",
+  "timestamp" : 1754733956146,
+  "parameters" : {
+    "requestId" : "REQ-004-GHI",
+    "userId" : "USER-789",
+    "parameters" : {
+      "itemsProcessed" : 150,
+      "success" : true,
+      "processingTime" : 6
+    },
+    "timestamp" : 1754733956145
+  }
+}</pre>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context Before:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "PROCESSING_RESUMED",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : 1754733956143,
+  "resumedTime" : 1754733956145,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 3,
+  "processingSteps" : [ "Data validation started", "Processing paused by user", "Processing resumed automatically" ]
+}</pre>
+                        <p class="hash">Hash: ea7b0fc0c6c989f0...</p>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "PROCESSING_RESUMED",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : 1754733956143,
+  "resumedTime" : 1754733956145,
+  "processingCompleteTime" : null,
+  "completionTime" : null,
+  "eventCount" : 3,
+  "processingSteps" : [ "Data validation started", "Processing paused by user", "Processing resumed automatically" ]
+}</pre>
+                        <p class="hash">Hash: ea7b0fc0c6c989f0...</p>
+                    </div>
+                    <div class="diff-section">
+                        <h4>Context Changes:</h4>
+                        <div class="diff-display" id="diff-4"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-5')">
+                    <span class="version">v5</span>
+                    <span class="transition">VALIDATING → COMPLETED</span>
+                    <span class="event-badge">VALIDATION_SUCCESS</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T16:05:56.148572396</span>
+                </div>
+                <div class="timeline-details" id="snapshot-5" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "VALIDATION_SUCCESS",
+  "payload" : null,
+  "timestamp" : 1754733956148,
+  "userId" : "SYSTEM",
+  "requestId" : "REQ-005-JKL",
+  "parameters" : {
+    "validationRules" : [ "RULE_1", "RULE_2", "RULE_3" ],
+    "finalStatus" : "APPROVED",
+    "validationScore" : 95.5
+  },
+  "description" : "Generic event: VALIDATION_SUCCESS"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "VALIDATION_SUCCESS",
+  "eventClass" : "RichEvent",
+  "timestamp" : 1754733956156,
+  "parameters" : {
+    "requestId" : "REQ-005-JKL",
+    "userId" : "SYSTEM",
+    "parameters" : {
+      "validationRules" : [ "RULE_1", "RULE_2", "RULE_3" ],
+      "finalStatus" : "APPROVED",
+      "validationScore" : 95.5
+    },
+    "timestamp" : 1754733956148
+  }
+}</pre>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context Before:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "VALIDATING",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : 1754733956143,
+  "resumedTime" : 1754733956145,
+  "processingCompleteTime" : 1754733956148,
+  "completionTime" : null,
+  "eventCount" : 4,
+  "processingSteps" : [ "Data validation started", "Processing paused by user", "Processing resumed automatically", "Processing completed successfully" ]
+}</pre>
+                        <p class="hash">Hash: 86a48040a07c13e0...</p>
+                    </div>
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "testData" : "initial-data",
+  "customerId" : "CUST-12345",
+  "sessionId" : "SESSION-ABC-789",
+  "currentPhase" : "VALIDATING",
+  "processingFlags" : [ "FLAG_A", "FLAG_B" ],
+  "startTime" : 1754733956139,
+  "pausedTime" : 1754733956143,
+  "resumedTime" : 1754733956145,
+  "processingCompleteTime" : 1754733956148,
+  "completionTime" : null,
+  "eventCount" : 4,
+  "processingSteps" : [ "Data validation started", "Processing paused by user", "Processing resumed automatically", "Processing completed successfully" ]
+}</pre>
+                        <p class="hash">Hash: 86a48040a07c13e0...</p>
+                    </div>
+                    <div class="diff-section">
+                        <h4>Context Changes:</h4>
+                        <div class="diff-display" id="diff-5"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+    function toggleDetails(id) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.style.display = element.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    function showMachine(machineId) {
+        // Hide all machine contents
+        const allContents = document.querySelectorAll('.machine-content');
+        allContents.forEach(content => {
+            content.style.display = 'none';
+        });
+
+        // Show selected machine content
+        const selected = document.getElementById('machine-' + machineId);
+        if (selected) {
+            selected.style.display = 'block';
+        }
+    }
+
+    // Initialize first machine as visible
+    document.addEventListener('DOMContentLoaded', function() {
+        const firstMachine = document.querySelector('.machine-content');
+        if (firstMachine) {
+            firstMachine.style.display = 'block';
+        }
+    });
+</script>
+</body>
+</html>

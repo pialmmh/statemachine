@@ -1,0 +1,875 @@
+{
+  "dashboard": {
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "target": {
+            "limit": 100,
+            "matchAny": false,
+            "tags": [],
+            "type": "dashboard"
+          },
+          "type": "dashboard"
+        },
+        {
+          "datasource": "StateMachine PostgreSQL",
+          "enable": true,
+          "expr": "SELECT timestamp as time, event_type as title, CONCAT(machine_id, ': ', state_before, ' → ', state_after) as text FROM state_machine_snapshots WHERE $__timeFilter(timestamp) AND machine_id = '$machine_id'",
+          "iconColor": "blue",
+          "name": "State Machine Events",
+          "showIn": 0,
+          "tags": ["events"],
+          "titleFormat": "{{event_type}}: {{text}}"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 20,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "lineInterpolation": "stepAfter",
+              "lineWidth": 2,
+              "pointSize": 8,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "always",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value"]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "time_series",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  timestamp as time,\n  CONCAT(state_before, ' → ', state_after) as metric,\n  version as value\nFROM state_machine_snapshots \nWHERE \n  machine_id = '$machine_id'\n  AND run_id = '$run_id'\n  AND $__timeFilter(timestamp)\nORDER BY timestamp ASC",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "transition_duration"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": [
+              {
+                "name": "$__timeFilter",
+                "params": [],
+                "type": "macro"
+              }
+            ]
+          }
+        ],
+        "title": "State Transition Flow",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              }
+            },
+            "mappings": []
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 8
+        },
+        "id": 2,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  event_type as \"Event Type\",\n  COUNT(*) as \"Count\"\nFROM state_machine_snapshots \nWHERE \n  $__timeFilter(timestamp)\n  AND ($machine_id = 'All' OR machine_id = '$machine_id')\nGROUP BY event_type\nORDER BY COUNT(*) DESC",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "event_type"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Event Distribution",
+        "type": "piechart"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "displayMode": "color-background",
+              "filterable": true,
+              "inspect": false
+            },
+            "mappings": [
+              {
+                "options": {
+                  "true": {
+                    "color": "green",
+                    "index": 0,
+                    "text": "🟢 ONLINE"
+                  },
+                  "false": {
+                    "color": "red",
+                    "index": 1,  
+                    "text": "🔴 OFFLINE"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 100
+                },
+                {
+                  "color": "red",
+                  "value": 500
+                }
+              ]
+            },
+            "unit": "ms"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Duration (ms)"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Machine Status"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-text"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 16,
+          "x": 8,
+          "y": 8
+        },
+        "id": 3,
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Time"
+            }
+          ]
+        },
+        "pluginVersion": "10.2.3",
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  timestamp as \"Time\",\n  version as \"Version\",\n  CONCAT(state_before, ' → ', state_after) as \"Transition\",\n  event_type as \"Event\",\n  transition_duration as \"Duration (ms)\",\n  registry_status as \"Registry Status\",\n  machine_online_status as \"Machine Status\"\nFROM state_machine_snapshots \nWHERE \n  run_id = '$run_id'\n  AND $__timeFilter(timestamp)\nORDER BY version ASC\nLIMIT 100",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "machine_id"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Transition History",
+        "type": "table"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "line"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 100
+                },
+                {
+                  "color": "red",
+                  "value": 500
+                }
+              ]
+            },
+            "unit": "ms"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        },
+        "id": 4,
+        "options": {
+          "legend": {
+            "calcs": ["mean", "max"],
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "time_series",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  timestamp as time,\n  transition_duration as value,\n  CONCAT(state_before, ' → ', state_after) as metric\nFROM state_machine_snapshots \nWHERE \n  machine_id = '$machine_id'\n  AND run_id = '$run_id'\n  AND $__timeFilter(timestamp)\nORDER BY timestamp ASC",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "transition_duration"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Transition Performance",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              }
+            },
+            "mappings": [],
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 0,
+          "y": 24
+        },
+        "id": 5,
+        "options": {
+          "displayMode": "basic",
+          "orientation": "horizontal",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "showUnfilled": true,
+          "text": {}
+        },
+        "pluginVersion": "10.2.3",
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT \n  registry_status as \"Status\",\n  COUNT(*) as \"Count\"\nFROM state_machine_snapshots \nWHERE $__timeFilter(timestamp)\nGROUP BY registry_status\nORDER BY COUNT(*) DESC",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "registry_status"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Registry Status Distribution",
+        "type": "bargauge"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 4,
+          "x": 8,
+          "y": 24
+        },
+        "id": 6,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "text": {},
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.2.3",
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT COUNT(DISTINCT machine_id) as \"Total Machines\" FROM state_machine_snapshots WHERE $__timeFilter(timestamp)",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "machine_id"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Total Machines",
+        "type": "stat"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 4,
+          "x": 12,
+          "y": 24
+        },
+        "id": 7,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "text": {},
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.2.3",
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT COUNT(DISTINCT run_id) as \"Total Runs\" FROM state_machine_snapshots WHERE $__timeFilter(timestamp)",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "run_id"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Total Runs",
+        "type": "stat"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 100
+                }
+              ]
+            },
+            "unit": "ms"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 4,
+          "x": 16,
+          "y": 24
+        },
+        "id": 8,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "text": {},
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.2.3",
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT ROUND(AVG(transition_duration)::numeric, 2) as \"Avg Duration\" FROM state_machine_snapshots WHERE $__timeFilter(timestamp)",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "transition_duration"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Avg Transition Time",
+        "type": "stat"
+      },
+      {
+        "datasource": "StateMachine PostgreSQL",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 3,
+          "w": 4,
+          "x": 20,
+          "y": 24
+        },
+        "id": 9,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "text": {},
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.2.3",
+        "targets": [
+          {
+            "datasource": "StateMachine PostgreSQL",
+            "format": "table",
+            "group": [],
+            "metricColumn": "none",
+            "rawQuery": true,
+            "rawSql": "SELECT COUNT(*) as \"Slow Transitions\" FROM state_machine_snapshots WHERE transition_duration > 100 AND $__timeFilter(timestamp)",
+            "refId": "A",
+            "select": [
+              [
+                {
+                  "params": [
+                    "transition_duration"
+                  ],
+                  "type": "column"
+                }
+              ]
+            ],
+            "table": "state_machine_snapshots",
+            "timeColumn": "timestamp",
+            "timeColumnType": "timestamp",
+            "where": []
+          }
+        ],
+        "title": "Slow Transitions",
+        "type": "stat"
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 37,
+    "style": "dark",
+    "tags": ["state-machine", "monitoring"],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "selected": false,
+            "text": "call-demo-001",
+            "value": "call-demo-001"
+          },
+          "datasource": "StateMachine PostgreSQL",
+          "definition": "SELECT DISTINCT machine_id FROM state_machine_snapshots ORDER BY machine_id",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Machine ID",
+          "multi": false,
+          "name": "machine_id",
+          "options": [],
+          "query": "SELECT DISTINCT machine_id FROM state_machine_snapshots ORDER BY machine_id",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "current": {
+            "selected": false,
+            "text": "call-demo-2025-01-15_10-30-00-12345",
+            "value": "call-demo-2025-01-15_10-30-00-12345"
+          },
+          "datasource": "StateMachine PostgreSQL",
+          "definition": "SELECT DISTINCT run_id FROM state_machine_snapshots WHERE machine_id = '$machine_id' ORDER BY run_id DESC LIMIT 20",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Run ID",
+          "multi": false,
+          "name": "run_id",
+          "options": [],
+          "query": "SELECT DISTINCT run_id FROM state_machine_snapshots WHERE machine_id = '$machine_id' ORDER BY run_id DESC LIMIT 20",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "type": "query"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "State Machine Overview",
+    "uid": "statemachine-overview",
+    "version": 1,
+    "weekStart": ""
+  }
+}

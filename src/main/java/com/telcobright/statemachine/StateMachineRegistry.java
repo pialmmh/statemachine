@@ -6,6 +6,7 @@ import java.util.function.Supplier;
 import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.StateMachineContextEntity;
+import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
 
 /**
  * Registry for managing state machine instances
@@ -15,6 +16,8 @@ public class StateMachineRegistry {
     
     private final Map<String, GenericStateMachine<?, ?>> activeMachines = new ConcurrentHashMap<>();
     private final TimeoutManager timeoutManager;
+    private boolean debugMode = false;
+    private SimpleDatabaseSnapshotRecorder snapshotRecorder;
     
     /**
      * Default constructor for testing
@@ -31,10 +34,59 @@ public class StateMachineRegistry {
     }
     
     /**
+     * Enable debug mode with monitoring for all machines managed by this registry
+     */
+    public void enableDebugMode() {
+        this.debugMode = true;
+        this.snapshotRecorder = new SimpleDatabaseSnapshotRecorder();
+        System.out.println("🐛 Debug mode ENABLED for StateMachineRegistry");
+        System.out.println("📊 All machines will automatically use monitoring");
+    }
+    
+    /**
+     * Enable debug mode with custom snapshot recorder
+     */
+    public void enableDebugMode(SimpleDatabaseSnapshotRecorder recorder) {
+        this.debugMode = true;
+        this.snapshotRecorder = recorder;
+        System.out.println("🐛 Debug mode ENABLED for StateMachineRegistry with custom recorder");
+    }
+    
+    /**
+     * Disable debug mode
+     */
+    public void disableDebugMode() {
+        this.debugMode = false;
+        this.snapshotRecorder = null;
+        System.out.println("🐛 Debug mode DISABLED for StateMachineRegistry");
+    }
+    
+    /**
+     * Check if debug mode is enabled
+     */
+    public boolean isDebugMode() {
+        return debugMode;
+    }
+    
+    /**
      * Register a state machine
+     * Automatically applies debug mode if enabled
      */
     public void register(String id, GenericStateMachine<?, ?> machine) {
         activeMachines.put(id, machine);
+        
+        // Apply debug mode if enabled
+        if (debugMode && snapshotRecorder != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                GenericStateMachine<?, ?> genericMachine = machine;
+                genericMachine.enableDebugFromRegistry(snapshotRecorder);
+                genericMachine.setDebugSessionId("registry-session-" + System.currentTimeMillis());
+                System.out.println("📊 Applied debug mode to machine: " + id);
+            } catch (Exception e) {
+                System.err.println("⚠️ Failed to apply debug mode to machine " + id + ": " + e.getMessage());
+            }
+        }
     }
     
     /**
@@ -148,6 +200,13 @@ public class StateMachineRegistry {
      */
     public int size() {
         return activeMachines.size();
+    }
+    
+    /**
+     * Check if a machine is registered in the registry
+     */
+    public boolean isRegistered(String id) {
+        return activeMachines.containsKey(id);
     }
     
     /**

@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for snapshot storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: statemachine-postgres
+    environment:
+      POSTGRES_DB: statemachine_monitoring
+      POSTGRES_USER: statemachine
+      POSTGRES_PASSWORD: monitoring123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U statemachine -d statemachine_monitoring"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: statemachine-grafana
+    environment:
+      # Admin credentials
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: statemachine123
+      
+      # General settings
+      GF_USERS_ALLOW_SIGN_UP: false
+      
+      # Feature toggles
+      GF_FEATURE_TOGGLES_ENABLE: "publicDashboards"
+      
+      # Server settings
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_SERVER_SERVE_FROM_SUB_PATH: false
+      
+      # Alerting
+      GF_ALERTING_ENABLED: false
+      GF_UNIFIED_ALERTING_ENABLED: false
+      
+      # Skip plugin installation for now
+    
+    ports:
+      - "3000:3000"
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+    
+    networks:
+      - monitoring
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    restart: unless-stopped
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: statemachine-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@statemachine.com
+      PGADMIN_DEFAULT_PASSWORD: pgadmin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - monitoring
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+    name: statemachine_postgres_data
+  
+  grafana_data:
+    driver: local  
+    name: statemachine_grafana_data
+    
+  pgadmin_data:
+    driver: local
+    name: statemachine_pgadmin_data
+
+networks:
+  monitoring:
+    driver: bridge
+    name: statemachine_monitoring

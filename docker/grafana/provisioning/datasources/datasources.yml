@@ -1,0 +1,28 @@
+apiVersion: 1
+
+# Automatically configure PostgreSQL data source
+datasources:
+  - name: StateMachine PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: statemachine_monitoring
+    user: statemachine
+    secureJsonData:
+      password: monitoring123
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true
+    
+  # Optional: TestData source for development
+  - name: TestData DB  
+    type: testdata
+    access: proxy
+    isDefault: false
+    editable: true

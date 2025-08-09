@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine History - call-machine-session</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 2em;
+    }
+
+    h2 {
+        color: #555;
+        margin-bottom: 15px;
+        font-size: 1.5em;
+    }
+
+    h3 {
+        color: #666;
+        margin-bottom: 15px;
+        font-size: 1.2em;
+    }
+
+    .machine-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .machine-info p {
+        color: #666;
+        margin: 5px 0;
+    }
+
+    .machine-selector {
+        margin-bottom: 30px;
+        padding: 15px;
+        background: #f0f0f0;
+        border-radius: 8px;
+    }
+
+    .machine-selector select {
+        padding: 8px 15px;
+        font-size: 16px;
+        border: 2px solid #667eea;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+    }
+
+    .state-diagram {
+        background: #f0f8ff;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        overflow-x: auto;
+    }
+
+    .flow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px;
+        white-space: nowrap;
+    }
+
+    .state {
+        background: #667eea;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+
+    .state.final {
+        background: #28a745;
+    }
+
+    .event {
+        background: #ffc107;
+        color: #333;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .arrow {
+        color: #999;
+        font-size: 1.5em;
+    }
+
+    .timeline {
+        margin-top: 30px;
+    }
+
+    .timeline-entry {
+        margin-bottom: 20px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .timeline-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .timeline-header:hover {
+        background: #e9ecef;
+    }
+
+    .version {
+        background: #6c757d;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .transition {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .event-badge {
+        background: #17a2b8;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+    }
+
+    .duration {
+        color: #28a745;
+        font-size: 0.9em;
+        margin-left: auto;
+    }
+
+    .timestamp {
+        color: #999;
+        font-size: 0.85em;
+    }
+
+    .timeline-details {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .context-section {
+        margin-bottom: 20px;
+    }
+
+    .context-section h4 {
+        color: #555;
+        margin-bottom: 10px;
+    }
+
+    .json-display {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        overflow-x: auto;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .hash {
+        color: #999;
+        font-size: 0.85em;
+        margin-top: 5px;
+        font-family: monospace;
+    }
+
+    .diff-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .diff-display {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    .diff-add {
+        background: #d4edda;
+        color: #155724;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .diff-remove {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .summary {
+        background: #e8f4f8;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .machine-status, .state-status {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+
+    .status-online {
+        background: #28a745;
+        color: white;
+    }
+
+    .status-offline {
+        background: #dc3545;
+        color: white;
+    }
+
+    .registry-status {
+        background: #6c757d;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+    }
+
+    .status-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .status-item {
+        font-size: 0.9em;
+        color: #333;
+    }
+
+    .event-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #fff3cd;
+        border-radius: 6px;
+    }
+
+    .event-section h5 {
+        color: #856404;
+        margin: 10px 0 5px 0;
+        font-size: 1em;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>State Machine Transition History</h1>
+        <div class="machine-info">
+            <h2>Machine: call-machine-session</h2>
+            <p>Total Transitions: 8</p>
+            <p>Type: CallEntity</p>
+            <p>Run ID: call-session-2c46c8a9</p>
+        </div>
+
+        <div class="state-diagram">
+            <h3>State Flow</h3>
+            <div class="flow">
+                <span class="state">IDLE</span>
+                <span class="arrow">→</span>
+                <span class="event">[INCOMING_CALL]</span>
+                <span class="arrow">→</span>
+                <span class="state">RINGING</span>
+                <span class="arrow">→</span>
+                <span class="event">[SESSION_PROGRESS]</span>
+                <span class="arrow">→</span>
+                <span class="state">RINGING</span>
+                <span class="arrow">→</span>
+                <span class="event">[SESSION_PROGRESS]</span>
+                <span class="arrow">→</span>
+                <span class="state">RINGING</span>
+                <span class="arrow">→</span>
+                <span class="event">[SESSION_PROGRESS]</span>
+                <span class="arrow">→</span>
+                <span class="state">RINGING</span>
+                <span class="arrow">→</span>
+                <span class="event">[ANSWER]</span>
+                <span class="arrow">→</span>
+                <span class="state">CONNECTED</span>
+                <span class="arrow">→</span>
+                <span class="event">[DTMF]</span>
+                <span class="arrow">→</span>
+                <span class="state">CONNECTED</span>
+                <span class="arrow">→</span>
+                <span class="event">[DTMF]</span>
+                <span class="arrow">→</span>
+                <span class="state">CONNECTED</span>
+                <span class="arrow">→</span>
+                <span class="event">[HANGUP]</span>
+                <span class="arrow">→</span>
+                <span class="state final">HUNGUP</span>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <h3>Transition Timeline</h3>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-1')">
+                    <span class="version">v1</span>
+                    <span class="transition">IDLE → RINGING</span>
+                    <span class="event-badge">INCOMING_CALL</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:30.712199439</span>
+                </div>
+                <div class="timeline-details" id="snapshot-1" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "INCOMING_CALL",
+  "payload" : null,
+  "timestamp" : 1754739450712,
+  "fromNumber" : "+1800555123",
+  "callType" : "TOLL_FREE",
+  "priority" : "HIGH",
+  "recordingRequired" : true,
+  "description" : "Generic event: INCOMING_CALL"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "INCOMING_CALL",
+  "eventClass" : "EnhancedIncomingCallEvent",
+  "timestamp" : 1754739450713,
+  "parameters" : {
+    "recordingRequired" : true,
+    "priority" : "HIGH",
+    "callType" : "TOLL_FREE"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-2')">
+                    <span class="version">v2</span>
+                    <span class="transition">RINGING → RINGING</span>
+                    <span class="event-badge">SESSION_PROGRESS</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:31.215939724</span>
+                </div>
+                <div class="timeline-details" id="snapshot-2" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "SESSION_PROGRESS",
+  "payload" : null,
+  "timestamp" : 1754739451215,
+  "responseCode" : "100",
+  "description" : "Trying",
+  "progressPercentage" : 10,
+  "customParameters" : { }
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "SESSION_PROGRESS",
+  "eventClass" : "SessionProgressEvent",
+  "timestamp" : 1754739451219,
+  "parameters" : {
+    "description" : "Trying",
+    "progressPercentage" : 10,
+    "customParameters" : { },
+    "responseCode" : "100"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-3')">
+                    <span class="version">v3</span>
+                    <span class="transition">RINGING → RINGING</span>
+                    <span class="event-badge">SESSION_PROGRESS</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:31.52271965</span>
+                </div>
+                <div class="timeline-details" id="snapshot-3" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "SESSION_PROGRESS",
+  "payload" : null,
+  "timestamp" : 1754739451522,
+  "responseCode" : "180",
+  "description" : "Ringing",
+  "progressPercentage" : 50,
+  "customParameters" : { }
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "SESSION_PROGRESS",
+  "eventClass" : "SessionProgressEvent",
+  "timestamp" : 1754739451523,
+  "parameters" : {
+    "description" : "Ringing",
+    "progressPercentage" : 50,
+    "customParameters" : { },
+    "responseCode" : "180"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-4')">
+                    <span class="version">v4</span>
+                    <span class="transition">RINGING → RINGING</span>
+                    <span class="event-badge">SESSION_PROGRESS</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:32.025204993</span>
+                </div>
+                <div class="timeline-details" id="snapshot-4" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "SESSION_PROGRESS",
+  "payload" : null,
+  "timestamp" : 1754739452024,
+  "responseCode" : "183",
+  "description" : "Session Progress",
+  "progressPercentage" : 75,
+  "customParameters" : {
+    "codec" : "G.711",
+    "media" : "audio"
+  }
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "SESSION_PROGRESS",
+  "eventClass" : "SessionProgressEvent",
+  "timestamp" : 1754739452025,
+  "parameters" : {
+    "description" : "Session Progress",
+    "progressPercentage" : 75,
+    "customParameters" : {
+      "codec" : "G.711",
+      "media" : "audio"
+    },
+    "responseCode" : "183"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-5')">
+                    <span class="version">v5</span>
+                    <span class="transition">RINGING → CONNECTED</span>
+                    <span class="event-badge">ANSWER</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:32.328906529</span>
+                </div>
+                <div class="timeline-details" id="snapshot-5" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "ANSWER",
+  "payload" : null,
+  "timestamp" : 1754739452328,
+  "answeredBy" : "AUTO_ATTENDANT",
+  "answerTime" : 1754739452328,
+  "answerMethod" : "IVR_SYSTEM",
+  "description" : "Generic event: ANSWER"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "ANSWER",
+  "eventClass" : "EnhancedAnswerEvent",
+  "timestamp" : 1754739452331,
+  "parameters" : {
+    "answerMethod" : "IVR_SYSTEM"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-6')">
+                    <span class="version">v6</span>
+                    <span class="transition">CONNECTED → CONNECTED</span>
+                    <span class="event-badge">DTMF</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:33.334033488</span>
+                </div>
+                <div class="timeline-details" id="snapshot-6" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "DTMF",
+  "payload" : null,
+  "timestamp" : 1754739453333,
+  "digit" : "1",
+  "duration" : 200,
+  "volume" : -10,
+  "description" : "Generic event: DTMF"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "DTMF",
+  "eventClass" : "DTMFEvent",
+  "timestamp" : 1754739453336,
+  "parameters" : {
+    "duration" : 200,
+    "volume" : -10,
+    "digit" : "1"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-7')">
+                    <span class="version">v7</span>
+                    <span class="transition">CONNECTED → CONNECTED</span>
+                    <span class="event-badge">DTMF</span>
+                    <span class="duration">1ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:33.838504857</span>
+                </div>
+                <div class="timeline-details" id="snapshot-7" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "DTMF",
+  "payload" : null,
+  "timestamp" : 1754739453837,
+  "digit" : "*",
+  "duration" : 150,
+  "volume" : -12,
+  "description" : "Generic event: DTMF"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "DTMF",
+  "eventClass" : "DTMFEvent",
+  "timestamp" : 1754739453838,
+  "parameters" : {
+    "duration" : 150,
+    "volume" : -12,
+    "digit" : "*"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-8')">
+                    <span class="version">v8</span>
+                    <span class="transition">CONNECTED → HUNGUP</span>
+                    <span class="event-badge">HANGUP</span>
+                    <span class="duration">0ms</span>
+                    <span class="machine-status status-online">ONLINE</span>
+                    <span class="timestamp">2025-08-09T17:37:34.341153269</span>
+                </div>
+                <div class="timeline-details" id="snapshot-8" style="display: none;">
+                    <div class="status-section">
+                        <h4>Status Information:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">Machine Status: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">State Mode: <span class="status-online">ONLINE</span></div>
+                            <div class="status-item">Registry: <span class="registry-status">NOT_REGISTERED</span></div>
+                        </div>
+                    </div>
+                    <div class="event-section">
+                        <h4>Event Details:</h4>
+                        <h5>Full Event Payload:</h5>
+                        <pre class="json-display">{
+  "eventType" : "HANGUP",
+  "payload" : null,
+  "timestamp" : 1754739454340,
+  "reason" : "NORMAL_CLEARING",
+  "initiatedBy" : "CALLEE",
+  "cause" : "16",
+  "billableSeconds" : 45,
+  "description" : "Generic event: HANGUP"
+}</pre>
+                        <h5>Event Parameters:</h5>
+                        <pre class="json-display">{
+  "eventType" : "HANGUP",
+  "eventClass" : "EnhancedHangupEvent",
+  "timestamp" : 1754739454344,
+  "parameters" : {
+    "billableSeconds" : 45,
+    "cause" : "16"
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+    function toggleDetails(id) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.style.display = element.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    function showMachine(machineId) {
+        // Hide all machine contents
+        const allContents = document.querySelectorAll('.machine-content');
+        allContents.forEach(content => {
+            content.style.display = 'none';
+        });
+
+        // Show selected machine content
+        const selected = document.getElementById('machine-' + machineId);
+        if (selected) {
+            selected.style.display = 'block';
+        }
+    }
+
+    // Initialize first machine as visible
+    document.addEventListener('DOMContentLoaded', function() {
+        const firstMachine = document.querySelector('.machine-content');
+        if (firstMachine) {
+            firstMachine.style.display = 'block';
+        }
+    });
+</script>
+</body>
+</html>

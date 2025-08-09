@@ -17,6 +17,11 @@ import com.telcobright.db.PartitionedRepository;
 import com.telcobright.statemachine.state.EnhancedStateConfig;
 import com.telcobright.statemachine.timeout.TimeUnit;
 import com.telcobright.statemachine.timeout.TimeoutConfig;
+import com.telcobright.statemachine.monitoring.SnapshotRecorder;
+import com.telcobright.statemachine.monitoring.SnapshotConfig;
+import com.telcobright.statemachine.monitoring.DefaultSnapshotRecorder;
+import com.telcobright.statemachine.monitoring.DatabaseSnapshotRecorder;
+import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
 
 /**
  * Fluent builder for creating state machines with expressive syntax
@@ -35,6 +40,13 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
     private PartitionedRepository<TPersistingEntity, Object> shardingRepository;
     private IdLookUpMode shardingLookupMode;
     private Class<TPersistingEntity> entityClass;
+    
+    // Debug and monitoring configuration
+    private boolean debugEnabled = false;
+    private SnapshotRecorder<TPersistingEntity, TContext> snapshotRecorder;
+    private String runId;
+    private String correlationId;
+    private String debugSessionId;
     
     // Current state being configured
     private StateBuilder currentStateBuilder;
@@ -79,6 +91,129 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
      */
     public FluentStateMachineBuilder<TPersistingEntity, TContext> withTimeoutEventType(Class<? extends StateMachineEvent> eventType) {
         this.timeoutEventType = eventType;
+        return this;
+    }
+    
+    /**
+     * Enable debug mode with default snapshot recorder
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebug() {
+        return enableDebug(new DefaultSnapshotRecorder<>());
+    }
+    
+    /**
+     * Enable debug mode with comprehensive snapshot configuration
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebugComprehensive() {
+        return enableDebug(new DefaultSnapshotRecorder<>(SnapshotConfig.comprehensiveConfig()));
+    }
+    
+    /**
+     * Enable debug mode with production-safe snapshot configuration
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebugProduction() {
+        return enableDebug(new DefaultSnapshotRecorder<>(SnapshotConfig.productionConfig()));
+    }
+    
+    /**
+     * Enable debug mode with custom snapshot recorder
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebug(SnapshotRecorder<TPersistingEntity, TContext> snapshotRecorder) {
+        this.debugEnabled = true;
+        this.snapshotRecorder = snapshotRecorder;
+        return this;
+    }
+    
+    /**
+     * Disable debug mode
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> disableDebug() {
+        this.debugEnabled = false;
+        this.snapshotRecorder = null;
+        return this;
+    }
+    
+    /**
+     * Enable debug mode with database persistence using partitioned repository
+     * Auto-generates entity-specific snapshot classes (e.g., CallEntity -> CallEntitySnapshot)
+     * Snapshots are encoded as JSON+Base64 for efficient storage
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebugWithDatabase(
+            StateMachineSnapshotRepository repository, 
+            Class<TPersistingEntity> entityClass) {
+        return enableDebugWithDatabase(repository, entityClass, SnapshotConfig.comprehensiveConfig());
+    }
+    
+    /**
+     * Enable debug mode with database persistence and custom configuration
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebugWithDatabase(
+            StateMachineSnapshotRepository repository,
+            Class<TPersistingEntity> entityClass,
+            SnapshotConfig config) {
+        
+        this.debugEnabled = true;
+        this.entityClass = entityClass;
+        
+        // Create database-backed recorder with automatic entity snapshot generation
+        DatabaseSnapshotRecorder<TPersistingEntity, TContext> dbRecorder = 
+            new DatabaseSnapshotRecorder<>(config, repository, entityClass);
+        
+        this.snapshotRecorder = dbRecorder;
+        
+        System.out.println("📊 Database debug mode enabled:");
+        System.out.println("   • Entity Type: " + entityClass.getSimpleName());
+        System.out.println("   • Expected Snapshot Class: " + entityClass.getSimpleName() + "Snapshot");
+        System.out.println("   • Encoding: JSON + Base64");
+        System.out.println("   • Repository: " + repository.getClass().getSimpleName());
+        
+        return this;
+    }
+    
+    /**
+     * Enable debug mode with automatic run ID generation based on current timestamp
+     * Perfect for tracking complete runtime history like XState
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> enableDebugWithAutoRunId() {
+        this.debugEnabled = true;
+        
+        // Auto-generate timestamp-based run ID
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+        String timestamp = java.time.LocalDateTime.now().format(formatter);
+        String randomSuffix = String.valueOf(System.nanoTime()).substring(8);
+        this.runId = this.machineId.toLowerCase() + "-" + timestamp + "-" + randomSuffix;
+        
+        // Use default comprehensive recorder if none specified
+        if (this.snapshotRecorder == null) {
+            this.snapshotRecorder = new DefaultSnapshotRecorder<>(SnapshotConfig.comprehensiveConfig());
+        }
+        
+        System.out.println("🔍 Auto-debug mode enabled with Run ID: " + this.runId);
+        
+        return this;
+    }
+    
+    /**
+     * Set run ID for correlation
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> withRunId(String runId) {
+        this.runId = runId;
+        return this;
+    }
+    
+    /**
+     * Set correlation ID for tracking
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> withCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
+        return this;
+    }
+    
+    /**
+     * Set debug session ID
+     */
+    public FluentStateMachineBuilder<TPersistingEntity, TContext> withDebugSessionId(String debugSessionId) {
+        this.debugSessionId = debugSessionId;
         return this;
     }
     
@@ -192,6 +327,20 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
         // Set initial state
         if (initialState != null) {
             stateMachine.initialState(initialState);
+        }
+        
+        // Configure debug mode if enabled
+        if (debugEnabled && snapshotRecorder != null) {
+            stateMachine.enableDebug(snapshotRecorder);
+            if (runId != null) {
+                stateMachine.setRunId(runId);
+            }
+            if (correlationId != null) {
+                stateMachine.setCorrelationId(correlationId);
+            }
+            if (debugSessionId != null) {
+                stateMachine.setDebugSessionId(debugSessionId);
+            }
         }
         
         return stateMachine;

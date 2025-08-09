@@ -1,0 +1,180 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "State Machine History Dashboard",
+    "description": "Complete XState-like monitoring for state machine runtime history",
+    "tags": ["state-machine", "monitoring", "xstate"],
+    "timezone": "browser",
+    "schemaVersion": 30,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "machine_id",
+          "type": "query",
+          "label": "Machine ID",
+          "query": "SELECT DISTINCT machine_id FROM state_machine_snapshots ORDER BY machine_id",
+          "datasource": "${DS_POSTGRESQL}",
+          "multi": false,
+          "includeAll": false,
+          "refresh": "on_dashboard_load"
+        },
+        {
+          "name": "run_id",
+          "type": "query", 
+          "label": "Run ID",
+          "query": "SELECT DISTINCT run_id FROM state_machine_snapshots WHERE machine_id = '$machine_id' ORDER BY run_id DESC LIMIT 20",
+          "datasource": "${DS_POSTGRESQL}",
+          "multi": false,
+          "includeAll": false,
+          "refresh": "on_variable_change"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "State Transition Flow",
+        "type": "state-timeline",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "datasource": "${DS_POSTGRESQL}",
+            "format": "time_series",
+            "rawSql": "SELECT timestamp as time, CONCAT(state_before, ' → ', state_after) as metric, 1 as value FROM state_machine_snapshots WHERE machine_id = '$machine_id' AND run_id = '$run_id' AND $__timeFilter(timestamp) ORDER BY timestamp ASC",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 100,
+              "lineWidth": 2
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Event Distribution",
+        "type": "barchart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "datasource": "${DS_POSTGRESQL}",
+            "format": "time_series", 
+            "rawSql": "SELECT $__timeGroupAlias(timestamp, $__interval), event_type, COUNT(*) as count FROM state_machine_snapshots WHERE $__timeFilter(timestamp) AND machine_id = '$machine_id' AND run_id = '$run_id' GROUP BY 1, event_type ORDER BY 1",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Transition Performance",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "datasource": "${DS_POSTGRESQL}",
+            "format": "time_series",
+            "rawSql": "SELECT timestamp as time, transition_duration as value, CONCAT(state_before, ' → ', state_after) as metric FROM state_machine_snapshots WHERE machine_id = '$machine_id' AND run_id = '$run_id' AND $__timeFilter(timestamp) ORDER BY timestamp ASC",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Complete Transition History",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "datasource": "${DS_POSTGRESQL}",
+            "format": "table",
+            "rawSql": "SELECT timestamp as \"Time\", version as \"Version\", CONCAT(state_before, ' → ', state_after) as \"Transition\", event_type as \"Event\", transition_duration as \"Duration (ms)\", registry_status as \"Registry Status\", CASE WHEN machine_online_status THEN 'ONLINE' ELSE 'OFFLINE' END as \"Machine Status\" FROM state_machine_snapshots WHERE run_id = '$run_id' AND $__timeFilter(timestamp) ORDER BY version ASC",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Duration (ms)"},
+              "properties": [
+                {"id": "custom.displayMode", "value": "color-background"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 100},
+                    {"color": "red", "value": 500}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Machine Status"},
+              "properties": [
+                {"id": "mappings", "value": [
+                  {"type": "value", "value": "ONLINE", "text": "🟢 ONLINE"},
+                  {"type": "value", "value": "OFFLINE", "text": "🔴 OFFLINE"}
+                ]}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [{"desc": false, "displayName": "Version"}]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Context Evolution",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 26},
+        "targets": [
+          {
+            "datasource": "${DS_POSTGRESQL}",
+            "format": "logs",
+            "rawSql": "SELECT timestamp as time, CONCAT('v', version, ': ', state_before, ' → ', state_after, ' (', event_type, ')') as message, convert_from(decode(context_after_json, 'base64'), 'UTF8') as context FROM state_machine_snapshots WHERE run_id = '$run_id' AND context_after_json IS NOT NULL AND $__timeFilter(timestamp) ORDER BY timestamp ASC",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "sortOrder": "Ascending",
+          "wrapLogMessage": true
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "State Machine Events",
+          "datasource": "${DS_POSTGRESQL}",
+          "enable": true,
+          "iconColor": "blue",
+          "query": "SELECT timestamp as time, event_type as title, CONCAT(state_before, ' → ', state_after) as text FROM state_machine_snapshots WHERE machine_id = '$machine_id' AND $__timeFilter(timestamp)",
+          "textFormat": "{{event_type}}: {{text}}"
+        }
+      ]
+    }
+  }
+}

@@ -11,6 +11,11 @@ import com.telcobright.statemachine.events.TimeoutEvent;
 import com.telcobright.statemachine.state.EnhancedStateConfig;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.StateMachineContextEntity;
+import com.telcobright.statemachine.monitoring.SnapshotRecorder;
+import com.telcobright.statemachine.monitoring.SnapshotConfig;
+import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Enhanced Generic State Machine with timeout, persistence, and offline support
@@ -29,6 +34,16 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private TPersistingEntity persistingEntity;  // The entity that gets persisted
     private TContext context;  // Volatile context
     
+    // Monitoring and debugging
+    private boolean debugEnabled = false;
+    private boolean persistSnapshotsToDb = false;
+    private boolean registryControlledDebug = false;
+    private SnapshotRecorder<TPersistingEntity, TContext> snapshotRecorder;
+    private String runId;
+    private String correlationId;
+    private String debugSessionId;
+    private StateMachineSnapshotRepository snapshotRepository;
+    
     // Callbacks
     private Consumer<String> onStateTransition;
     private Consumer<GenericStateMachine<TPersistingEntity, TContext>> onOfflineTransition;
@@ -38,6 +53,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         this.currentState = "initial";
         this.timeoutManager = timeoutManager;
         this.registry = registry;
+        
+        // Auto-generate run ID based on timestamp if debug is enabled
+        this.runId = generateTimestampRunId();
     }
     
     /**
@@ -157,25 +175,114 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     }
     
     /**
-     * Handle incoming events
+     * Handle incoming events with snapshot recording
      */
     private void handleEvent(StateMachineEvent event) {
-        Map<String, String> stateTransitions = transitions.get(currentState);
-        if (stateTransitions != null) {
-            String targetState = stateTransitions.get(event.getEventType());
-            if (targetState != null) {
-                transitionTo(targetState);
-            } else {
-                // Check for stay actions
-                Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
-                if (stateStayActions != null) {
-                    BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
-                    if (action != null) {
-                        action.accept(this, event);
+        // Capture before state for snapshot
+        String stateBefore = currentState;
+        TContext contextBefore = null;
+        if (isDebugEnabled()) {
+            // Create a snapshot of context before processing
+            contextBefore = context; // Note: In real implementation, you might want to deep copy
+        }
+        
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            Map<String, String> stateTransitions = transitions.get(currentState);
+            if (stateTransitions != null) {
+                String targetState = stateTransitions.get(event.getEventType());
+                if (targetState != null) {
+                    transitionTo(targetState);
+                } else {
+                    // Check for stay actions
+                    Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
+                    if (stateStayActions != null) {
+                        BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
+                        if (action != null) {
+                            action.accept(this, event);
+                        }
                     }
                 }
             }
+        } finally {
+            // Record snapshot if debug is enabled
+            if (isDebugEnabled()) {
+                long transitionDuration = System.currentTimeMillis() - startTime;
+                recordSnapshot(stateBefore, currentState, event, contextBefore, context, transitionDuration);
+            }
         }
+    }
+    
+    /**
+     * Record a snapshot of the state transition with comprehensive status information
+     */
+    private void recordSnapshot(String stateBefore, String stateAfter, StateMachineEvent event, 
+                               TContext contextBefore, TContext contextAfter, long transitionDuration) {
+        try {
+            if (snapshotRecorder != null) {
+                Long version = snapshotRecorder.getNextVersion(id);
+                String machineType = persistingEntity != null ? persistingEntity.getClass().getSimpleName() : this.getClass().getSimpleName();
+                
+                // Get registry status
+                String registryStatus = getRegistryStatus();
+                
+                // Get machine online status (check if machine is actively running)
+                boolean machineOnlineStatus = !Thread.currentThread().isInterrupted() && registry != null;
+                
+                // Get state offline configuration
+                boolean stateOfflineStatus = isStateOffline(stateAfter);
+                
+                snapshotRecorder.recordTransition(
+                    id, 
+                    machineType,
+                    version,
+                    stateBefore,
+                    stateAfter,
+                    event,
+                    contextBefore,
+                    contextAfter,
+                    transitionDuration,
+                    runId,
+                    correlationId,
+                    debugSessionId,
+                    machineOnlineStatus,
+                    stateOfflineStatus,
+                    registryStatus
+                );
+            }
+        } catch (Exception e) {
+            // Never let snapshot recording break the main flow
+            System.err.println("Warning: Failed to record snapshot for machine " + id + ": " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get the current registry status for this machine
+     */
+    private String getRegistryStatus() {
+        if (registry == null) {
+            return "NO_REGISTRY";
+        }
+        
+        try {
+            // Check if this machine is registered and active
+            if (registry.isRegistered(id)) {
+                return registry.isActive(id) ? "REGISTERED_ACTIVE" : "REGISTERED_INACTIVE";
+            } else {
+                return "NOT_REGISTERED";
+            }
+        } catch (Exception e) {
+            return "REGISTRY_ERROR: " + e.getMessage();
+        }
+    }
+    
+    /**
+     * Check if a state is configured as offline
+     */
+    private boolean isStateOffline(String stateId) {
+        EnhancedStateConfig config = stateConfigs.get(stateId);
+        return config != null && config.isOffline();
     }
     
     /**
@@ -311,5 +418,144 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public boolean isActive() {
         return !isComplete();
+    }
+    
+    // ===================== MONITORING AND DEBUG METHODS =====================
+    
+    /**
+     * Enable debug mode with snapshot recording
+     * WARNING: This should only be called by StateMachineRegistry
+     * Direct usage is deprecated - use StateMachineRegistry.enableDebugMode() instead
+     */
+    @Deprecated
+    public GenericStateMachine<TPersistingEntity, TContext> enableDebug(SnapshotRecorder<TPersistingEntity, TContext> snapshotRecorder) {
+        if (!registryControlledDebug) {
+            System.err.println("⚠️  WARNING: Direct debug mode enablement is deprecated!");
+            System.err.println("   Use StateMachineRegistry.enableDebugMode() instead.");
+            System.err.println("   Machine: " + this.id);
+        }
+        this.debugEnabled = true;
+        this.snapshotRecorder = snapshotRecorder;
+        return this;
+    }
+    
+    /**
+     * Enable debug mode from registry (internal method)
+     */
+    /* package-private */ GenericStateMachine<TPersistingEntity, TContext> enableDebugFromRegistry(SnapshotRecorder<TPersistingEntity, TContext> snapshotRecorder) {
+        this.registryControlledDebug = true;
+        this.debugEnabled = true;
+        this.snapshotRecorder = snapshotRecorder;
+        return this;
+    }
+    
+    /**
+     * Disable debug mode
+     */
+    public GenericStateMachine<TPersistingEntity, TContext> disableDebug() {
+        this.debugEnabled = false;
+        this.snapshotRecorder = null;
+        return this;
+    }
+    
+    /**
+     * Check if debug mode is enabled
+     */
+    public boolean isDebugEnabled() {
+        return debugEnabled && snapshotRecorder != null;
+    }
+    
+    /**
+     * Set the run ID for correlation
+     */
+    public GenericStateMachine<TPersistingEntity, TContext> setRunId(String runId) {
+        this.runId = runId;
+        return this;
+    }
+    
+    /**
+     * Set the correlation ID for tracking
+     */
+    public GenericStateMachine<TPersistingEntity, TContext> setCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
+        return this;
+    }
+    
+    /**
+     * Set the debug session ID
+     */
+    public GenericStateMachine<TPersistingEntity, TContext> setDebugSessionId(String debugSessionId) {
+        this.debugSessionId = debugSessionId;
+        return this;
+    }
+    
+    /**
+     * Get the run ID
+     */
+    public String getRunId() {
+        return runId;
+    }
+    
+    /**
+     * Get the correlation ID
+     */
+    public String getCorrelationId() {
+        return correlationId;
+    }
+    
+    /**
+     * Get the debug session ID
+     */
+    public String getDebugSessionId() {
+        return debugSessionId;
+    }
+    
+    /**
+     * Get the snapshot recorder
+     */
+    public SnapshotRecorder<TPersistingEntity, TContext> getSnapshotRecorder() {
+        return snapshotRecorder;
+    }
+    
+    /**
+     * Enable database persistence for snapshots when debug mode is active
+     */
+    public GenericStateMachine<TPersistingEntity, TContext> enableSnapshotPersistence(StateMachineSnapshotRepository repository) {
+        this.snapshotRepository = repository;
+        this.persistSnapshotsToDb = true;
+        return this;
+    }
+    
+    /**
+     * Auto-generate timestamp-based run ID
+     */
+    private String generateTimestampRunId() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+        String timestamp = LocalDateTime.now().format(formatter);
+        String randomSuffix = String.valueOf(System.nanoTime()).substring(8); // Last 5 digits of nanos
+        return getId().toLowerCase() + "-" + timestamp + "-" + randomSuffix;
+    }
+    
+    /**
+     * Set debug mode with automatic run ID generation and optional database persistence
+     */
+    public GenericStateMachine<TPersistingEntity, TContext> enableDebugMode(boolean enableDb) {
+        this.debugEnabled = true;
+        this.runId = generateTimestampRunId();
+        this.persistSnapshotsToDb = enableDb;
+        
+        // Log the debug session info
+        System.out.println("🔍 Debug mode enabled for machine: " + getId());
+        System.out.println("📊 Run ID: " + this.runId);
+        System.out.println("💾 Database persistence: " + (enableDb ? "ENABLED" : "DISABLED"));
+        
+        return this;
+    }
+    
+    /**
+     * Check if snapshot persistence to DB is enabled
+     */
+    public boolean isSnapshotPersistenceEnabled() {
+        return persistSnapshotsToDb && snapshotRepository != null;
     }
 }

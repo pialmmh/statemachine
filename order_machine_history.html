@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine History - order-machine-001</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 2em;
+    }
+
+    h2 {
+        color: #555;
+        margin-bottom: 15px;
+        font-size: 1.5em;
+    }
+
+    h3 {
+        color: #666;
+        margin-bottom: 15px;
+        font-size: 1.2em;
+    }
+
+    .machine-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .machine-info p {
+        color: #666;
+        margin: 5px 0;
+    }
+
+    .machine-selector {
+        margin-bottom: 30px;
+        padding: 15px;
+        background: #f0f0f0;
+        border-radius: 8px;
+    }
+
+    .machine-selector select {
+        padding: 8px 15px;
+        font-size: 16px;
+        border: 2px solid #667eea;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+    }
+
+    .state-diagram {
+        background: #f0f8ff;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        overflow-x: auto;
+    }
+
+    .flow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px;
+        white-space: nowrap;
+    }
+
+    .state {
+        background: #667eea;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+
+    .state.final {
+        background: #28a745;
+    }
+
+    .event {
+        background: #ffc107;
+        color: #333;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .arrow {
+        color: #999;
+        font-size: 1.5em;
+    }
+
+    .timeline {
+        margin-top: 30px;
+    }
+
+    .timeline-entry {
+        margin-bottom: 20px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .timeline-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .timeline-header:hover {
+        background: #e9ecef;
+    }
+
+    .version {
+        background: #6c757d;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .transition {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .event-badge {
+        background: #17a2b8;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+    }
+
+    .duration {
+        color: #28a745;
+        font-size: 0.9em;
+        margin-left: auto;
+    }
+
+    .timestamp {
+        color: #999;
+        font-size: 0.85em;
+    }
+
+    .timeline-details {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .context-section {
+        margin-bottom: 20px;
+    }
+
+    .context-section h4 {
+        color: #555;
+        margin-bottom: 10px;
+    }
+
+    .json-display {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        overflow-x: auto;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .hash {
+        color: #999;
+        font-size: 0.85em;
+        margin-top: 5px;
+        font-family: monospace;
+    }
+
+    .diff-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .diff-display {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    .diff-add {
+        background: #d4edda;
+        color: #155724;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .diff-remove {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 2px 4px;
+        border-radius: 2px;
+    }
+
+    .summary {
+        background: #e8f4f8;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>State Machine Transition History</h1>
+        <div class="machine-info">
+            <h2>Machine: order-machine-001</h2>
+            <p>Total Transitions: 5</p>
+            <p>Type: OrderEntity</p>
+            <p>Run ID: html-viewer-test-10725fb1</p>
+        </div>
+
+        <div class="state-diagram">
+            <h3>State Flow</h3>
+            <div class="flow">
+                <span class="state">PENDING</span>
+                <span class="arrow">→</span>
+                <span class="event">[VALIDATE]</span>
+                <span class="arrow">→</span>
+                <span class="state">VALIDATED</span>
+                <span class="arrow">→</span>
+                <span class="event">[PAYMENT_RECEIVED]</span>
+                <span class="arrow">→</span>
+                <span class="state">PAID</span>
+                <span class="arrow">→</span>
+                <span class="event">[SHIP]</span>
+                <span class="arrow">→</span>
+                <span class="state">SHIPPED</span>
+                <span class="arrow">→</span>
+                <span class="event">[DELIVER]</span>
+                <span class="arrow">→</span>
+                <span class="state">DELIVERED</span>
+                <span class="arrow">→</span>
+                <span class="event">[CONFIRM]</span>
+                <span class="arrow">→</span>
+                <span class="state final">COMPLETED</span>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <h3>Transition Timeline</h3>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-1')">
+                    <span class="version">v1</span>
+                    <span class="transition">PENDING → VALIDATED</span>
+                    <span class="event-badge">VALIDATE</span>
+                    <span class="duration">1ms</span>
+                    <span class="timestamp">2025-08-09T15:44:35.728119739</span>
+                </div>
+                <div class="timeline-details" id="snapshot-1" style="display: none;">
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "orderId" : "order-001",
+  "category" : "electronics",
+  "quantity" : 2,
+  "validatedTime" : null,
+  "paymentId" : null,
+  "trackingNumber" : null,
+  "deliveredTime" : null
+}</pre>
+                        <p class="hash">Hash: c163311ca4c8ec8d...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-2')">
+                    <span class="version">v2</span>
+                    <span class="transition">VALIDATED → PAID</span>
+                    <span class="event-badge">PAYMENT_RECEIVED</span>
+                    <span class="duration">0ms</span>
+                    <span class="timestamp">2025-08-09T15:44:35.73208729</span>
+                </div>
+                <div class="timeline-details" id="snapshot-2" style="display: none;">
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "orderId" : "order-001",
+  "category" : "electronics",
+  "quantity" : 2,
+  "validatedTime" : 1754732675731,
+  "paymentId" : null,
+  "trackingNumber" : null,
+  "deliveredTime" : null
+}</pre>
+                        <p class="hash">Hash: 3b2daac42156e4bf...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-3')">
+                    <span class="version">v3</span>
+                    <span class="transition">PAID → SHIPPED</span>
+                    <span class="event-badge">SHIP</span>
+                    <span class="duration">0ms</span>
+                    <span class="timestamp">2025-08-09T15:44:35.733280535</span>
+                </div>
+                <div class="timeline-details" id="snapshot-3" style="display: none;">
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "orderId" : "order-001",
+  "category" : "electronics",
+  "quantity" : 2,
+  "validatedTime" : 1754732675731,
+  "paymentId" : "payment-xyz-789",
+  "trackingNumber" : null,
+  "deliveredTime" : null
+}</pre>
+                        <p class="hash">Hash: 207e897c16a87946...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-4')">
+                    <span class="version">v4</span>
+                    <span class="transition">SHIPPED → DELIVERED</span>
+                    <span class="event-badge">DELIVER</span>
+                    <span class="duration">0ms</span>
+                    <span class="timestamp">2025-08-09T15:44:35.7344937</span>
+                </div>
+                <div class="timeline-details" id="snapshot-4" style="display: none;">
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "orderId" : "order-001",
+  "category" : "electronics",
+  "quantity" : 2,
+  "validatedTime" : 1754732675731,
+  "paymentId" : "payment-xyz-789",
+  "trackingNumber" : "TRACK123456789",
+  "deliveredTime" : null
+}</pre>
+                        <p class="hash">Hash: 58fbd8520b74a8fb...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-entry">
+                <div class="timeline-header" onclick="toggleDetails('snapshot-5')">
+                    <span class="version">v5</span>
+                    <span class="transition">DELIVERED → COMPLETED</span>
+                    <span class="event-badge">CONFIRM</span>
+                    <span class="duration">0ms</span>
+                    <span class="timestamp">2025-08-09T15:44:35.735454438</span>
+                </div>
+                <div class="timeline-details" id="snapshot-5" style="display: none;">
+                    <div class="context-section">
+                        <h4>Context After:</h4>
+                        <pre class="json-display">{
+  "orderId" : "order-001",
+  "category" : "electronics",
+  "quantity" : 2,
+  "validatedTime" : 1754732675731,
+  "paymentId" : "payment-xyz-789",
+  "trackingNumber" : "TRACK123456789",
+  "deliveredTime" : 1754732675735
+}</pre>
+                        <p class="hash">Hash: 74015684e2944b6e...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+    function toggleDetails(id) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.style.display = element.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    function showMachine(machineId) {
+        // Hide all machine contents
+        const allContents = document.querySelectorAll('.machine-content');
+        allContents.forEach(content => {
+            content.style.display = 'none';
+        });
+
+        // Show selected machine content
+        const selected = document.getElementById('machine-' + machineId);
+        if (selected) {
+            selected.style.display = 'block';
+        }
+    }
+
+    // Initialize first machine as visible
+    document.addEventListener('DOMContentLoaded', function() {
+        const firstMachine = document.querySelector('.machine-content');
+        if (firstMachine) {
+            firstMachine.style.display = 'block';
+        }
+    });
+</script>
+</body>
+</html>
