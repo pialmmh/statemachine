@@ -64,25 +64,25 @@ public class MonitoredCallMachineDemo {
         // 2. Send IncomingCall event
         System.out.println("2️⃣ Sending IncomingCall event...");
         IncomingCall incomingCall = new IncomingCall("+1-555-1234");
-        machine.sendEvent(incomingCall);
+        machine.fire(incomingCall);
         Thread.sleep(100);
         
         // 3. Send SessionProgress while ringing
         System.out.println("3️⃣ Sending SessionProgress event...");
         SessionProgress sessionProgress = new SessionProgress("EARLY_MEDIA", 100);
-        machine.sendEvent(sessionProgress);
+        machine.fire(sessionProgress);
         Thread.sleep(100);
         
         // 4. Send Answer event
         System.out.println("4️⃣ Sending Answer event...");
         Answer answer = new Answer();
-        machine.sendEvent(answer);
+        machine.fire(answer);
         Thread.sleep(100);
         
         // 5. Send Hangup event to complete call
         System.out.println("5️⃣ Sending Hangup event...");
         Hangup hangup = new Hangup();
-        machine.sendEvent(hangup);
+        machine.fire(hangup);
         
         System.out.println("📞 Call completed successfully!");
         System.out.println("   Current state: " + machine.getCurrentState());

@@ -142,6 +142,7 @@
                 <li><a href="#feature-matrix">📊 Feature/Responsibility Matrix</a></li>
                 <li><a href="#performance">⚡ Performance Optimization</a></li>
                 <li><a href="#mysql-integration">🗄️ MySQL Integration</a></li>
+                <li><a href="#monitoring-setup">📊 State Machine Monitoring Setup</a></li>
                 <li><a href="#examples">📝 Examples</a></li>
                 <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
             </ul>
@@ -514,6 +515,222 @@ CREATE TABLE sms_entities (
 );
         </div>
 
+        <h2 id="monitoring-setup">📊 State Machine Monitoring Setup</h2>
+
+        <p>The TelcoBright State Machine Library includes a powerful <strong>custom web-based monitoring interface</strong> that provides real-time visualization of state machine transitions, event details, and context data. The monitoring system captures complete state machine execution history with performance metrics.</p>
+
+        <div class="highlight">
+            <strong>🎯 Monitoring Features:</strong> Real-time state transition visualization, complete event payload inspection, before/after context comparison, registry status tracking, and performance metrics with transition durations.
+        </div>
+
+        <div class="note">
+            <strong>🚀 Quick Start:</strong> Run the monitoring server with <code>java -cp "target/classes:target/test-classes:$(cat classpath.txt)" com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer</code>, then open <a href="http://localhost:8091">http://localhost:8091</a> to see your custom monitoring dashboard.
+        </div>
+
+        <h3>Prerequisites</h3>
+        <ul>
+            <li><strong>☕ Java Runtime:</strong> Java 11+ required to run the monitoring server</li>
+            <li><strong>🗄️ PostgreSQL (Optional):</strong> For live database monitoring - falls back to sample data if not available</li>
+            <li><strong>🔗 Network Access:</strong> Port 8091 for the monitoring web interface</li>
+        </ul>
+
+        <h3>🚀 Starting the Monitoring Server</h3>
+        
+        <div class="code-block">
+# Start the monitoring server (with sample data)
+java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
+    com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer
+
+# The server will start on port 8091 and display:
+# 🚀 State Machine Monitoring Server Started!
+# 📊 Open your browser and go to: http://localhost:8091
+# 🎯 Custom monitoring interface for TelcoBright State Machines
+
+# Access the monitoring dashboard at:
+# http://localhost:8091
+        </div>
+
+        <h3>🔧 Enhanced Monitoring (with Database)</h3>
+        
+        <p>For live monitoring data from actual state machine executions, you can optionally set up PostgreSQL:</p>
+        
+        <div class="code-block">
+# 1. Start PostgreSQL (using Docker)
+cd docker
+docker-compose up -d postgres
+
+# 2. Add PostgreSQL JDBC driver to your classpath
+# (Download postgresql-XX.X.X.jar and add to classpath)
+
+# 3. Run the enhanced monitoring server
+java -cp "target/classes:target/test-classes:$(cat classpath.txt):postgresql-XX.X.X.jar" \
+    com.telcobright.statemachine.monitoring.web.EnhancedMonitoringServer
+        </div>
+
+        <h3>🎯 Monitoring Interface Features</h3>
+        
+        <p>The custom monitoring dashboard provides comprehensive insights into your state machines:</p>
+        
+        <table class="feature-matrix">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Description</th>
+                    <th>Benefits</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>📋 Run List</strong></td>
+                    <td>Shows recent state machine executions</td>
+                    <td>Quick overview of machine activity with triggering class info</td>
+                </tr>
+                <tr>
+                    <td><strong>📊 State Flow Visualization</strong></td>
+                    <td>Visual representation of state transitions</td>
+                    <td>Easy understanding of IDLE → RINGING → CONNECTED flows</td>
+                </tr>
+                <tr>
+                    <td><strong>⚡ Event Details</strong></td>
+                    <td>Complete event payloads and timing</td>
+                    <td>Debug event processing and performance analysis</td>
+                </tr>
+                <tr>
+                    <td><strong>🧠 Context Inspection</strong></td>
+                    <td>Before/after context comparison</td>
+                    <td>Track how events modify machine state and context</td>
+                </tr>
+                <tr>
+                    <td><strong>🏛️ Registry Status</strong></td>
+                    <td>Machine lifecycle and hydration tracking</td>
+                    <td>Understand registry management and memory optimization</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>🌐 Monitoring Dashboard Access</h3>
+        
+        <div class="highlight">
+            <strong>Custom Monitoring Interface:</strong> <a href="http://localhost:8091">http://localhost:8091</a><br>
+            <strong>Features:</strong> No login required - direct access to state machine monitoring
+        </div>
+
+        <h3>📈 Database Schema</h3>
+        
+        <p>The monitoring system uses a comprehensive schema to track state machine behavior:</p>
+        
+        <div class="code-block">
+-- State Machine Snapshots Table
+CREATE TABLE state_machine_snapshots (
+    id                          BIGSERIAL PRIMARY KEY,
+    machine_id                  VARCHAR(255) NOT NULL,
+    machine_type                VARCHAR(255) NOT NULL,
+    run_id                      VARCHAR(255) NOT NULL,
+    version                     BIGINT NOT NULL,
+    state_before                VARCHAR(255),
+    state_after                 VARCHAR(255),
+    event_type                  VARCHAR(255),
+    transition_duration         BIGINT DEFAULT 0,
+    timestamp                   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    registry_status             VARCHAR(100),
+    machine_online_status       BOOLEAN DEFAULT true,
+    state_offline_status        BOOLEAN DEFAULT false,
+    event_payload_json          TEXT,
+    context_before_json         TEXT,
+    context_after_json          TEXT,
+    triggering_class_name       VARCHAR(255),
+    triggering_class_full_path  TEXT,
+    registry_status_before      VARCHAR(100),
+    registry_status_after       VARCHAR(100),
+    machine_hydrated_before     BOOLEAN DEFAULT false,
+    machine_hydrated_after      BOOLEAN DEFAULT false,
+    event_sent_through_registry BOOLEAN DEFAULT true
+);
+
+-- Performance Index
+CREATE INDEX idx_snapshots_machine_timestamp 
+ON state_machine_snapshots (machine_id, timestamp DESC);
+        </div>
+
+        <h3>🎯 Running State Machine Demos</h3>
+        
+        <p>Generate monitoring data by running state machine demo classes:</p>
+        
+        <div class="code-block">
+# 1. Start the monitoring server first
+java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
+    com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer &
+
+# 2. Run CallMachine demo to generate transitions
+java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
+    com.telcobright.statemachine.test.MonitoredCallMachineDemo
+
+# 3. Run comprehensive monitoring demo
+java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
+    com.telcobright.statemachine.test.ComprehensiveMonitoringDemo
+
+# 4. View results at http://localhost:8091
+        </div>
+
+        <h3>📊 Understanding the Monitoring Data</h3>
+        
+        <p>The monitoring interface shows the complete lifecycle of your state machines:</p>
+        
+        <div class="code-block">
+🔍 Sample CallMachine Flow Visualization:
+
+Step 1: INCOMING_CALL Event (120ms)
+   IDLE → RINGING
+   📦 Payload: {"caller":"+1-555-DEMO"}
+   🏛️ Registry: REGISTERED_ACTIVE → REGISTERED_ACTIVE
+   
+Step 2: SESSION_PROGRESS Event (50ms)  
+   RINGING → RINGING (stay transition)
+   📦 Payload: {"status":"EARLY_MEDIA","code":100}
+   📊 Context: Call session events updated
+   
+Step 3: ANSWER Event (200ms)
+   RINGING → CONNECTED
+   📦 Payload: {"answeredBy":"user"}
+   📈 Context: Connected time recorded
+   
+Step 4: HANGUP Event (100ms)
+   CONNECTED → IDLE  
+   📦 Payload: {"reason":"normal_clearing","duration":45}
+   ✅ Context: Call marked as complete
+        </div>
+
+        <h3>🔧 Troubleshooting Monitoring</h3>
+        
+        <div class="warning">
+            <strong>Issue:</strong> Monitoring server won't start on port 8091<br>
+            <strong>Solution:</strong> Check if port 8091 is already in use with <code>ss -tlnp | grep 8091</code> and stop any conflicting services.
+        </div>
+
+        <div class="warning">
+            <strong>Issue:</strong> No monitoring data visible in dashboard<br>
+            <strong>Solution:</strong> Run state machine demos like <code>MonitoredCallMachineDemo</code> to generate sample data, or check if the database connection is working.
+        </div>
+
+        <div class="warning">
+            <strong>Issue:</strong> "PostgreSQL driver not found" error<br>
+            <strong>Solution:</strong> Use <code>SimpleMonitoringServer</code> for sample data, or add PostgreSQL JDBC driver to classpath for live monitoring.
+        </div>
+
+        <h3>💡 Monitoring Best Practices</h3>
+        
+        <ul>
+            <li><strong>🎯 Real-time Monitoring:</strong> Keep the monitoring server running during development for live state machine inspection</li>
+            <li><strong>📦 Event Analysis:</strong> Use the payload inspection feature to debug event processing issues</li>
+            <li><strong>⏱️ Performance Tracking:</strong> Monitor transition durations to identify performance bottlenecks</li>
+            <li><strong>🏷️ Registry Integration:</strong> Track machine lifecycle and hydration status for memory optimization</li>
+            <li><strong>📈 Historical Analysis:</strong> Use the run list to compare different executions and identify patterns</li>
+        </ul>
+
+        <div class="note">
+            <strong>📝 Monitoring Tip:</strong> The custom monitoring interface is designed specifically for TelcoBright State Machines, providing detailed insights into registry management, context changes, and event flow that are not available in generic monitoring tools.
+        </div>
+
         <h2 id="examples">📝 Examples</h2>
 
         <h3>Complete SMS Processing Example</h3>
@@ -586,6 +803,16 @@ public void processBulkSms(List&lt;SmsRequest&gt; requests) {
         <div class="warning">
             <strong>Issue:</strong> Performance issues with many new entities<br>
             <strong>Solution:</strong> Use <code>registry.create()</code> instead of <code>registry.createOrGet()</code> when you know entities are new.
+        </div>
+
+        <div class="warning">
+            <strong>Issue:</strong> Monitoring not working - port 8091 not accessible<br>
+            <strong>Solution:</strong> Start the monitoring server first: <code>java -cp "target/classes:target/test-classes:$(cat classpath.txt)" com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer</code>
+        </div>
+
+        <div class="warning">
+            <strong>Issue:</strong> Server starts but no data visible<br>
+            <strong>Solution:</strong> The server provides sample data by default. Run state machine demos to see more realistic data flows.
         </div>
 
         <h3>Debug Information</h3>

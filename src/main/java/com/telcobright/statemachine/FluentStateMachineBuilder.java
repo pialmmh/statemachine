@@ -369,7 +369,7 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
         }
         
         /**
-         * Set timeout for this state
+         * Set timeout for this state (uses default TIMEOUT event)
          */
         public StateBuilder timeout(long duration, TimeUnit unit) {
             TimeoutConfig timeout = new TimeoutConfig(duration, unit, "TIMEOUT");
@@ -378,7 +378,16 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
         }
         
         /**
-         * Set timeout with specific target state
+         * Set timeout for this state with specific target state
+         */
+        public StateBuilder timeout(long duration, TimeUnit unit, String targetState) {
+            TimeoutConfig timeout = new TimeoutConfig(duration, unit, targetState);
+            stateConfig.timeout(timeout);
+            return this;
+        }
+        
+        /**
+         * Set timeout with specific target state and action
          */
         public StateBuilder onTimeout(String targetState, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
             // Store timeout action - we'll need to enhance the state config to support this

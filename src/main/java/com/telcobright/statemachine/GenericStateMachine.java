@@ -106,6 +106,14 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     }
     
     /**
+     * Restore state from persisted entity (for rehydration)
+     */
+    public void restoreState(String state) {
+        this.currentState = state;
+        System.out.println("StateMachine " + id + " restored to state: " + currentState);
+    }
+    
+    /**
      * Stop the state machine
      */
     public void stop() {
@@ -155,6 +163,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 System.out.println("StateMachine " + id + " marked as complete - reached final state: " + newState);
             }
         }
+        
+        // Print current state after transition
+        System.out.println("📍 Current State: " + newState);
     }
     
     /**
@@ -189,18 +200,25 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         long startTime = System.currentTimeMillis();
         
         try {
-            Map<String, String> stateTransitions = transitions.get(currentState);
-            if (stateTransitions != null) {
-                String targetState = stateTransitions.get(event.getEventType());
-                if (targetState != null) {
-                    transitionTo(targetState);
-                } else {
-                    // Check for stay actions
-                    Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
-                    if (stateStayActions != null) {
-                        BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
-                        if (action != null) {
-                            action.accept(this, event);
+            // Special handling for TimeoutEvent - use its embedded target state
+            if (event instanceof TimeoutEvent) {
+                TimeoutEvent timeoutEvent = (TimeoutEvent) event;
+                transitionTo(timeoutEvent.getTargetState());
+            } else {
+                // Normal event handling through transitions map
+                Map<String, String> stateTransitions = transitions.get(currentState);
+                if (stateTransitions != null) {
+                    String targetState = stateTransitions.get(event.getEventType());
+                    if (targetState != null) {
+                        transitionTo(targetState);
+                    } else {
+                        // Check for stay actions
+                        Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
+                        if (stateStayActions != null) {
+                            BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
+                            if (action != null) {
+                                action.accept(this, event);
+                            }
                         }
                     }
                 }
@@ -362,12 +380,6 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     /**
      * Send event to state machine (for testing)
      */
-    public void sendEvent(StateMachineEvent event) {
-        handleEvent(event);
-    }
-    
-    
-    
     /**
      * Define a stay action - handle an event within a state without transitioning
      */

@@ -367,7 +367,7 @@ public class {{machineName}}TestRunner {
         
         {{#each testScenario}}
         // {{comment}}
-        machine.sendEvent(new {{event}}({{#if payload}}"{{payload}}"{{/if}}));
+        machine.fire(new {{event}}({{#if payload}}"{{payload}}"{{/if}}));
         Thread.sleep({{delay}});
         
         {{/each}}
