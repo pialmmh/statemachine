@@ -5,6 +5,7 @@ import com.telcobright.statemachine.events.GenericStateMachineEvent;
 import com.telcobright.statemachine.events.StateMachineEvent;
 import com.telcobright.statemachine.monitoring.*;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -201,6 +202,7 @@ public class ComprehensiveSnapshotTest {
         private String priority;
         private String currentState;
         private boolean complete = false;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         public TestEntity(String id) {
             this.id = id;
@@ -211,14 +213,31 @@ public class ComprehensiveSnapshotTest {
         @Override
         public void setComplete(boolean complete) { this.complete = complete; }
         
+        @Override
+        public String getCurrentState() { return currentState; }
+        
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
+        }
+        
         // Getters and setters
         public String getId() { return id; }
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
         public String getPriority() { return priority; }
         public void setPriority(String priority) { this.priority = priority; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
-        public String getCurrentState() { return currentState; }
     }
     
     // Rich context with comprehensive data

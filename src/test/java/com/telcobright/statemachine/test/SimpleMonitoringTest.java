@@ -4,6 +4,7 @@ import com.telcobright.statemachine.*;
 import com.telcobright.statemachine.events.GenericStateMachineEvent;
 import com.telcobright.statemachine.monitoring.*;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -89,6 +90,7 @@ public class SimpleMonitoringTest {
         private String id;
         private String currentState;
         private boolean complete = false;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         public TestEntity(String id) {
             this.id = id;
@@ -108,12 +110,25 @@ public class SimpleMonitoringTest {
             return id;
         }
         
+        @Override
         public void setCurrentState(String currentState) {
             this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
         }
         
+        @Override
         public String getCurrentState() {
             return currentState;
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
         }
     }
     

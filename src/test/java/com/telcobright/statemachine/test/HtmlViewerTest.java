@@ -330,6 +330,7 @@ public class HtmlViewerTest {
         private String toNumber;
         private String currentState;
         private boolean complete = false;
+        private java.time.LocalDateTime lastStateChange = java.time.LocalDateTime.now();
         
         public CallEntity(String id, String fromNumber, String toNumber) {
             this.id = id;
@@ -341,12 +342,23 @@ public class HtmlViewerTest {
         public boolean isComplete() { return complete; }
         @Override
         public void setComplete(boolean complete) { this.complete = complete; }
+        @Override
+        public String getCurrentState() { return currentState; }
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = java.time.LocalDateTime.now();
+        }
+        @Override
+        public java.time.LocalDateTime getLastStateChange() { return lastStateChange; }
+        @Override
+        public void setLastStateChange(java.time.LocalDateTime lastStateChange) { 
+            this.lastStateChange = lastStateChange; 
+        }
         
         public String getId() { return id; }
         public String getFromNumber() { return fromNumber; }
         public String getToNumber() { return toNumber; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
-        public String getCurrentState() { return currentState; }
     }
     
     public static class CallContext {
@@ -381,6 +393,7 @@ public class HtmlViewerTest {
         private double amount;
         private String currentState;
         private boolean complete = false;
+        private java.time.LocalDateTime lastStateChange = java.time.LocalDateTime.now();
         
         public OrderEntity(String id, String customerId, double amount) {
             this.id = id;
@@ -392,11 +405,23 @@ public class HtmlViewerTest {
         public boolean isComplete() { return complete; }
         @Override
         public void setComplete(boolean complete) { this.complete = complete; }
+        @Override
+        public String getCurrentState() { return currentState; }
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = java.time.LocalDateTime.now();
+        }
+        @Override
+        public java.time.LocalDateTime getLastStateChange() { return lastStateChange; }
+        @Override
+        public void setLastStateChange(java.time.LocalDateTime lastStateChange) { 
+            this.lastStateChange = lastStateChange; 
+        }
         
         public String getId() { return id; }
         public String getCustomerId() { return customerId; }
         public double getAmount() { return amount; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
     }
     
     public static class OrderContext {
@@ -434,6 +459,7 @@ public class HtmlViewerTest {
         private long fileSize;
         private String currentState;
         private boolean complete = false;
+        private java.time.LocalDateTime lastStateChange = java.time.LocalDateTime.now();
         
         public FileEntity(String id, String fileName, long fileSize) {
             this.id = id;
@@ -445,11 +471,23 @@ public class HtmlViewerTest {
         public boolean isComplete() { return complete; }
         @Override
         public void setComplete(boolean complete) { this.complete = complete; }
+        @Override
+        public String getCurrentState() { return currentState; }
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = java.time.LocalDateTime.now();
+        }
+        @Override
+        public java.time.LocalDateTime getLastStateChange() { return lastStateChange; }
+        @Override
+        public void setLastStateChange(java.time.LocalDateTime lastStateChange) { 
+            this.lastStateChange = lastStateChange; 
+        }
         
         public String getId() { return id; }
         public String getFileName() { return fileName; }
         public long getFileSize() { return fileSize; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
     }
     
     public static class FileContext {

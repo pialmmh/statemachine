@@ -504,6 +504,7 @@ public class CallMachineMonitoringDemo {
         private String toNumber;
         private String currentState;
         private boolean complete = false;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         @Override
         public boolean isComplete() { return complete; }
@@ -517,8 +518,25 @@ public class CallMachineMonitoringDemo {
         public void setFromNumber(String fromNumber) { this.fromNumber = fromNumber; }
         public String getToNumber() { return toNumber; }
         public void setToNumber(String toNumber) { this.toNumber = toNumber; }
+        
+        @Override
         public String getCurrentState() { return currentState; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
+        
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
+        }
     }
     
     // Call Context for rich call tracking

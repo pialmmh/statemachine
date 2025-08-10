@@ -1,10 +1,10 @@
 package com.telcobright.statemachine;
 
-import com.telcobright.db.entity.ShardingEntity;
+import java.time.LocalDateTime;
 
 /**
  * Interface for state machine context entities that combines persistence and completion capabilities.
- * Extends ShardingEntity for database persistence and adds completion tracking functionality.
+ * Provides database persistence capabilities and adds completion tracking functionality.
  * 
  * When an entity is marked as complete, the state machine has reached its final state
  * and will not be rehydrated from the repository for further processing.
@@ -14,7 +14,7 @@ import com.telcobright.db.entity.ShardingEntity;
  * 
  * @param <TKey> The type of the entity's primary key
  */
-public interface StateMachineContextEntity<TKey> extends ShardingEntity<TKey> {
+public interface StateMachineContextEntity<TKey> {
     
     /**
      * Check if this entity/state machine has completed its lifecycle.
@@ -47,4 +47,36 @@ public interface StateMachineContextEntity<TKey> extends ShardingEntity<TKey> {
     default boolean isActive() {
         return !isComplete();
     }
+    
+    /**
+     * Get the current state of the state machine.
+     * This field is persisted and updated after each state transition.
+     * 
+     * @return the current state name
+     */
+    String getCurrentState();
+    
+    /**
+     * Set the current state of the state machine.
+     * This should be updated automatically by the state machine after each transition.
+     * 
+     * @param state the new state name
+     */
+    void setCurrentState(String state);
+    
+    /**
+     * Get the timestamp of the last state change.
+     * This field is persisted and updated after each state transition.
+     * 
+     * @return the datetime when the state was last changed
+     */
+    LocalDateTime getLastStateChange();
+    
+    /**
+     * Set the timestamp of the last state change.
+     * This should be updated automatically by the state machine after each transition.
+     * 
+     * @param lastStateChange the datetime when the state was changed
+     */
+    void setLastStateChange(LocalDateTime lastStateChange);
 }

@@ -44,6 +44,7 @@ public class HumanLikeComprehensiveTest {
         private boolean isComplete = false;
         private LocalDateTime createdAt = LocalDateTime.now();
         private LocalDateTime updatedAt = LocalDateTime.now();
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         public SmsTestEntity() {}
         
@@ -67,10 +68,14 @@ public class HumanLikeComprehensiveTest {
         public String getMessageText() { return messageText; }
         public void setMessageText(String messageText) { this.messageText = messageText; }
         
+        @Override
         public String getCurrentState() { return currentState; }
+        
+        @Override
         public void setCurrentState(String currentState) { 
             this.currentState = currentState;
             this.updatedAt = LocalDateTime.now();
+            this.lastStateChange = LocalDateTime.now();
         }
         
         public int getAttemptCount() { return attemptCount; }
@@ -86,6 +91,16 @@ public class HumanLikeComprehensiveTest {
         public void setComplete(boolean complete) { 
             this.isComplete = complete;
             this.updatedAt = LocalDateTime.now();
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
         }
         
         @Override

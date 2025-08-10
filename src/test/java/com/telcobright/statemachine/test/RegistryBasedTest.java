@@ -18,6 +18,7 @@ public class RegistryBasedTest {
         private String currentState;
         private boolean isComplete = false;
         private LocalDateTime createdAt;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         public TestEntity(String id) {
             this.id = id;
@@ -27,8 +28,26 @@ public class RegistryBasedTest {
         
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
+        
+        @Override
         public String getCurrentState() { return currentState; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
+        
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
+        }
+        
         public LocalDateTime getCreatedAt() { return createdAt; }
         
         // Completable interface

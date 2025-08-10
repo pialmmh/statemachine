@@ -107,10 +107,57 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     
     /**
      * Restore state from persisted entity (for rehydration)
+     * Checks if the state has timed out and transitions to timeout target state if necessary
      */
     public void restoreState(String state) {
         this.currentState = state;
         System.out.println("StateMachine " + id + " restored to state: " + currentState);
+        
+        // Check for timeout after rehydration
+        checkAndHandleTimeout();
+    }
+    
+    /**
+     * Check if the current state has timed out based on persisted lastStateChange
+     * and transition to timeout target state if timeout has occurred
+     */
+    private void checkAndHandleTimeout() {
+        if (persistingEntity == null) {
+            return; // No entity to check timeout against
+        }
+        
+        LocalDateTime lastStateChange = persistingEntity.getLastStateChange();
+        if (lastStateChange == null) {
+            return; // No timestamp to check against
+        }
+        
+        // Get timeout configuration for current state
+        EnhancedStateConfig stateConfig = stateConfigs.get(currentState);
+        if (stateConfig == null || !stateConfig.hasTimeout()) {
+            return; // No timeout configured for this state
+        }
+        
+        // Calculate time elapsed since last state change
+        LocalDateTime now = LocalDateTime.now();
+        java.time.Duration elapsed = java.time.Duration.between(lastStateChange, now);
+        long elapsedMillis = elapsed.toMillis();
+        
+        // Get timeout duration in milliseconds
+        long timeoutMillis = stateConfig.getTimeoutConfig().getDuration();
+        
+        System.out.println("Timeout check for state " + currentState + ": elapsed=" + elapsedMillis + "ms, timeout=" + timeoutMillis + "ms");
+        
+        // Check if timeout has occurred
+        if (elapsedMillis > timeoutMillis) {
+            String targetState = stateConfig.getTimeoutConfig().getTargetState();
+            System.out.println("⏰ State " + currentState + " has timed out after " + elapsedMillis + "ms. Transitioning to: " + targetState);
+            
+            // Fire timeout event to trigger transition
+            TimeoutEvent timeoutEvent = new TimeoutEvent(currentState, targetState);
+            handleEvent(timeoutEvent);
+        } else {
+            System.out.println("✅ State " + currentState + " has not timed out. Remaining: " + (timeoutMillis - elapsedMillis) + "ms");
+        }
     }
     
     /**
@@ -173,15 +220,10 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     private void persistState() {
         if (persistingEntity != null) {
-            // TODO: Implement full ShardingEntity persistence integration
-            // For now, just update the entity's state field if it exists
-            try {
-                java.lang.reflect.Method setCurrentState = persistingEntity.getClass().getMethod("setCurrentState", String.class);
-                setCurrentState.invoke(persistingEntity, currentState);
-                System.out.println("Updated entity state to: " + currentState);
-            } catch (Exception e) {
-                // Entity doesn't have setCurrentState method or other error - that's ok
-            }
+            // Update state and lastStateChange fields
+            persistingEntity.setCurrentState(currentState);
+            persistingEntity.setLastStateChange(LocalDateTime.now());
+            System.out.println("Updated entity state to: " + currentState + " at " + persistingEntity.getLastStateChange());
         }
     }
     

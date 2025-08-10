@@ -26,6 +26,7 @@ public class SimpleTestRunner {
         private String id;
         private String currentState;
         private boolean isComplete = false;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         public SimpleEntity(String id) {
             this.id = id;
@@ -34,14 +35,31 @@ public class SimpleTestRunner {
         
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
+        
+        @Override
         public String getCurrentState() { return currentState; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
+        
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
+        }
         
         @Override
         public boolean isComplete() { return isComplete; }
         
         @Override
         public void setComplete(boolean complete) { this.isComplete = complete; }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
+        }
         
         @Override
         public String toString() {

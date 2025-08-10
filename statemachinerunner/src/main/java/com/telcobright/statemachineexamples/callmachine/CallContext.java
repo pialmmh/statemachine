@@ -4,36 +4,85 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import com.telcobright.statemachine.StateMachineContextEntity;
+import com.telcobright.db.entity.Id;
+import com.telcobright.db.entity.ShardingKey;
+import com.telcobright.db.entity.Column;
 
 /**
  * Rich call context with comprehensive call data and business logic
+ * Now implements StateMachineContextEntity for persistence support
  */
-public class CallContext {
+public class CallContext implements StateMachineContextEntity<String> {
+    
+    @Id
+    @Column("call_id")
     private String callId;
+    
+    @Column("current_state")
+    private String currentState;
+    
+    @Column("last_state_change")
+    private LocalDateTime lastStateChange;
+    
+    @Column("from_number")
     private String fromNumber;
+    
+    @Column("to_number")
     private String toNumber;
+    
+    @Column("start_time")
     private LocalDateTime startTime;
+    
+    @Column("end_time")
     private LocalDateTime endTime;
+    
+    @Column("connect_time")
     private LocalDateTime connectTime;
+    
+    @Column("call_direction")
     private String callDirection; // INBOUND, OUTBOUND
+    
+    @Column("call_status")
     private String callStatus; // RINGING, CONNECTED, ENDED
+    
+    // Note: sessionEvents will be stored separately or as JSON
     private List<String> sessionEvents;
+    
+    @Column("ring_count")
     private int ringCount;
+    
+    @Column("disconnect_reason")
     private String disconnectReason;
+    
+    @Column("recording_enabled")
     private boolean recordingEnabled;
     
-    public CallContext() {}
+    @Column("is_complete")
+    private boolean isComplete = false;
+    
+    @ShardingKey
+    @Column("partition_key")
+    private String partitionKey; // For sharding - based on callId
+    
+    public CallContext() {
+        this.sessionEvents = new ArrayList<>();
+    }
     
     public CallContext(String callId, String fromNumber, String toNumber) {
+        this();
         this.callId = callId;
         this.fromNumber = fromNumber;
         this.toNumber = toNumber;
         this.startTime = LocalDateTime.now();
+        this.currentState = "IDLE"; // Default initial state
+        this.lastStateChange = LocalDateTime.now();
         this.callDirection = "INBOUND"; // Default
         this.callStatus = "INITIALIZING";
-        this.sessionEvents = new ArrayList<>();
         this.ringCount = 0;
         this.recordingEnabled = false;
+        this.isComplete = false;
+        this.partitionKey = callId; // Use callId for sharding
         
         addSessionEvent("Call initialized from " + fromNumber + " to " + toNumber);
     }
@@ -134,6 +183,7 @@ public class CallContext {
     public List<String> getSessionEvents() { return sessionEvents; }
     
     public int getRingCount() { return ringCount; }
+    public void setRingCount(int ringCount) { this.ringCount = ringCount; }
     
     public String getDisconnectReason() { return disconnectReason; }
     
@@ -162,9 +212,55 @@ public class CallContext {
         return fromNumber;
     }
     
+    // StateMachineContextEntity interface implementation
+    @Override
+    public String getCurrentState() { 
+        return currentState; 
+    }
+    
+    @Override
+    public void setCurrentState(String currentState) { 
+        this.currentState = currentState;
+        this.lastStateChange = LocalDateTime.now();
+    }
+    
+    @Override
+    public LocalDateTime getLastStateChange() { 
+        return lastStateChange; 
+    }
+    
+    @Override
+    public void setLastStateChange(LocalDateTime lastStateChange) { 
+        this.lastStateChange = lastStateChange; 
+    }
+    
+    @Override
+    public boolean isComplete() { 
+        return isComplete; 
+    }
+    
+    @Override
+    public void setComplete(boolean complete) { 
+        this.isComplete = complete; 
+    }
+    
+    public Object getShardingKey() { 
+        return partitionKey; 
+    }
+    
+    // Additional getters/setters for new fields
+    public String getPartitionKey() { 
+        return partitionKey; 
+    }
+    
+    public void setPartitionKey(String partitionKey) { 
+        this.partitionKey = partitionKey; 
+    }
+    
+    @Override
     public String toString() {
-        return String.format("CallContext{callId='%s', from='%s', to='%s', status='%s', duration=%s}",
-                callId, fromNumber, toNumber, callStatus, 
-                getCallDuration().toSeconds() + "s");
+        return String.format("CallContext{callId='%s', state='%s', from='%s', to='%s', status='%s', duration=%s, complete=%s}",
+                callId, currentState, fromNumber, toNumber, callStatus, 
+                getCallDuration().toSeconds() + "s", isComplete);
     }
 }

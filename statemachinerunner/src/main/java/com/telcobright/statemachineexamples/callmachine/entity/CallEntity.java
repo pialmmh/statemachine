@@ -50,6 +50,9 @@ public class CallEntity implements StateMachineContextEntity<String> {
     @Column("is_complete")
     private boolean isComplete = false;
     
+    @Column("last_state_change")
+    private LocalDateTime lastStateChange;
+    
     // Default constructor
     public CallEntity() {
         this.createdAt = LocalDateTime.now();
@@ -61,6 +64,7 @@ public class CallEntity implements StateMachineContextEntity<String> {
         this();
         this.callId = callId;
         this.currentState = currentState;
+        this.lastStateChange = LocalDateTime.now();
         this.fromNumber = fromNumber;
         this.toNumber = toNumber;
         this.callStatus = "INITIALIZING";
@@ -76,6 +80,13 @@ public class CallEntity implements StateMachineContextEntity<String> {
     public String getCurrentState() { return currentState; }
     public void setCurrentState(String currentState) { 
         this.currentState = currentState;
+        this.updatedAt = LocalDateTime.now();
+        this.lastStateChange = LocalDateTime.now();
+    }
+    
+    public LocalDateTime getLastStateChange() { return lastStateChange; }
+    public void setLastStateChange(LocalDateTime lastStateChange) { 
+        this.lastStateChange = lastStateChange;
         this.updatedAt = LocalDateTime.now();
     }
     

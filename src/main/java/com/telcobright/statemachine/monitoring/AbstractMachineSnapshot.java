@@ -175,6 +175,21 @@ public abstract class AbstractMachineSnapshot implements MachineSnapshot, StateM
     @Override
     public void setComplete(boolean complete) { this.isComplete = complete; }
     
+    @Override
+    public String getCurrentState() { return stateAfter; }
+    
+    @Override
+    public void setCurrentState(String state) { this.stateAfter = state; }
+    
+    @Override
+    public LocalDateTime getLastStateChange() { return createdAt; }
+    
+    @Override
+    public void setLastStateChange(LocalDateTime lastStateChange) { 
+        // For snapshots, we use createdAt as the state change timestamp
+        this.createdAt = lastStateChange;
+    }
+    
     // Setters for building snapshots
     public void setSnapshotId(String snapshotId) { this.snapshotId = snapshotId; }
     public void setMachineId(String machineId) { this.machineId = machineId; }

@@ -6,6 +6,8 @@ import com.telcobright.statemachine.monitoring.*;
 import com.telcobright.statemachine.persistence.*;
 import com.telcobright.statemachine.test.entity.CallEntitySnapshot;
 
+import java.time.LocalDateTime;
+
 /**
  * Comprehensive State Machine Monitoring Demo
  * 
@@ -524,10 +526,30 @@ public class ComprehensiveMonitoringDemo {
         private String toNumber;
         private String currentState;
         private boolean complete = false;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         @Override public boolean isComplete() { return complete; }
         @Override public void setComplete(boolean complete) { this.complete = complete; }
         public String getShardingKey() { return callId; }
+        
+        @Override
+        public String getCurrentState() { return currentState; }
+        
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
+        }
         
         public String getCallId() { return callId; }
         public void setCallId(String callId) { this.callId = callId; }
@@ -535,8 +557,6 @@ public class ComprehensiveMonitoringDemo {
         public void setFromNumber(String fromNumber) { this.fromNumber = fromNumber; }
         public String getToNumber() { return toNumber; }
         public void setToNumber(String toNumber) { this.toNumber = toNumber; }
-        public String getCurrentState() { return currentState; }
-        public void setCurrentState(String currentState) { this.currentState = currentState; }
     }
     
     public static class CallContext {

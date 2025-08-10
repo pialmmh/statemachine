@@ -4,6 +4,8 @@ import com.telcobright.statemachine.*;
 import com.telcobright.statemachine.events.GenericStateMachineEvent;
 import com.telcobright.statemachine.monitoring.*;
 
+import java.time.LocalDateTime;
+
 /**
  * Quick demonstration of how to use monitoring and generate reports.
  * This is the simplest possible example to get started.
@@ -98,6 +100,8 @@ public class QuickMonitoringDemo {
     public static class SimpleEntity implements StateMachineContextEntity<String> {
         private String id;
         private boolean complete = false;
+        private String currentState;
+        private LocalDateTime lastStateChange = LocalDateTime.now();
         
         public SimpleEntity(String id) {
             this.id = id;
@@ -107,6 +111,25 @@ public class QuickMonitoringDemo {
         public boolean isComplete() { return complete; }
         @Override
         public void setComplete(boolean complete) { this.complete = complete; }
+        
+        @Override
+        public String getCurrentState() { return currentState; }
+        
+        @Override
+        public void setCurrentState(String currentState) { 
+            this.currentState = currentState;
+            this.lastStateChange = LocalDateTime.now();
+        }
+        
+        @Override
+        public LocalDateTime getLastStateChange() {
+            return lastStateChange;
+        }
+        
+        @Override
+        public void setLastStateChange(LocalDateTime lastStateChange) {
+            this.lastStateChange = lastStateChange;
+        }
         
         public String getId() { return id; }
     }
