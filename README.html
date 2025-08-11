@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TelcoBright State Machine Library</title>
+    <title>TelcoBright State Machine Library - Technical Documentation</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -52,799 +52,462 @@
             padding-left: 0;
         }
         .toc li {
-            padding: 5px 0;
+            margin: 8px 0;
+            padding-left: 20px;
         }
         .toc a {
             color: #007bff;
             text-decoration: none;
-            padding-left: 20px;
         }
         .toc a:hover {
             text-decoration: underline;
         }
-        .code-block {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 4px;
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
             padding: 15px;
-            margin: 15px 0;
+            border-radius: 5px;
             overflow-x: auto;
-            font-family: 'Courier New', Consolas, monospace;
-            font-size: 14px;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        pre code {
+            background: none;
+            padding: 0;
         }
         .highlight {
             background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 4px;
             padding: 15px;
-            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
         }
-        .note {
-            background: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 15px 0;
+        .section {
+            margin-bottom: 40px;
         }
-        .warning {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-        .feature-matrix {
+        table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
         }
-        .feature-matrix th, .feature-matrix td {
+        th, td {
             border: 1px solid #dee2e6;
             padding: 12px;
             text-align: left;
         }
-        .feature-matrix th {
-            background-color: #e9ecef;
-            font-weight: bold;
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
         }
-        .feature-matrix tr:nth-child(even) {
-            background-color: #f8f9fa;
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 3px;
+            margin: 0 5px;
         }
-        .checkmark {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .cross {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        .emoji {
-            font-size: 1.2em;
-        }
+        .badge-primary { background: #007bff; color: white; }
+        .badge-success { background: #28a745; color: white; }
+        .badge-warning { background: #ffc107; color: #212529; }
+        .badge-danger { background: #dc3545; color: white; }
+        .badge-info { background: #17a2b8; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎯 TelcoBright State Machine Library</h1>
-        <p><strong>A powerful, registry-based state machine framework with dual generic architecture, persistence support, and high-volume processing capabilities.</strong></p>
+        <h1>🚀 TelcoBright State Machine Library</h1>
+        
+        <div class="highlight">
+            <strong>Quick Start:</strong> Run <code>./monitor-start.sh</code> to start the monitoring system, then access <code>http://localhost:8091</code>
+        </div>
 
         <div class="toc">
             <h2>📋 Table of Contents</h2>
             <ul>
-                <li><a href="#overview">🔍 Overview</a></li>
-                <li><a href="#key-features">✨ Key Features</a></li>
-                <li><a href="#architecture">🏗️ Architecture</a></li>
-                <li><a href="#interface-design">🔧 Interface Design</a></li>
-                <li><a href="#getting-started">🚀 Getting Started</a></li>
-                <li><a href="#registry-usage">🏛️ Registry-Based Usage</a></li>
-                <li><a href="#entity-configuration">💾 Entity Configuration</a></li>
-                <li><a href="#comprehensive-testing">🧪 Comprehensive Testing</a></li>
-                <li><a href="#feature-matrix">📊 Feature/Responsibility Matrix</a></li>
-                <li><a href="#performance">⚡ Performance Optimization</a></li>
-                <li><a href="#mysql-integration">🗄️ MySQL Integration</a></li>
-                <li><a href="#monitoring-setup">📊 State Machine Monitoring Setup</a></li>
-                <li><a href="#examples">📝 Examples</a></li>
-                <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+                <li>📖 <a href="#overview">Project Overview</a></li>
+                <li>🏗️ <a href="#architecture">Architecture Components</a></li>
+                <li>🚀 <a href="#quickstart">Quick Start Guide</a></li>
+                <li>📊 <a href="#monitoring">Monitoring System</a></li>
+                <li>🔌 <a href="#websocket">WebSocket Integration</a></li>
+                <li>💾 <a href="#database">Database Persistence</a></li>
+                <li>📁 <a href="#structure">File Structure</a></li>
+                <li>🔧 <a href="#configuration">Configuration</a></li>
+                <li>📝 <a href="#examples">Examples</a></li>
+                <li>🎯 <a href="#patterns">Design Patterns</a></li>
             </ul>
         </div>
 
-        <h2 id="overview">🔍 Overview</h2>
-        <p>The TelcoBright State Machine Library provides a robust, enterprise-grade state machine framework designed for high-volume telecom applications. It features a dual generic architecture that separates persistent and volatile data, registry-based lifecycle management, and comprehensive MySQL integration through partitioned repositories.</p>
-
-        <div class="highlight">
-            <strong>🎯 Primary Use Case:</strong> High-volume SMS and call processing with state persistence, retry logic, timeout handling, and completion tracking.
+        <div class="section" id="overview">
+            <h2>📖 Project Overview</h2>
+            <p>A comprehensive state machine framework with real-time monitoring, database persistence, and WebSocket-based live viewing capabilities. The system provides both historical snapshot viewing and live state transition monitoring through a web interface.</p>
+            
+            <h3>Key Features</h3>
+            <ul>
+                <li><span class="badge badge-primary">Core</span> Generic state machine implementation with hierarchical states</li>
+                <li><span class="badge badge-success">Registry</span> Centralized management of multiple state machines</li>
+                <li><span class="badge badge-info">Monitoring</span> Real-time WebSocket monitoring and historical snapshots</li>
+                <li><span class="badge badge-warning">Persistence</span> PostgreSQL database integration for state history</li>
+                <li><span class="badge badge-danger">Web UI</span> Dual-mode interface (Snapshot/Live viewing)</li>
+            </ul>
         </div>
 
-        <h2 id="key-features">✨ Key Features</h2>
-        <ul>
-            <li><strong>🔄 Dual Generic Architecture:</strong> <code>GenericStateMachine&lt;TPersistingEntity, TContext&gt;</code></li>
-            <li><strong>🏛️ Registry-Based Management:</strong> Centralized lifecycle management with performance optimization</li>
-            <li><strong>💾 Unified Interface Design:</strong> <code>StateMachineContextEntity</code> extends <code>ShardingEntity</code></li>
-            <li><strong>🗄️ MySQL Persistence:</strong> Partitioned repository support with ById and ByIdAndDateRange lookup modes</li>
-            <li><strong>⏰ Timeout Handling:</strong> Built-in timeout management with configurable actions</li>
-            <li><strong>🔚 Completion Tracking:</strong> Automatic final state detection and completion marking</li>
-            <li><strong>📈 High-Volume Processing:</strong> Optimized for bulk operations and concurrent processing</li>
-            <li><strong>🧪 Comprehensive Testing:</strong> Human-like test scenarios with detailed validation</li>
-            <li><strong>🎭 Fluent Builder API:</strong> Intuitive state machine configuration</li>
-            <li><strong>🔄 Retry Logic:</strong> Built-in support for retry scenarios and failure handling</li>
-        </ul>
+        <div class="section" id="architecture">
+            <h2>🏗️ Architecture Components</h2>
+            
+            <h3>1. Core State Machine Framework</h3>
+            <pre><code>// Generic state machine with three type parameters
+StateMachine&lt;S, E, C&gt;
+  S - State enum type
+  E - Event enum type  
+  C - Context type (implements StateMachineContextEntity)
 
-        <h2 id="architecture">🏗️ Architecture</h2>
-        
-        <h3>Dual Generic Design</h3>
-        <div class="code-block">
-GenericStateMachine&lt;TPersistingEntity extends StateMachineContextEntity&lt;?&gt;, TContext&gt;
+// Configuration builder
+StateMachineConfig&lt;S, E, C&gt;
+  - Define states and transitions
+  - Add entry/exit actions
+  - Configure guards
+  - Support hierarchical states</code></pre>
 
-Where:
-- TPersistingEntity: The entity that gets persisted to database
-- TContext: Volatile runtime context (not persisted)
+            <h3>2. State Machine Registry</h3>
+            <pre><code>StateMachineRegistry&lt;TPersistentContext, TVolatileContext&gt;
+  - createMachine(id, config, persistentContext, volatileContext)
+  - rehydrateMachine(id, config, persistentContext, volatileContext)
+  - removeMachine(id)
+  - sendEvent(id, event)
+  - addListener(listener)</code></pre>
+
+            <h3>3. Listener Interface</h3>
+            <pre><code>StateMachineListener&lt;TPersistentContext, TVolatileContext&gt;
+  - onRegistryCreate(machineId)
+  - onRegistryRehydrate(machineId)
+  - onRegistryRemove(machineId)
+  - onStateMachineEvent(machineId, oldState, newState, context)</code></pre>
         </div>
 
-        <div class="note">
-            <strong>📝 Design Principle:</strong> The ID of the persistingEntity IS the ID of the state machine. This creates a direct 1:1 mapping between business entities and their state machines.
+        <div class="section" id="quickstart">
+            <h2>🚀 Quick Start Guide</h2>
+            
+            <h3>Starting the Monitoring System</h3>
+            <pre><code># Start both WebSocket server and Web UI
+./monitor-start.sh
+
+# This starts:
+# - WebSocket server on port 9999
+# - SimpleMonitoringServer on port 8091
+# Access at: http://localhost:8091</code></pre>
+
+            <h3>Running Demo State Machines</h3>
+            <pre><code># Interactive CLI Monitor
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.monitoring.cli.StateMachineCliMonitor"
+
+# WebSocket-enabled Runner
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.StateMachineRunnerWithWebServer"
+
+# Minimal Test Runner
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.demo.MinimalUpdateRunner"</code></pre>
         </div>
 
-        <h3>Registry-Based Lifecycle Management</h3>
-        <div class="code-block">
-StateMachineRegistry registry = new StateMachineRegistry();
+        <div class="section" id="monitoring">
+            <h2>📊 Monitoring System</h2>
+            
+            <h3>SimpleMonitoringServer (Port 8091)</h3>
+            <p>The "perfect" monitoring server with dual-mode interface:</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mode</th>
+                        <th>Features</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Snapshot Mode</strong> <span class="badge badge-primary">Default</span></td>
+                        <td>
+                            • Historical transitions from PostgreSQL<br>
+                            • Context diff viewing (before/after)<br>
+                            • Registry status tracking<br>
+                            • Triggering class information
+                        </td>
+                        <td>Analyzing past state transitions and debugging</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Live Mode</strong> <span class="badge badge-success">WebSocket</span></td>
+                        <td>
+                            • Real-time state updates<br>
+                            • Event sending panel<br>
+                            • Editable JSON payloads<br>
+                            • Connection status indicator
+                        </td>
+                        <td>Testing and monitoring active state machines</td>
+                    </tr>
+                </tbody>
+            </table>
 
-// For NEW entities (performance optimized - skips DB lookup)
-GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
-    registry.create(smsId, () -&gt; SmsMachine.create(smsId));
-
-// For EXISTING entities (checks DB first)
-GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
-    registry.createOrGet(smsId, () -&gt; SmsMachine.create(smsId));
+            <h3>Web UI Features</h3>
+            <ul>
+                <li>Purple gradient theme with responsive layout</li>
+                <li>Left panel: Recent runs (Snapshot) / Event sender (Live)</li>
+                <li>Right panel: History viewer / Live state display</li>
+                <li>Database status indicator (top-right, small font)</li>
+                <li>Mode toggle buttons: 📸 Snapshot Viewer / 🔴 Live Viewer</li>
+                <li>Toast notifications for connection events</li>
+            </ul>
         </div>
 
-        <h2 id="interface-design">🔧 Interface Design</h2>
-        
-        <h3>Unified StateMachineContextEntity Interface</h3>
-        <div class="code-block">
-public interface StateMachineContextEntity&lt;TKey&gt; extends ShardingEntity&lt;TKey&gt; {
-    // Completion tracking
-    boolean isComplete();
-    void setComplete(boolean complete);
-    
-    // Convenience methods
-    default void markComplete() { setComplete(true); }
-    default boolean isActive() { return !isComplete(); }
+        <div class="section" id="websocket">
+            <h2>🔌 WebSocket Integration</h2>
+            
+            <h3>WebSocket Server (Port 9999)</h3>
+            <pre><code>// Server broadcasts state changes
+{
+  "type": "STATE_CHANGE",
+  "machineId": "call-123",
+  "oldState": "IDLE",
+  "newState": "RINGING",
+  "context": { /* full context */ },
+  "timestamp": "2024-01-01T12:00:00"
+}</code></pre>
+
+            <h3>Client Commands</h3>
+            <pre><code>// Send event with payload
+ws.send(JSON.stringify({
+  action: "INCOMING_CALL",
+  payload: { callerNumber: "+1-555-9999" }
+}));
+
+// Request current state
+ws.send(JSON.stringify({
+  action: "GET_STATE"
+}));</code></pre>
+
+            <h3>Supported Events</h3>
+            <ul>
+                <li><code>INCOMING_CALL</code> - Initiate incoming call</li>
+                <li><code>ANSWER</code> - Answer the call</li>
+                <li><code>HANGUP</code> - End the call</li>
+                <li><code>SESSION_PROGRESS</code> - Session progress update</li>
+            </ul>
+        </div>
+
+        <div class="section" id="database">
+            <h2>💾 Database Persistence</h2>
+            
+            <h3>PostgreSQL Configuration</h3>
+            <pre><code>Database: statemachine_monitoring
+User: statemachine
+Password: monitoring123
+URL: jdbc:postgresql://localhost:5432/statemachine_monitoring</code></pre>
+
+            <h3>Database Schema</h3>
+            <pre><code>CREATE TABLE state_machine_snapshots (
+    id BIGSERIAL PRIMARY KEY,
+    run_id VARCHAR(255),
+    machine_id VARCHAR(255),
+    machine_type VARCHAR(100),
+    version BIGINT,
+    timestamp TIMESTAMP,
+    state_before VARCHAR(100),
+    state_after VARCHAR(100),
+    event_type VARCHAR(100),
+    transition_duration BIGINT,
+    registry_status VARCHAR(50),
+    machine_online_status BOOLEAN,
+    event_payload_json TEXT,      -- Base64 encoded JSON
+    context_before_json TEXT,     -- Base64 encoded JSON
+    context_after_json TEXT,      -- Base64 encoded JSON
+    registry_status_before VARCHAR(50),
+    registry_status_after VARCHAR(50),
+    machine_hydrated_before BOOLEAN,
+    machine_hydrated_after BOOLEAN,
+    event_sent_through_registry BOOLEAN,
+    triggering_class_name VARCHAR(255),
+    triggering_class_full_path VARCHAR(500)
+);</code></pre>
+        </div>
+
+        <div class="section" id="structure">
+            <h2>📁 File Structure</h2>
+            <pre><code>src/main/java/com/telcobright/statemachine/
+├── core/
+│   ├── StateMachine.java                    # Core state machine implementation
+│   ├── StateMachineConfig.java              # Configuration builder
+│   └── StateMachineContextEntity.java       # Base context interface
+├── registry/
+│   ├── StateMachineRegistry.java            # Centralized registry
+│   └── StateMachineListener.java            # Event listener interface
+├── monitoring/
+│   ├── web/
+│   │   ├── SimpleMonitoringServer.java      # Main web UI (port 8091)
+│   │   └── EnhancedMonitoringServer.java    # Alternative UI
+│   ├── cli/
+│   │   └── StateMachineCliMonitor.java      # Interactive CLI monitor
+│   └── service/
+│       └── MonitoringService.java           # Database persistence
+├── websocket/
+│   ├── StateMachineRunnerWithWebServer.java # WebSocket server (port 9999)
+│   └── WebSocketMonitor.java                # WebSocket client
+├── demo/
+│   ├── call/
+│   │   ├── CallMachine.java                 # Call state machine
+│   │   ├── CallEntity.java                  # Persistent context
+│   │   └── CallContext.java                 # Volatile context
+│   └── MinimalUpdateRunner.java             # Test runner
+└── persistence/
+    └── StateMachineSnapshot.java            # Snapshot entity</code></pre>
+        </div>
+
+        <div class="section" id="configuration">
+            <h2>🔧 Configuration</h2>
+            
+            <h3>Maven Dependencies</h3>
+            <pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.postgresql&lt;/groupId&gt;
+    &lt;artifactId&gt;postgresql&lt;/artifactId&gt;
+    &lt;version&gt;42.6.0&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.java-websocket&lt;/groupId&gt;
+    &lt;artifactId&gt;Java-WebSocket&lt;/artifactId&gt;
+    &lt;version&gt;1.5.4&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;com.google.code.gson&lt;/groupId&gt;
+    &lt;artifactId&gt;gson&lt;/artifactId&gt;
+    &lt;version&gt;2.10.1&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+        </div>
+
+        <div class="section" id="examples">
+            <h2>📝 Examples</h2>
+            
+            <h3>Call State Machine</h3>
+            <pre><code>// States
+public enum CallState {
+    IDLE, INCOMING, OUTGOING, RINGING,
+    IN_CALL, ON_HOLD, COMPLETED, FAILED
 }
-        </div>
 
-        <div class="highlight">
-            <strong>🎯 Simplified Design:</strong> Entities now implement just ONE interface instead of two (<code>ShardingEntity</code> + <code>Completable</code>), providing both persistence and completion capabilities in a unified interface.
-        </div>
+// Events
+public enum CallEvent {
+    INCOMING_CALL, OUTGOING_CALL, ANSWER,
+    HANGUP, HOLD, RESUME, TIMEOUT, ERROR
+}
 
-        <h3>Example Entity Implementation</h3>
-        <div class="code-block">
-public class SmsEntity implements StateMachineContextEntity&lt;String&gt; {
-    @Id
-    @Column("sms_id")
-    private String smsId;  // This is the state machine ID
-    
-    @Column("current_state")
-    private String currentState;
-    
-    @Column("from_number")
-    private String fromNumber;
-    
-    @Column("to_number") 
-    private String toNumber;
-    
-    @Column("message_text")
-    private String messageText;
-    
-    @Column("attempt_count")
-    private int attemptCount;
-    
-    @ShardingKey
-    @Column("created_at")
-    private LocalDateTime createdAt;
-    
-    @Column("is_complete")
-    private boolean isComplete = false;
-    
-    // StateMachineContextEntity implementation
+// Configuration
+StateMachineConfig&lt;CallState, CallEvent, CallEntity&gt; config = 
+    new StateMachineConfig.Builder&lt;&gt;()
+        .state(CallState.IDLE)
+            .on(CallEvent.INCOMING_CALL).transitionTo(CallState.INCOMING)
+            .on(CallEvent.OUTGOING_CALL).transitionTo(CallState.OUTGOING)
+        .state(CallState.INCOMING)
+            .onEntry(ctx -> log("Incoming call from " + ctx.getCallerNumber()))
+            .on(CallEvent.ANSWER).transitionTo(CallState.IN_CALL)
+            .on(CallEvent.HANGUP).transitionTo(CallState.COMPLETED)
+        .build();</code></pre>
+
+            <h3>Creating and Using Registry</h3>
+            <pre><code>// Create registry
+StateMachineRegistry&lt;CallEntity, CallContext&gt; registry = new StateMachineRegistry&lt;&gt;();
+
+// Add listener for monitoring
+registry.addListener(new StateMachineListener&lt;&gt;() {
     @Override
-    public boolean isComplete() { return isComplete; }
-    
-    @Override
-    public void setComplete(boolean complete) { 
-        this.isComplete = complete; 
-        this.updatedAt = LocalDateTime.now();
+    public void onStateMachineEvent(String machineId, String oldState, 
+                                   String newState, CallEntity entity, 
+                                   CallContext context) {
+        System.out.println("State change: " + oldState + " → " + newState);
     }
-    
-    // ... getters and setters
-}
+});
+
+// Create machine
+CallEntity entity = new CallEntity();
+CallContext context = new CallContext();
+registry.createMachine("call-123", config, entity, context);
+
+// Send event
+registry.sendEvent("call-123", CallEvent.INCOMING_CALL);</code></pre>
         </div>
 
-        <h2 id="getting-started">🚀 Getting Started</h2>
-
-        <h3>1. Create Your Entity</h3>
-        <div class="code-block">
-public class SmsEntity implements StateMachineContextEntity&lt;String&gt; {
-    // Entity fields with JPA-like annotations
-    // Implement StateMachineContextEntity methods
-}
-        </div>
-
-        <h3>2. Create Your Context</h3>
-        <div class="code-block">
-public class SmsContext {
-    private String processingStatus;
-    private List&lt;String&gt; events = new ArrayList&lt;&gt;();
-    // Volatile runtime data
-}
-        </div>
-
-        <h3>3. Build Your State Machine</h3>
-        <div class="code-block">
-public static GenericStateMachine&lt;SmsEntity, SmsContext&gt; create(String smsId) {
-    return FluentStateMachineBuilder.&lt;SmsEntity, SmsContext&gt;create(smsId)
-        .initialState("PENDING")
-        .state("PENDING").done()
-        .state("SENDING").timeout(30000, TimeUnit.MILLISECONDS).done()
-        .state("DELIVERED").finalState().done()
-        .state("FAILED").finalState().done()
-        .build();
-}
-        </div>
-
-        <h3>4. Use Registry for Lifecycle Management</h3>
-        <div class="code-block">
-StateMachineRegistry registry = new StateMachineRegistry();
-
-// Create new SMS (performance optimized)
-GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
-    registry.create(smsId, () -&gt; SmsMachine.create(smsId));
-
-// Set up entity and context
-SmsEntity entity = new SmsEntity(smsId, fromNumber, toNumber, message);
-SmsContext context = new SmsContext(smsId);
-
-machine.setPersistingEntity(entity);
-machine.setContext(context);
-machine.start();
-
-// Process events
-machine.fire(new SendSms());
-machine.fire(new DeliveryConfirmation());
-        </div>
-
-        <h2 id="registry-usage">🏛️ Registry-Based Usage</h2>
-
-        <div class="warning">
-            <strong>⚠️ Important:</strong> This library is intended to be used through a registry ONLY. Do not create state machines directly without the StateMachineRegistry.
-        </div>
-
-        <h3>Registry Methods</h3>
-        <div class="code-block">
-// Create new machine (skips DB lookup for performance)
-registry.create(id, factory);
-
-// Create or get existing machine (checks DB first)
-registry.createOrGet(id, factory);
-
-// Check if machine exists in memory
-registry.isInMemory(id);
-
-// Get registry size
-registry.size();
-
-// Manual eviction (for memory management)
-registry.evict(id);
-        </div>
-
-        <h3>Performance Optimization</h3>
-        <div class="highlight">
-            <strong>🚀 Performance Tip:</strong> Use <code>create()</code> method for thousands of new incoming requests/SMS when you know they're new. This avoids unnecessary DB lookups and significantly improves performance.
-        </div>
-
-        <h2 id="entity-configuration">💾 Entity Configuration</h2>
-
-        <h3>Partitioned Repository Integration</h3>
-        <div class="code-block">
-// MySQL Configuration
-host: 127.0.0.1
-user: root
-password: 123456
-
-// Lookup Modes:
-- ById: Simple ID-based lookup
-- ByIdAndDateRange: High-volume processing with date partitioning
-        </div>
-
-        <h3>Entity Annotations</h3>
-        <div class="code-block">
-@Id                    // Primary key
-@Column("table_field") // Database column mapping
-@ShardingKey          // Partitioning key (usually timestamp)
-        </div>
-
-        <h2 id="comprehensive-testing">🧪 Comprehensive Testing</h2>
-
-        <h3>Human-Like Test Scenarios</h3>
-        <p>The library includes comprehensive human-like tests that simulate real-world scenarios:</p>
-
-        <div class="code-block">
-// Run comprehensive tests
-java -cp "target/classes:target/test-classes:$(mvn dependency:build-classpath -q -Dmdep.outputFile=/dev/stdout)" \
-    com.telcobright.statemachine.test.HumanLikeComprehensiveTest
-        </div>
-
-        <h3>Test Scenarios Included</h3>
-        <ul>
-            <li><strong>📱 Basic SMS Flow:</strong> "Sarah sends 'Happy Birthday!' SMS to her friend"</li>
-            <li><strong>🚨 Emergency Retry Logic:</strong> "Emergency SMS has network issues, needs retries"</li>
-            <li><strong>⏰ Timeout Handling:</strong> "SMS gets stuck due to carrier issues, times out"</li>
-            <li><strong>📈 High Volume Processing:</strong> "Marketing campaign sends 50 promotional SMS messages"</li>
-            <li><strong>🔍 Full Lifecycle Audit:</strong> "Detailed tracking of business-critical SMS with full audit"</li>
-        </ul>
-
-        <h3>Other Test Classes</h3>
-        <div class="code-block">
-// Simple registry tests
-java -cp "..." com.telcobright.statemachine.test.SimpleTestRunner
-
-// Quick demo
-java -cp "..." com.telcobright.statemachine.test.QuickDemo
-
-// Registry-based patterns
-java -cp "..." com.telcobright.statemachine.test.RegistryBasedTest
-        </div>
-
-        <h2 id="feature-matrix">📊 Feature/Responsibility Matrix</h2>
-        
-        <table class="feature-matrix">
-            <thead>
-                <tr>
-                    <th>Feature/Responsibility</th>
-                    <th>StateMachineRegistry</th>
-                    <th>GenericStateMachine</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Lifecycle Management</strong></td>
-                    <td><span class="checkmark">✅</span> Primary responsibility</td>
-                    <td><span class="cross">❌</span> Managed by registry</td>
-                </tr>
-                <tr>
-                    <td><strong>Memory Management</strong></td>
-                    <td><span class="checkmark">✅</span> Tracks active instances</td>
-                    <td><span class="cross">❌</span> No memory tracking</td>
-                </tr>
-                <tr>
-                    <td><strong>Performance Optimization</strong></td>
-                    <td><span class="checkmark">✅</span> create() vs createOrGet()</td>
-                    <td><span class="cross">❌</span> No optimization logic</td>
-                </tr>
-                <tr>
-                    <td><strong>Completion Handling</strong></td>
-                    <td><span class="checkmark">✅</span> Prevents rehydration of completed</td>
-                    <td><span class="cross">❌</span> Reports status only</td>
-                </tr>
-                <tr>
-                    <td><strong>State Transitions</strong></td>
-                    <td><span class="cross">❌</span> No direct involvement</td>
-                    <td><span class="checkmark">✅</span> Core responsibility</td>
-                </tr>
-                <tr>
-                    <td><strong>Event Processing</strong></td>
-                    <td><span class="cross">❌</span> No event handling</td>
-                    <td><span class="checkmark">✅</span> Processes all events</td>
-                </tr>
-                <tr>
-                    <td><strong>Timeout Management</strong></td>
-                    <td><span class="cross">❌</span> No timeout logic</td>
-                    <td><span class="checkmark">✅</span> Handles timeouts</td>
-                </tr>
-                <tr>
-                    <td><strong>Context Management</strong></td>
-                    <td><span class="cross">❌</span> No context handling</td>
-                    <td><span class="checkmark">✅</span> Manages entity + context</td>
-                </tr>
-                <tr>
-                    <td><strong>Final State Detection</strong></td>
-                    <td><span class="cross">❌</span> Uses machine's status</td>
-                    <td><span class="checkmark">✅</span> Detects and marks final states</td>
-                </tr>
-                <tr>
-                    <td><strong>Persistence Integration</strong></td>
-                    <td><span class="cross">❌</span> No persistence logic</td>
-                    <td><span class="checkmark">✅</span> Integrates with entities</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="note">
-            <strong>📝 Design Philosophy:</strong> The registry focuses on lifecycle and performance management, while the state machine focuses on behavior and state transitions. This separation of concerns provides clean architecture and optimal performance.
-        </div>
-
-        <h2 id="performance">⚡ Performance Optimization</h2>
-
-        <h3>Registry Performance Features</h3>
-        <ul>
-            <li><strong>🚀 create() Method:</strong> Skips DB lookup for new entities (thousands of new SMS/calls)</li>
-            <li><strong>🔍 createOrGet() Method:</strong> Checks DB first for existing entities</li>
-            <li><strong>💾 Memory Management:</strong> Tracks active instances to prevent memory leaks</li>
-            <li><strong>🏁 Completion Optimization:</strong> Completed machines are not rehydrated unnecessarily</li>
-        </ul>
-
-        <h3>High Volume Processing</h3>
-        <div class="code-block">
-// Example: Processing 1000 new SMS messages
-for (int i = 0; i &lt; 1000; i++) {
-    String smsId = generateSmsId();
-    
-    // Use create() for performance (skips DB lookup)
-    GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
-        registry.create(smsId, () -&gt; SmsMachine.create(smsId));
-    
-    // Process SMS...
-}
-        </div>
-
-        <h2 id="mysql-integration">🗄️ MySQL Integration</h2>
-
-        <h3>Database Configuration</h3>
-        <div class="code-block">
-# MySQL Test Configuration
-host: 127.0.0.1
-user: root
-password: 123456
-
-# Partitioned Repository Support
-- ById lookup mode
-- ByIdAndDateRange lookup mode (for high-volume processing)
-        </div>
-
-        <h3>Schema Requirements</h3>
-        <div class="code-block">
-CREATE TABLE sms_entities (
-    sms_id VARCHAR(255) PRIMARY KEY,
-    current_state VARCHAR(50),
-    from_number VARCHAR(20),
-    to_number VARCHAR(20),
-    message_text TEXT,
-    attempt_count INT DEFAULT 0,
-    is_complete BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-        </div>
-
-        <h2 id="monitoring-setup">📊 State Machine Monitoring Setup</h2>
-
-        <p>The TelcoBright State Machine Library includes a powerful <strong>custom web-based monitoring interface</strong> that provides real-time visualization of state machine transitions, event details, and context data. The monitoring system captures complete state machine execution history with performance metrics.</p>
-
-        <div class="highlight">
-            <strong>🎯 Monitoring Features:</strong> Real-time state transition visualization, complete event payload inspection, before/after context comparison, registry status tracking, and performance metrics with transition durations.
-        </div>
-
-        <div class="note">
-            <strong>🚀 Quick Start:</strong> Run the monitoring server with <code>java -cp "target/classes:target/test-classes:$(cat classpath.txt)" com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer</code>, then open <a href="http://localhost:8091">http://localhost:8091</a> to see your custom monitoring dashboard.
-        </div>
-
-        <h3>Prerequisites</h3>
-        <ul>
-            <li><strong>☕ Java Runtime:</strong> Java 11+ required to run the monitoring server</li>
-            <li><strong>🗄️ PostgreSQL (Optional):</strong> For live database monitoring - falls back to sample data if not available</li>
-            <li><strong>🔗 Network Access:</strong> Port 8091 for the monitoring web interface</li>
-        </ul>
-
-        <h3>🚀 Starting the Monitoring Server</h3>
-        
-        <div class="code-block">
-# Start the monitoring server (with sample data)
-java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
-    com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer
-
-# The server will start on port 8091 and display:
-# 🚀 State Machine Monitoring Server Started!
-# 📊 Open your browser and go to: http://localhost:8091
-# 🎯 Custom monitoring interface for TelcoBright State Machines
-
-# Access the monitoring dashboard at:
-# http://localhost:8091
-        </div>
-
-        <h3>🔧 Enhanced Monitoring (with Database)</h3>
-        
-        <p>For live monitoring data from actual state machine executions, you can optionally set up PostgreSQL:</p>
-        
-        <div class="code-block">
-# 1. Start PostgreSQL (using Docker)
-cd docker
-docker-compose up -d postgres
-
-# 2. Add PostgreSQL JDBC driver to your classpath
-# (Download postgresql-XX.X.X.jar and add to classpath)
-
-# 3. Run the enhanced monitoring server
-java -cp "target/classes:target/test-classes:$(cat classpath.txt):postgresql-XX.X.X.jar" \
-    com.telcobright.statemachine.monitoring.web.EnhancedMonitoringServer
-        </div>
-
-        <h3>🎯 Monitoring Interface Features</h3>
-        
-        <p>The custom monitoring dashboard provides comprehensive insights into your state machines:</p>
-        
-        <table class="feature-matrix">
-            <thead>
-                <tr>
-                    <th>Feature</th>
-                    <th>Description</th>
-                    <th>Benefits</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>📋 Run List</strong></td>
-                    <td>Shows recent state machine executions</td>
-                    <td>Quick overview of machine activity with triggering class info</td>
-                </tr>
-                <tr>
-                    <td><strong>📊 State Flow Visualization</strong></td>
-                    <td>Visual representation of state transitions</td>
-                    <td>Easy understanding of IDLE → RINGING → CONNECTED flows</td>
-                </tr>
-                <tr>
-                    <td><strong>⚡ Event Details</strong></td>
-                    <td>Complete event payloads and timing</td>
-                    <td>Debug event processing and performance analysis</td>
-                </tr>
-                <tr>
-                    <td><strong>🧠 Context Inspection</strong></td>
-                    <td>Before/after context comparison</td>
-                    <td>Track how events modify machine state and context</td>
-                </tr>
-                <tr>
-                    <td><strong>🏛️ Registry Status</strong></td>
-                    <td>Machine lifecycle and hydration tracking</td>
-                    <td>Understand registry management and memory optimization</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>🌐 Monitoring Dashboard Access</h3>
-        
-        <div class="highlight">
-            <strong>Custom Monitoring Interface:</strong> <a href="http://localhost:8091">http://localhost:8091</a><br>
-            <strong>Features:</strong> No login required - direct access to state machine monitoring
-        </div>
-
-        <h3>📈 Database Schema</h3>
-        
-        <p>The monitoring system uses a comprehensive schema to track state machine behavior:</p>
-        
-        <div class="code-block">
--- State Machine Snapshots Table
-CREATE TABLE state_machine_snapshots (
-    id                          BIGSERIAL PRIMARY KEY,
-    machine_id                  VARCHAR(255) NOT NULL,
-    machine_type                VARCHAR(255) NOT NULL,
-    run_id                      VARCHAR(255) NOT NULL,
-    version                     BIGINT NOT NULL,
-    state_before                VARCHAR(255),
-    state_after                 VARCHAR(255),
-    event_type                  VARCHAR(255),
-    transition_duration         BIGINT DEFAULT 0,
-    timestamp                   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    registry_status             VARCHAR(100),
-    machine_online_status       BOOLEAN DEFAULT true,
-    state_offline_status        BOOLEAN DEFAULT false,
-    event_payload_json          TEXT,
-    context_before_json         TEXT,
-    context_after_json          TEXT,
-    triggering_class_name       VARCHAR(255),
-    triggering_class_full_path  TEXT,
-    registry_status_before      VARCHAR(100),
-    registry_status_after       VARCHAR(100),
-    machine_hydrated_before     BOOLEAN DEFAULT false,
-    machine_hydrated_after      BOOLEAN DEFAULT false,
-    event_sent_through_registry BOOLEAN DEFAULT true
-);
-
--- Performance Index
-CREATE INDEX idx_snapshots_machine_timestamp 
-ON state_machine_snapshots (machine_id, timestamp DESC);
-        </div>
-
-        <h3>🎯 Running State Machine Demos</h3>
-        
-        <p>Generate monitoring data by running state machine demo classes:</p>
-        
-        <div class="code-block">
-# 1. Start the monitoring server first
-java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
-    com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer &
-
-# 2. Run CallMachine demo to generate transitions
-java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
-    com.telcobright.statemachine.test.MonitoredCallMachineDemo
-
-# 3. Run comprehensive monitoring demo
-java -cp "target/classes:target/test-classes:$(cat classpath.txt)" \
-    com.telcobright.statemachine.test.ComprehensiveMonitoringDemo
-
-# 4. View results at http://localhost:8091
-        </div>
-
-        <h3>📊 Understanding the Monitoring Data</h3>
-        
-        <p>The monitoring interface shows the complete lifecycle of your state machines:</p>
-        
-        <div class="code-block">
-🔍 Sample CallMachine Flow Visualization:
-
-Step 1: INCOMING_CALL Event (120ms)
-   IDLE → RINGING
-   📦 Payload: {"caller":"+1-555-DEMO"}
-   🏛️ Registry: REGISTERED_ACTIVE → REGISTERED_ACTIVE
-   
-Step 2: SESSION_PROGRESS Event (50ms)  
-   RINGING → RINGING (stay transition)
-   📦 Payload: {"status":"EARLY_MEDIA","code":100}
-   📊 Context: Call session events updated
-   
-Step 3: ANSWER Event (200ms)
-   RINGING → CONNECTED
-   📦 Payload: {"answeredBy":"user"}
-   📈 Context: Connected time recorded
-   
-Step 4: HANGUP Event (100ms)
-   CONNECTED → IDLE  
-   📦 Payload: {"reason":"normal_clearing","duration":45}
-   ✅ Context: Call marked as complete
-        </div>
-
-        <h3>🔧 Troubleshooting Monitoring</h3>
-        
-        <div class="warning">
-            <strong>Issue:</strong> Monitoring server won't start on port 8091<br>
-            <strong>Solution:</strong> Check if port 8091 is already in use with <code>ss -tlnp | grep 8091</code> and stop any conflicting services.
-        </div>
-
-        <div class="warning">
-            <strong>Issue:</strong> No monitoring data visible in dashboard<br>
-            <strong>Solution:</strong> Run state machine demos like <code>MonitoredCallMachineDemo</code> to generate sample data, or check if the database connection is working.
-        </div>
-
-        <div class="warning">
-            <strong>Issue:</strong> "PostgreSQL driver not found" error<br>
-            <strong>Solution:</strong> Use <code>SimpleMonitoringServer</code> for sample data, or add PostgreSQL JDBC driver to classpath for live monitoring.
-        </div>
-
-        <h3>💡 Monitoring Best Practices</h3>
-        
-        <ul>
-            <li><strong>🎯 Real-time Monitoring:</strong> Keep the monitoring server running during development for live state machine inspection</li>
-            <li><strong>📦 Event Analysis:</strong> Use the payload inspection feature to debug event processing issues</li>
-            <li><strong>⏱️ Performance Tracking:</strong> Monitor transition durations to identify performance bottlenecks</li>
-            <li><strong>🏷️ Registry Integration:</strong> Track machine lifecycle and hydration status for memory optimization</li>
-            <li><strong>📈 Historical Analysis:</strong> Use the run list to compare different executions and identify patterns</li>
-        </ul>
-
-        <div class="note">
-            <strong>📝 Monitoring Tip:</strong> The custom monitoring interface is designed specifically for TelcoBright State Machines, providing detailed insights into registry management, context changes, and event flow that are not available in generic monitoring tools.
-        </div>
-
-        <h2 id="examples">📝 Examples</h2>
-
-        <h3>Complete SMS Processing Example</h3>
-        <div class="code-block">
-public class SmsProcessingExample {
-    private StateMachineRegistry registry = new StateMachineRegistry();
-    
-    public void processSms(String smsId, String from, String to, String message) {
-        // Create new SMS state machine
-        GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
-            registry.create(smsId, () -&gt; SmsMachine.create(smsId));
-        
-        // Set up persistent entity
-        SmsEntity entity = new SmsEntity(smsId, from, to, message);
-        machine.setPersistingEntity(entity);
-        
-        // Set up volatile context
-        SmsContext context = new SmsContext(smsId);
-        machine.setContext(context);
-        
-        // Start processing
-        machine.start();
-        
-        // Send SMS
-        context.addEvent("SMS processing started");
-        machine.fire(new SendSms());
-        
-        // Handle delivery confirmation
-        machine.fire(new DeliveryConfirmation());
-        
-        // Check completion
-        if (machine.isComplete()) {
-            System.out.println("SMS delivered successfully: " + entity);
-        }
-    }
-}
-        </div>
-
-        <h3>Bulk Processing Example</h3>
-        <div class="code-block">
-public void processBulkSms(List&lt;SmsRequest&gt; requests) {
-    requests.parallelStream().forEach(request -&gt; {
-        String smsId = generateId();
-        
-        // Use create() for performance (new SMS)
-        GenericStateMachine&lt;SmsEntity, SmsContext&gt; machine = 
-            registry.create(smsId, () -&gt; SmsMachine.create(smsId));
-        
-        // Configure and process
-        setupMachine(machine, request);
-        processSmsAsync(machine);
-    });
-}
-        </div>
-
-        <h2 id="troubleshooting">🔧 Troubleshooting</h2>
-
-        <h3>Common Issues</h3>
-        
-        <div class="warning">
-            <strong>Issue:</strong> Machine not transitioning states<br>
-            <strong>Solution:</strong> Ensure proper event firing and state configuration. Check that states are defined with correct transitions.
-        </div>
-
-        <div class="warning">
-            <strong>Issue:</strong> Memory leaks in high-volume scenarios<br>
-            <strong>Solution:</strong> Ensure completed machines are properly marked with final states. The registry will handle memory cleanup for completed machines.
-        </div>
-
-        <div class="warning">
-            <strong>Issue:</strong> Performance issues with many new entities<br>
-            <strong>Solution:</strong> Use <code>registry.create()</code> instead of <code>registry.createOrGet()</code> when you know entities are new.
-        </div>
-
-        <div class="warning">
-            <strong>Issue:</strong> Monitoring not working - port 8091 not accessible<br>
-            <strong>Solution:</strong> Start the monitoring server first: <code>java -cp "target/classes:target/test-classes:$(cat classpath.txt)" com.telcobright.statemachine.monitoring.web.SimpleMonitoringServer</code>
-        </div>
-
-        <div class="warning">
-            <strong>Issue:</strong> Server starts but no data visible<br>
-            <strong>Solution:</strong> The server provides sample data by default. Run state machine demos to see more realistic data flows.
-        </div>
-
-        <h3>Debug Information</h3>
-        <div class="code-block">
-// Check registry status
-System.out.println("Active machines: " + registry.size());
-System.out.println("Machine in memory: " + registry.isInMemory(machineId));
-
-// Check machine status
-System.out.println("Current state: " + machine.getCurrentState());
-System.out.println("Is complete: " + machine.isComplete());
-System.out.println("Entity: " + machine.getPersistingEntity());
-        </div>
-
-        <h3>Test Validation</h3>
-        <div class="code-block">
-// Run comprehensive tests to validate setup
-mvn test
-
-// Run specific comprehensive test
-java -cp "..." com.telcobright.statemachine.test.HumanLikeComprehensiveTest
+        <div class="section" id="patterns">
+            <h2>🎯 Design Patterns</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Usage</th>
+                        <th>Benefits</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Registry Pattern</strong></td>
+                        <td>Centralized state machine management</td>
+                        <td>Single point of control, easy monitoring</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Observer Pattern</strong></td>
+                        <td>State change notifications</td>
+                        <td>Decoupled monitoring and logging</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Builder Pattern</strong></td>
+                        <td>State machine configuration</td>
+                        <td>Fluent API, type-safe configuration</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Repository Pattern</strong></td>
+                        <td>Database persistence layer</td>
+                        <td>Abstracted data access</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Strategy Pattern</strong></td>
+                        <td>Monitoring modes (snapshot vs live)</td>
+                        <td>Runtime behavior switching</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <div class="highlight">
-            <strong>🎯 Success Criteria:</strong> All comprehensive tests should pass with 100% success rate, demonstrating proper functionality across all scenarios including initialization, retry logic, timeout handling, high-volume processing, and lifecycle management.
+            <h3>📌 Important Notes</h3>
+            <ul>
+                <li>SimpleMonitoringServer (port 8091) is the "perfect" production-ready version</li>
+                <li>WebSocket server must be running for live mode functionality</li>
+                <li>Database connection is optional - falls back to sample data if unavailable</li>
+                <li>All state machines must implement <code>StateMachineContextEntity</code> for persistence</li>
+                <li>Registry mediates all events to ensure proper monitoring and persistence</li>
+            </ul>
         </div>
 
-        <hr style="margin: 40px 0;">
-        <p style="text-align: center; color: #6c757d;">
-            <strong>TelcoBright State Machine Library</strong> - Enterprise-grade state machine framework<br>
-            Built with ❤️ for high-volume telecom applications
-        </p>
+        <div class="section">
+            <h2>🔗 Quick Command Reference</h2>
+            <pre><code># Start monitoring system
+./monitor-start.sh
+
+# Compile project
+mvn compile
+
+# Run CLI monitor
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.monitoring.cli.StateMachineCliMonitor"
+
+# Access web interface
+http://localhost:8091
+
+# WebSocket endpoint
+ws://localhost:9999</code></pre>
+        </div>
+
+        <footer style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center; color: #6c757d;">
+            <p>TelcoBright State Machine Library - Complete Technical Documentation</p>
+            <p>Last Updated: 2024 | Version: 1.0</p>
+        </footer>
     </div>
 </body>
 </html>

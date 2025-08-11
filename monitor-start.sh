@@ -14,6 +14,12 @@ echo "  WebSocket Port: $WS_PORT"
 echo "  Web UI Port: $WEB_PORT"
 echo ""
 
+# Kill any existing processes on the ports
+echo "Cleaning up existing processes..."
+lsof -ti:$WEB_PORT 2>/dev/null | xargs -r kill -9 2>/dev/null
+lsof -ti:$WS_PORT 2>/dev/null | xargs -r kill -9 2>/dev/null
+sleep 1
+
 # Compile project
 echo "Compiling project..."
 mvn compile -q

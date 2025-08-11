@@ -68,14 +68,20 @@ public class SimpleMonitoringServer {
     class MainPageHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String html = generateMainPage();
-            
-            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
-            exchange.sendResponseHeaders(200, html.getBytes().length);
-            
-            OutputStream os = exchange.getResponseBody();
-            os.write(html.getBytes());
-            os.close();
+            try {
+                String html = generateMainPage();
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, html.getBytes().length);
+                
+                OutputStream os = exchange.getResponseBody();
+                os.write(html.getBytes());
+                os.close();
+            } catch (Exception e) {
+                System.err.println("Error in MainPageHandler: " + e.getMessage());
+                e.printStackTrace();
+                throw new IOException(e);
+            }
         }
     }
     
@@ -362,9 +368,9 @@ public class SimpleMonitoringServer {
     }
     
     private String generateMainPage() {
-        String dbStatus = databaseAvailable ? 
-            "<div style='background: #d4edda; color: #155724; padding: 8px; border-radius: 4px; margin-bottom: 10px;'>✅ Live database connection active</div>" :
-            "<div style='background: #fff3cd; color: #856404; padding: 8px; border-radius: 4px; margin-bottom: 10px;'>⚠️ Using sample data - install PostgreSQL JDBC driver for live monitoring</div>";
+        String dbStatusIcon = databaseAvailable ? "✅" : "⚠️";
+        String dbStatusText = databaseAvailable ? "DB Connected" : "Sample Data";
+        String dbStatusColor = databaseAvailable ? "#28a745" : "#ffc107";
             
         return """
 <!DOCTYPE html>
@@ -382,16 +388,55 @@ public class SimpleMonitoringServer {
             color: white;
             padding: 15px 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
-        .header h1 { font-size: 24px; margin-bottom: 5px; }
-        .header p { font-size: 14px; opacity: 0.9; }
+        .header-left h1 { font-size: 24px; margin-bottom: 5px; }
+        .header-left p { font-size: 14px; opacity: 0.9; }
         
-        .status-bar {
-            padding: 10px 20px;
-            background: white;
-            border-bottom: 1px solid #dee2e6;
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
+        
+        .db-status {
+            font-size: 12px;
+            padding: 5px 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .mode-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .mode-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        
+        .mode-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .mode-btn.active {
+            background: rgba(255,255,255,0.4);
+            border-color: white;
+        }
+        
         
         .container {
             display: flex;
@@ -584,12 +629,16 @@ public class SimpleMonitoringServer {
 </head>
 <body>
     <div class="header">
-        <h1>📊 TelcoBright State Machine Monitoring</h1>
-        <p>Real-time monitoring of CallMachine and SmsMachine state transitions</p>
-    </div>
-    
-    <div class="status-bar">
-        """ + dbStatus + """
+        <div class="header-left">
+            <h1>📊 TelcoBright State Machine Monitoring</h1>
+            <p>Real-time monitoring of CallMachine and SmsMachine state transitions</p>
+        </div>
+        <div class="header-right">
+            <div class="mode-buttons">
+                <button class="mode-btn active" onclick="setMode('snapshot')">📸 Snapshot Viewer</button>
+                <button class="mode-btn" onclick="setMode('live')">🔴 Live Viewer</button>
+            </div>
+        </div>
     </div>
     
     <div class="container">
@@ -626,10 +675,27 @@ public class SimpleMonitoringServer {
     <script>
         let currentPage = 0;
         let selectedRunId = null;
+        let currentMode = 'snapshot';
         
         window.onload = function() {
             loadRuns();
         };
+        
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            if (mode === 'live') {
+                // Switch to live mode - would need WebSocket implementation
+                alert('Live mode is under development. Please use snapshot mode for now.');
+                setMode('snapshot');
+            } else {
+                loadRuns();
+            }
+        }
         
         function loadRuns() {
             fetch('/api/runs?page=' + currentPage)
