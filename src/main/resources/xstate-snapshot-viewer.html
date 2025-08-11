@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XState-like Machine Snapshot Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 380px;
+            height: 100vh;
+            background: #0f172a;
+        }
+        
+        /* Left Sidebar - Snapshots List */
+        .sidebar-left {
+            background: #1e293b;
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #334155;
+            background: #0f172a;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        
+        .mode-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background: #334155;
+            border: 1px solid #475569;
+            color: #94a3b8;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+        
+        .mode-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .snapshot-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        
+        .snapshot-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.25rem;
+            background: #334155;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .snapshot-item:hover {
+            background: #475569;
+        }
+        
+        .snapshot-item.active {
+            background: #1e40af;
+            border-color: #3b82f6;
+        }
+        
+        .snapshot-state {
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .snapshot-time {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        
+        .snapshot-id {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+        
+        /* Main Content Area */
+        .main-content {
+            background: #0f172a;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            padding: 1.5rem 2rem;
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #1e293b;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.connected {
+            background: #10b981;
+        }
+        
+        .status-dot.disconnected {
+            background: #ef4444;
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .state-visualization {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        
+        .state-card {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+        }
+        
+        .state-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        
+        .current-state {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .state-metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .metadata-item {
+            padding: 1rem;
+            background: #0f172a;
+            border-radius: 0.5rem;
+            border: 1px solid #334155;
+        }
+        
+        .metadata-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metadata-value {
+            font-size: 1.125rem;
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+        
+        /* Right Sidebar - Context & Events */
+        .sidebar-right {
+            background: #1e293b;
+            border-left: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .context-tabs {
+            display: flex;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 1rem;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .tab-btn.active {
+            color: #3b82f6;
+        }
+        
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #3b82f6;
+        }
+        
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+        
+        .json-viewer {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        
+        .json-key {
+            color: #94a3b8;
+        }
+        
+        .json-string {
+            color: #86efac;
+        }
+        
+        .json-number {
+            color: #fbbf24;
+        }
+        
+        .json-boolean {
+            color: #f472b6;
+        }
+        
+        .json-null {
+            color: #94a3b8;
+            font-style: italic;
+        }
+        
+        /* Event Panel for Live Mode */
+        .event-panel {
+            padding: 1.5rem;
+            border-top: 1px solid #334155;
+            background: #0f172a;
+        }
+        
+        .event-panel h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        
+        .event-select {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #f1f5f9;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .event-payload {
+            width: 100%;
+            min-height: 120px;
+            padding: 0.75rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #f1f5f9;
+            border-radius: 0.5rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            resize: vertical;
+            margin-bottom: 1rem;
+        }
+        
+        .send-event-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .send-event-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .send-event-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Transitions list */
+        .transitions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .transition-item {
+            padding: 0.75rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .transition-event {
+            color: #3b82f6;
+            font-weight: 500;
+        }
+        
+        .transition-arrow {
+            color: #64748b;
+        }
+        
+        .transition-target {
+            color: #10b981;
+            font-weight: 500;
+        }
+        
+        /* State badge colors */
+        .state-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .state-idle { background: #10b981; }
+        .state-ringing { background: #fbbf24; }
+        .state-connected { background: #3b82f6; }
+        .state-error { background: #ef4444; }
+        
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+        
+        .toast {
+            padding: 1rem 1.5rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .toast.error {
+            border-color: #ef4444;
+        }
+        
+        .toast.success {
+            border-color: #10b981;
+        }
+        
+        .toast.info {
+            border-color: #3b82f6;
+        }
+        
+        .toast-message {
+            color: #f1f5f9;
+        }
+        
+        /* Loading spinner */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #334155;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Sidebar - Snapshots/States List -->
+        <aside class="sidebar-left">
+            <div class="sidebar-header">
+                <h2>Machine States</h2>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" onclick="setMode('snapshot')">Snapshot</button>
+                    <button class="mode-btn" onclick="setMode('live')">Live</button>
+                </div>
+            </div>
+            <div class="snapshot-list" id="snapshotList">
+                <!-- Snapshots will be dynamically added here -->
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="header">
+                <h1>
+                    <span id="machineId">Machine: Loading...</span>
+                </h1>
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot disconnected"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+            </header>
+            
+            <div class="state-visualization">
+                <div class="state-card">
+                    <div class="state-header">
+                        <div class="current-state" id="currentState">UNKNOWN</div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Registry Status</div>
+                            <div class="metadata-value" id="registryStatus">-</div>
+                        </div>
+                    </div>
+                    
+                    <div class="state-metadata">
+                        <div class="metadata-item">
+                            <div class="metadata-label">Session ID</div>
+                            <div class="metadata-value" id="sessionId">-</div>
+                        </div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Last Update</div>
+                            <div class="metadata-value" id="lastUpdate">-</div>
+                        </div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Total Events</div>
+                            <div class="metadata-value" id="totalEvents">0</div>
+                        </div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">State Changes</div>
+                            <div class="metadata-value" id="stateChanges">0</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="state-card">
+                    <div class="state-header">
+                        <h3 style="color: #94a3b8; font-size: 0.875rem; text-transform: uppercase;">Available Transitions</h3>
+                    </div>
+                    <div class="transitions-list" id="transitionsList">
+                        <!-- Transitions will be added dynamically -->
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Right Sidebar - Context & Events -->
+        <aside class="sidebar-right">
+            <div class="context-tabs">
+                <button class="tab-btn active" onclick="showTab('persistent')">Persistent Context</button>
+                <button class="tab-btn" onclick="showTab('volatile')">Volatile Context</button>
+            </div>
+            
+            <div class="tab-content">
+                <div id="persistentTab" class="json-viewer"></div>
+                <div id="volatileTab" class="json-viewer" style="display: none;"></div>
+            </div>
+            
+            <div class="event-panel" id="eventPanel" style="display: none;">
+                <h3>Send Event</h3>
+                <select class="event-select" id="eventSelect" onchange="selectEvent()">
+                    <option value="">Select Event...</option>
+                    <option value="INCOMING_CALL">INCOMING_CALL</option>
+                    <option value="ANSWER">ANSWER</option>
+                    <option value="HANGUP">HANGUP</option>
+                    <option value="SESSION_PROGRESS">SESSION_PROGRESS</option>
+                    <option value="HOLD">HOLD</option>
+                    <option value="UNHOLD">UNHOLD</option>
+                    <option value="TRANSFER">TRANSFER</option>
+                </select>
+                <textarea class="event-payload" id="eventPayload" placeholder="Event payload (JSON)"></textarea>
+                <button class="send-event-btn" id="sendEventBtn" onclick="sendEvent()" disabled>Send Event</button>
+            </div>
+        </aside>
+    </div>
+    
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <script>
+        let ws = null;
+        let currentMode = 'snapshot';
+        let currentSnapshot = null;
+        let totalEventCount = 0;
+        let stateChangeCount = 0;
+        
+        // Event templates
+        const eventTemplates = {
+            'INCOMING_CALL': { callerNumber: '+1-555-9999' },
+            'ANSWER': {},
+            'HANGUP': { reason: 'normal' },
+            'SESSION_PROGRESS': { sdp: 'v=0', ringNumber: 1 },
+            'HOLD': {},
+            'UNHOLD': {},
+            'TRANSFER': { targetNumber: '+1-555-8888' }
+        };
+        
+        // Mock snapshots for demonstration
+        const mockSnapshots = [
+            {
+                id: 'snap-001',
+                machineId: 'call-123456',
+                state: 'IDLE',
+                timestamp: new Date(Date.now() - 3600000).toISOString(),
+                persistent: {
+                    callId: 'call-123456',
+                    fromNumber: '+1-555-0001',
+                    toNumber: '+1-555-0002',
+                    callDirection: 'INBOUND',
+                    ringCount: 0
+                },
+                volatile: {
+                    sessionData: { sipCallId: 'sip-123' }
+                }
+            },
+            {
+                id: 'snap-002',
+                machineId: 'call-123456',
+                state: 'RINGING',
+                timestamp: new Date(Date.now() - 1800000).toISOString(),
+                persistent: {
+                    callId: 'call-123456',
+                    fromNumber: '+1-555-0001',
+                    toNumber: '+1-555-0002',
+                    callDirection: 'INBOUND',
+                    ringCount: 3
+                },
+                volatile: {
+                    sessionData: { sipCallId: 'sip-123' }
+                }
+            },
+            {
+                id: 'snap-003',
+                machineId: 'call-123456',
+                state: 'CONNECTED',
+                timestamp: new Date(Date.now() - 900000).toISOString(),
+                persistent: {
+                    callId: 'call-123456',
+                    fromNumber: '+1-555-0001',
+                    toNumber: '+1-555-0002',
+                    callDirection: 'INBOUND',
+                    ringCount: 3,
+                    connectedAt: new Date(Date.now() - 900000).toISOString()
+                },
+                volatile: {
+                    sessionData: { sipCallId: 'sip-123', mediaPort: 5060 }
+                }
+            }
+        ];
+        
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === mode);
+            });
+            
+            document.getElementById('eventPanel').style.display = mode === 'live' ? 'block' : 'none';
+            
+            if (mode === 'live') {
+                connectWebSocket();
+            } else {
+                if (ws) {
+                    ws.close();
+                }
+                loadSnapshots();
+            }
+        }
+        
+        function connectWebSocket() {
+            const wsUrl = 'ws://localhost:9999';
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    updateConnectionStatus(true);
+                    document.getElementById('sendEventBtn').disabled = false;
+                    showToast('Connected to live machine', 'success');
+                    ws.send(JSON.stringify({ action: 'GET_STATE' }));
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleLiveMessage(data);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    showToast('WebSocket connection error', 'error');
+                };
+                
+                ws.onclose = () => {
+                    updateConnectionStatus(false);
+                    document.getElementById('sendEventBtn').disabled = true;
+                    showToast('Disconnected from server. Retrying...', 'error');
+                    
+                    // Retry connection after 3 seconds
+                    if (currentMode === 'live') {
+                        setTimeout(connectWebSocket, 3000);
+                    }
+                };
+            } catch (e) {
+                showToast('Failed to connect to WebSocket server', 'error');
+                setTimeout(connectWebSocket, 3000);
+            }
+        }
+        
+        function updateConnectionStatus(connected) {
+            const dot = document.querySelector('.status-dot');
+            const text = document.getElementById('statusText');
+            
+            if (connected) {
+                dot.classList.remove('disconnected');
+                dot.classList.add('connected');
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                dot.classList.add('disconnected');
+                text.textContent = 'Disconnected';
+            }
+        }
+        
+        function handleLiveMessage(data) {
+            switch (data.type) {
+                case 'CURRENT_STATE':
+                case 'PERIODIC_UPDATE':
+                    updateLiveDisplay(data);
+                    break;
+                case 'STATE_CHANGE':
+                    stateChangeCount++;
+                    updateLiveDisplay(data);
+                    addLiveSnapshot(data);
+                    break;
+            }
+            totalEventCount++;
+            document.getElementById('totalEvents').textContent = totalEventCount;
+        }
+        
+        function updateLiveDisplay(data) {
+            if (data.machineId) {
+                document.getElementById('machineId').textContent = `Machine: ${data.machineId}`;
+            }
+            
+            if (data.currentState) {
+                document.getElementById('currentState').textContent = data.currentState;
+            }
+            
+            if (data.isRegistered !== undefined) {
+                document.getElementById('registryStatus').textContent = 
+                    data.isRegistered ? 'REGISTERED' : 'NOT REGISTERED';
+            }
+            
+            if (data.context) {
+                displayJson('persistentTab', data.context);
+            }
+            
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            document.getElementById('stateChanges').textContent = stateChangeCount;
+            
+            updateTransitions(data.currentState);
+        }
+        
+        function addLiveSnapshot(data) {
+            const list = document.getElementById('snapshotList');
+            const item = createSnapshotItem({
+                id: 'live-' + Date.now(),
+                state: data.newState || data.currentState,
+                timestamp: new Date().toISOString(),
+                machineId: data.machineId
+            });
+            list.insertBefore(item, list.firstChild);
+            
+            // Keep only last 20 items
+            while (list.children.length > 20) {
+                list.removeChild(list.lastChild);
+            }
+        }
+        
+        function loadSnapshots() {
+            const list = document.getElementById('snapshotList');
+            list.innerHTML = '';
+            
+            mockSnapshots.forEach(snapshot => {
+                const item = createSnapshotItem(snapshot);
+                list.appendChild(item);
+            });
+        }
+        
+        function createSnapshotItem(snapshot) {
+            const item = document.createElement('div');
+            item.className = 'snapshot-item';
+            item.innerHTML = `
+                <div class="snapshot-state">
+                    <span class="state-badge state-${snapshot.state.toLowerCase()}"></span>
+                    ${snapshot.state}
+                </div>
+                <div class="snapshot-time">${new Date(snapshot.timestamp).toLocaleTimeString()}</div>
+                <div class="snapshot-id">${snapshot.id}</div>
+            `;
+            item.onclick = () => selectSnapshot(snapshot);
+            return item;
+        }
+        
+        function selectSnapshot(snapshot) {
+            currentSnapshot = snapshot;
+            
+            // Update UI
+            document.querySelectorAll('.snapshot-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Display snapshot data
+            document.getElementById('machineId').textContent = `Machine: ${snapshot.machineId}`;
+            document.getElementById('currentState').textContent = snapshot.state;
+            document.getElementById('sessionId').textContent = snapshot.id;
+            document.getElementById('lastUpdate').textContent = new Date(snapshot.timestamp).toLocaleString();
+            
+            displayJson('persistentTab', snapshot.persistent);
+            displayJson('volatileTab', snapshot.volatile);
+            
+            updateTransitions(snapshot.state);
+        }
+        
+        function updateTransitions(state) {
+            const transitions = {
+                'IDLE': [{ event: 'INCOMING_CALL', target: 'RINGING' }],
+                'RINGING': [
+                    { event: 'ANSWER', target: 'CONNECTED' },
+                    { event: 'HANGUP', target: 'IDLE' }
+                ],
+                'CONNECTED': [{ event: 'HANGUP', target: 'IDLE' }]
+            };
+            
+            const list = document.getElementById('transitionsList');
+            list.innerHTML = '';
+            
+            const stateTransitions = transitions[state] || [];
+            stateTransitions.forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'transition-item';
+                item.innerHTML = `
+                    <span class="transition-event">${t.event}</span>
+                    <span class="transition-arrow">→</span>
+                    <span class="transition-target">${t.target}</span>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        function displayJson(tabId, data) {
+            const container = document.getElementById(tabId);
+            container.textContent = JSON.stringify(data, null, 2);
+        }
+        
+        function showTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(tab));
+            });
+            
+            document.getElementById('persistentTab').style.display = 
+                tab === 'persistent' ? 'block' : 'none';
+            document.getElementById('volatileTab').style.display = 
+                tab === 'volatile' ? 'block' : 'none';
+        }
+        
+        function selectEvent() {
+            const event = document.getElementById('eventSelect').value;
+            if (event && eventTemplates[event]) {
+                document.getElementById('eventPayload').value = 
+                    JSON.stringify(eventTemplates[event], null, 2);
+            }
+        }
+        
+        function sendEvent() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected to server', 'error');
+                return;
+            }
+            
+            const event = document.getElementById('eventSelect').value;
+            if (!event) {
+                showToast('Please select an event', 'error');
+                return;
+            }
+            
+            try {
+                const payload = JSON.parse(document.getElementById('eventPayload').value);
+                ws.send(JSON.stringify({ action: event, payload }));
+                showToast(`Sent event: ${event}`, 'success');
+            } catch (e) {
+                showToast('Invalid JSON payload', 'error');
+            }
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span class="toast-message">${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        // Initialize
+        window.addEventListener('load', () => {
+            loadSnapshots();
+        });
+    </script>
+</body>
+</html>

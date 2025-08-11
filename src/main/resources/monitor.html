@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #4ec9b0;
+            text-align: center;
+            padding: 20px;
+            border-bottom: 2px solid #4ec9b0;
+            margin-bottom: 20px;
+        }
+        
+        .connection-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background: #4ec9b0;
+            color: #1e1e1e;
+        }
+        
+        .disconnected {
+            background: #f44747;
+            color: white;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        
+        .panel h2 {
+            color: #4ec9b0;
+            border-bottom: 1px solid #464647;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #3c3c3c;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .label {
+            color: #9cdcfe;
+            font-weight: bold;
+        }
+        
+        .value {
+            color: #ce9178;
+        }
+        
+        .state-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .state-idle {
+            background: #4ec9b0;
+            color: #1e1e1e;
+        }
+        
+        .state-ringing {
+            background: #dcdcaa;
+            color: #1e1e1e;
+        }
+        
+        .state-connected {
+            background: #569cd6;
+            color: white;
+        }
+        
+        .event-log {
+            background: #1e1e1e;
+            border: 1px solid #464647;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .event-log h2 {
+            color: #4ec9b0;
+            margin-bottom: 10px;
+        }
+        
+        .event-item {
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid #4ec9b0;
+            padding-left: 10px;
+            font-size: 0.9em;
+        }
+        
+        .timestamp {
+            color: #608b4e;
+            margin-right: 10px;
+        }
+        
+        .controls {
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .controls h2 {
+            color: #4ec9b0;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #005a9e;
+        }
+        
+        button:disabled {
+            background: #3c3c3c;
+            cursor: not-allowed;
+        }
+        
+        .connection-config {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 5px;
+        }
+        
+        .connection-config input {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #464647;
+            padding: 8px;
+            margin: 0 10px;
+            border-radius: 3px;
+            width: 300px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 20px;
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 5px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            color: #9cdcfe;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 State Machine Monitor</h1>
+        <div class="connection-status disconnected" id="connectionStatus">DISCONNECTED</div>
+        
+        <div class="connection-config">
+            <label class="label">WebSocket URL:</label>
+            <input type="text" id="wsUrl" value="ws://localhost:9999" />
+            <button onclick="toggleConnection()" id="connectBtn">Connect</button>
+        </div>
+        
+        <div class="dashboard">
+            <div class="panel">
+                <h2>📊 Machine Info</h2>
+                <div class="info-row">
+                    <span class="label">Machine ID:</span>
+                    <span class="value" id="machineId">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Current State:</span>
+                    <span class="state-badge state-idle" id="currentState">UNKNOWN</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Registry Status:</span>
+                    <span class="value" id="registryStatus">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Last Update:</span>
+                    <span class="value" id="lastUpdate">-</span>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>📞 Call Context</h2>
+                <div class="info-row">
+                    <span class="label">From Number:</span>
+                    <span class="value" id="fromNumber">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">To Number:</span>
+                    <span class="value" id="toNumber">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Call Status:</span>
+                    <span class="value" id="callStatus">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Ring Count:</span>
+                    <span class="value" id="ringCount">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="event-log">
+            <h2>📝 Event History</h2>
+            <div id="eventList"></div>
+        </div>
+        
+        <div class="controls">
+            <h2>🎮 Controls</h2>
+            <button onclick="sendCommand('INCOMING_CALL')" id="btnCall">📞 Incoming Call</button>
+            <button onclick="sendCommand('ANSWER')" id="btnAnswer">✅ Answer</button>
+            <button onclick="sendCommand('HANGUP')" id="btnHangup">📵 Hangup</button>
+            <button onclick="sendCommand('SESSION_PROGRESS')" id="btnProgress">🔄 Session Progress</button>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="eventCount">0</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stateChanges">0</div>
+                <div class="stat-label">State Changes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="uptime">00:00</div>
+                <div class="stat-label">Uptime</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let connected = false;
+        let eventCount = 0;
+        let stateChangeCount = 0;
+        let startTime = null;
+        let maxEvents = 50;
+        
+        function updateConnectionStatus(isConnected) {
+            connected = isConnected;
+            const status = document.getElementById('connectionStatus');
+            const btn = document.getElementById('connectBtn');
+            
+            if (isConnected) {
+                status.textContent = 'CONNECTED';
+                status.className = 'connection-status connected';
+                btn.textContent = 'Disconnect';
+                enableControls(true);
+                startTime = Date.now();
+            } else {
+                status.textContent = 'DISCONNECTED';
+                status.className = 'connection-status disconnected';
+                btn.textContent = 'Connect';
+                enableControls(false);
+            }
+        }
+        
+        function enableControls(enabled) {
+            document.getElementById('btnCall').disabled = !enabled;
+            document.getElementById('btnAnswer').disabled = !enabled;
+            document.getElementById('btnHangup').disabled = !enabled;
+            document.getElementById('btnProgress').disabled = !enabled;
+        }
+        
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = () => {
+                    console.log('Connected to WebSocket server');
+                    updateConnectionStatus(true);
+                    addEvent('Connected to server', 'success');
+                    
+                    // Request initial state
+                    ws.send(JSON.stringify({ action: 'GET_STATE' }));
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleMessage(data);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    addEvent('Connection error', 'error');
+                };
+                
+                ws.onclose = () => {
+                    console.log('Disconnected from server');
+                    updateConnectionStatus(false);
+                    addEvent('Disconnected from server', 'error');
+                };
+                
+            } catch (e) {
+                console.error('Failed to connect:', e);
+                alert('Failed to connect: ' + e.message);
+            }
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function toggleConnection() {
+            if (connected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+        
+        function handleMessage(data) {
+            const timestamp = data.timestamp || new Date().toLocaleTimeString();
+            document.getElementById('lastUpdate').textContent = timestamp;
+            
+            switch (data.type) {
+                case 'CURRENT_STATE':
+                case 'PERIODIC_UPDATE':
+                    updateDisplay(data);
+                    break;
+                
+                case 'STATE_CHANGE':
+                    stateChangeCount++;
+                    document.getElementById('stateChanges').textContent = stateChangeCount;
+                    updateDisplay(data);
+                    addEvent(`State: ${data.oldState} → ${data.newState}`, 'state');
+                    break;
+                
+                case 'REGISTRY_CREATE':
+                    addEvent(`Registry created: ${data.machineId}`, 'info');
+                    break;
+                
+                case 'REGISTRY_REMOVE':
+                    addEvent(`Registry removed: ${data.machineId}`, 'info');
+                    break;
+            }
+            
+            eventCount++;
+            document.getElementById('eventCount').textContent = eventCount;
+        }
+        
+        function updateDisplay(data) {
+            if (data.machineId) {
+                document.getElementById('machineId').textContent = data.machineId;
+            }
+            
+            if (data.currentState) {
+                const stateElem = document.getElementById('currentState');
+                stateElem.textContent = data.currentState;
+                stateElem.className = 'state-badge state-' + data.currentState.toLowerCase();
+            }
+            
+            if (data.isRegistered !== undefined) {
+                document.getElementById('registryStatus').textContent = 
+                    data.isRegistered ? 'REGISTERED' : 'NOT REGISTERED';
+            }
+            
+            if (data.context) {
+                const ctx = data.context;
+                if (ctx.fromNumber) document.getElementById('fromNumber').textContent = ctx.fromNumber;
+                if (ctx.toNumber) document.getElementById('toNumber').textContent = ctx.toNumber;
+                if (ctx.callStatus) document.getElementById('callStatus').textContent = ctx.callStatus;
+                if (ctx.ringCount !== undefined) document.getElementById('ringCount').textContent = ctx.ringCount;
+            }
+        }
+        
+        function sendCommand(action) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: action }));
+                addEvent(`Sent command: ${action}`, 'command');
+            }
+        }
+        
+        function addEvent(message, type = 'info') {
+            const eventList = document.getElementById('eventList');
+            const eventItem = document.createElement('div');
+            eventItem.className = 'event-item';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            eventItem.innerHTML = `<span class="timestamp">${timestamp}</span>${message}`;
+            
+            eventList.insertBefore(eventItem, eventList.firstChild);
+            
+            // Keep only last N events
+            while (eventList.children.length > maxEvents) {
+                eventList.removeChild(eventList.lastChild);
+            }
+        }
+        
+        // Update uptime
+        setInterval(() => {
+            if (connected && startTime) {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('uptime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }, 1000);
+        
+        // Auto-connect on load
+        window.addEventListener('load', () => {
+            // Optionally auto-connect
+            // connect();
+        });
+    </script>
+</body>
+</html>

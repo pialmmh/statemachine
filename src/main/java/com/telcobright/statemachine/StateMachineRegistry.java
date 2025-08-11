@@ -2,6 +2,8 @@ package com.telcobright.statemachine;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
@@ -18,6 +20,7 @@ public class StateMachineRegistry {
     private final TimeoutManager timeoutManager;
     private boolean debugMode = false;
     private SimpleDatabaseSnapshotRecorder snapshotRecorder;
+    private final List<StateMachineListener<?, ?>> listeners = new CopyOnWriteArrayList<>();
     
     /**
      * Default constructor for testing
@@ -87,6 +90,9 @@ public class StateMachineRegistry {
                 System.err.println("⚠️ Failed to apply debug mode to machine " + id + ": " + e.getMessage());
             }
         }
+        
+        // Notify listeners
+        notifyRegistryCreate(id);
     }
     
     /**
@@ -94,12 +100,20 @@ public class StateMachineRegistry {
      */
     public void removeMachine(String id) {
         activeMachines.remove(id);
+        notifyRegistryRemove(id);
     }
     
     /**
      * Check if a machine is in memory
      */
     public boolean isInMemory(String id) {
+        return activeMachines.containsKey(id);
+    }
+    
+    /**
+     * Check if a machine is registered (alias for isInMemory)
+     */
+    public boolean isRegistered(String id) {
         return activeMachines.containsKey(id);
     }
     
@@ -196,17 +210,67 @@ public class StateMachineRegistry {
     }
     
     /**
+     * Add a listener for state machine events
+     */
+    public void addListener(StateMachineListener<?, ?> listener) {
+        listeners.add(listener);
+    }
+    
+    /**
+     * Remove a listener
+     */
+    public void removeListener(StateMachineListener<?, ?> listener) {
+        listeners.remove(listener);
+    }
+    
+    /**
+     * Notify listeners of registry create event
+     */
+    @SuppressWarnings("unchecked")
+    private void notifyRegistryCreate(String machineId) {
+        for (StateMachineListener listener : listeners) {
+            try {
+                listener.onRegistryCreate(machineId);
+            } catch (Exception e) {
+                System.err.println("Error notifying listener of registry create: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Notify listeners of registry remove event
+     */
+    @SuppressWarnings("unchecked")
+    private void notifyRegistryRemove(String machineId) {
+        for (StateMachineListener listener : listeners) {
+            try {
+                listener.onRegistryRemove(machineId);
+            } catch (Exception e) {
+                System.err.println("Error notifying listener of registry remove: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Notify listeners of state machine event
+     */
+    @SuppressWarnings("unchecked")
+    public void notifyStateMachineEvent(String machineId, String oldState, String newState, 
+                                       StateMachineContextEntity contextEntity, Object volatileContext) {
+        for (StateMachineListener listener : listeners) {
+            try {
+                listener.onStateMachineEvent(machineId, oldState, newState, contextEntity, volatileContext);
+            } catch (Exception e) {
+                System.err.println("Error notifying listener of state machine event: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
      * Get count of active machines
      */
     public int size() {
         return activeMachines.size();
-    }
-    
-    /**
-     * Check if a machine is registered in the registry
-     */
-    public boolean isRegistered(String id) {
-        return activeMachines.containsKey(id);
     }
     
     /**

@@ -1100,12 +1100,285 @@ public class EnhancedMonitoringServer {
         }
         
         function refreshData() {
-            currentPage = 0;
-            loadRuns();
-            
-            if (selectedRunId) {
-                loadHistory(selectedRunId);
+            if (currentMode === 'snapshot') {
+                currentPage = 0;
+                loadRuns();
+                
+                if (selectedRunId) {
+                    loadHistory(selectedRunId);
+                }
+            } else {
+                // In live mode, reconnect WebSocket
+                if (ws) {
+                    ws.close();
+                }
+                connectWebSocket();
             }
+        }
+        
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update button states
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update UI elements
+            const connectionStatus = document.getElementById('connectionStatus');
+            const liveEventPanel = document.getElementById('liveEventPanel');
+            const leftPanelTitle = document.getElementById('leftPanelTitle');
+            const historyHeader = document.getElementById('historyHeader');
+            
+            if (mode === 'live') {
+                connectionStatus.style.display = 'flex';
+                liveEventPanel.style.display = 'block';
+                leftPanelTitle.textContent = '🔴 Live Monitoring';
+                historyHeader.textContent = '📊 Live State Updates';
+                connectWebSocket();
+                startLiveUpdates();
+            } else {
+                connectionStatus.style.display = 'none';
+                liveEventPanel.style.display = 'none';
+                leftPanelTitle.textContent = '📋 Recent Runs';
+                historyHeader.textContent = '📊 State Machine History';
+                
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                
+                if (liveUpdateInterval) {
+                    clearInterval(liveUpdateInterval);
+                    liveUpdateInterval = null;
+                }
+                
+                loadRuns();
+            }
+        }
+        
+        function connectWebSocket() {
+            const wsUrl = 'ws://localhost:9999';
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    updateConnectionStatus(true);
+                    document.getElementById('sendEventBtn').disabled = false;
+                    showToast('Connected to live machine', 'success');
+                    ws.send(JSON.stringify({ action: 'GET_STATE' }));
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleLiveMessage(data);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    showToast('WebSocket connection error', 'error');
+                };
+                
+                ws.onclose = () => {
+                    updateConnectionStatus(false);
+                    document.getElementById('sendEventBtn').disabled = true;
+                    showToast('Disconnected from server. Retrying...', 'error');
+                    
+                    // Retry connection after 3 seconds if still in live mode
+                    if (currentMode === 'live') {
+                        setTimeout(connectWebSocket, 3000);
+                    }
+                };
+            } catch (e) {
+                showToast('Failed to connect to WebSocket server', 'error');
+                if (currentMode === 'live') {
+                    setTimeout(connectWebSocket, 3000);
+                }
+            }
+        }
+        
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            if (connected) {
+                dot.classList.remove('disconnected');
+                dot.classList.add('connected');
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                dot.classList.add('disconnected');
+                text.textContent = 'Disconnected';
+            }
+        }
+        
+        function handleLiveMessage(data) {
+            switch (data.type) {
+                case 'CURRENT_STATE':
+                case 'PERIODIC_UPDATE':
+                    updateLiveDisplay(data);
+                    break;
+                case 'STATE_CHANGE':
+                    stateChangeCount++;
+                    updateLiveDisplay(data);
+                    addLiveTransition(data);
+                    break;
+            }
+            totalEventCount++;
+        }
+        
+        function updateLiveDisplay(data) {
+            const content = document.getElementById('historyContent');
+            
+            // Create or update live display
+            let liveDisplay = document.getElementById('liveDisplay');
+            if (!liveDisplay) {
+                content.innerHTML = `
+                    <div id="liveDisplay" style="padding: 20px;">
+                        <div style="background: white; border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                            <h2 style="margin: 0 0 15px 0; color: #28a745;">🔴 Live State</h2>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                                <div>
+                                    <div class="status-label">Machine ID:</div>
+                                    <div class="status-value" id="liveMachineId">-</div>
+                                </div>
+                                <div>
+                                    <div class="status-label">Current State:</div>
+                                    <div class="status-value" id="liveCurrentState" style="font-size: 18px; font-weight: bold; color: #007bff;">-</div>
+                                </div>
+                                <div>
+                                    <div class="status-label">Registry Status:</div>
+                                    <div class="status-value" id="liveRegistryStatus">-</div>
+                                </div>
+                                <div>
+                                    <div class="status-label">Total Events:</div>
+                                    <div class="status-value" id="liveTotalEvents">0</div>
+                                </div>
+                                <div>
+                                    <div class="status-label">State Changes:</div>
+                                    <div class="status-value" id="liveStateChanges">0</div>
+                                </div>
+                                <div>
+                                    <div class="status-label">Last Update:</div>
+                                    <div class="status-value" id="liveLastUpdate">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="liveTransitions" style="max-height: 400px; overflow-y: auto;"></div>
+                    </div>
+                `;
+                liveDisplay = document.getElementById('liveDisplay');
+            }
+            
+            // Update live stats
+            if (data.machineId) {
+                document.getElementById('liveMachineId').textContent = data.machineId;
+            }
+            if (data.currentState) {
+                document.getElementById('liveCurrentState').textContent = data.currentState;
+            }
+            if (data.isRegistered !== undefined) {
+                document.getElementById('liveRegistryStatus').textContent = 
+                    data.isRegistered ? '✅ REGISTERED' : '❌ NOT REGISTERED';
+            }
+            document.getElementById('liveTotalEvents').textContent = totalEventCount;
+            document.getElementById('liveStateChanges').textContent = stateChangeCount;
+            document.getElementById('liveLastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+        
+        function addLiveTransition(data) {
+            const transitionsDiv = document.getElementById('liveTransitions');
+            if (!transitionsDiv) return;
+            
+            const transitionItem = document.createElement('div');
+            transitionItem.className = 'transition-item';
+            transitionItem.style.animation = 'slideIn 0.3s ease-out';
+            
+            transitionItem.innerHTML = `
+                <div style="background: #f8f9fa; padding: 12px; border-left: 4px solid #28a745;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${data.oldState || 'UNKNOWN'} → ${data.newState || data.currentState}</strong>
+                            <span style="margin-left: 10px; color: #6c757d; font-size: 12px;">
+                                ${new Date().toLocaleTimeString()}
+                            </span>
+                        </div>
+                    </div>
+                    ${data.context ? `
+                        <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px;">
+                            <pre style="margin: 0; font-size: 11px;">${JSON.stringify(data.context, null, 2)}</pre>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            transitionsDiv.insertBefore(transitionItem, transitionsDiv.firstChild);
+            
+            // Keep only last 10 transitions
+            while (transitionsDiv.children.length > 10) {
+                transitionsDiv.removeChild(transitionsDiv.lastChild);
+            }
+        }
+        
+        function startLiveUpdates() {
+            // Clear previous content
+            const runList = document.getElementById('runList');
+            runList.innerHTML = '<div style="padding: 20px; color: #28a745; text-align: center;">🔴 Live mode active<br><small>Events will appear here</small></div>';
+            
+            // Clear history content
+            const historyContent = document.getElementById('historyContent');
+            historyContent.innerHTML = '<div class="loading">Waiting for live data...</div>';
+        }
+        
+        function selectEvent() {
+            const event = document.getElementById('eventSelect').value;
+            if (event && eventTemplates[event]) {
+                document.getElementById('eventPayload').value = 
+                    JSON.stringify(eventTemplates[event], null, 2);
+            }
+        }
+        
+        function sendEvent() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected to server', 'error');
+                return;
+            }
+            
+            const event = document.getElementById('eventSelect').value;
+            if (!event) {
+                showToast('Please select an event', 'error');
+                return;
+            }
+            
+            try {
+                const payload = JSON.parse(document.getElementById('eventPayload').value || '{}');
+                ws.send(JSON.stringify({ action: event, payload }));
+                showToast(`Sent event: ${event}`, 'success');
+                
+                // Clear form
+                document.getElementById('eventSelect').value = '';
+                document.getElementById('eventPayload').value = '';
+            } catch (e) {
+                showToast('Invalid JSON payload', 'error');
+            }
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
     </script>
 </body>

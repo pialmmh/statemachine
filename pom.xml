@@ -56,6 +56,13 @@
 			<version>8.0.33</version>
 		</dependency>
 		
+		<!-- PostgreSQL Driver -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>42.6.0</version>
+		</dependency>
+		
 		<!-- HikariCP Connection Pool -->
 		<dependency>
 			<groupId>com.zaxxer</groupId>
@@ -68,6 +75,34 @@
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
 			<version>2.2.224</version>
+		</dependency>
+		
+		<!-- Lanterna for Terminal UI -->
+		<dependency>
+			<groupId>com.googlecode.lanterna</groupId>
+			<artifactId>lanterna</artifactId>
+			<version>3.1.1</version>
+		</dependency>
+		
+		<!-- JLine for better console handling -->
+		<dependency>
+			<groupId>org.jline</groupId>
+			<artifactId>jline</artifactId>
+			<version>3.23.0</version>
+		</dependency>
+		
+		<!-- WebSocket server dependencies -->
+		<dependency>
+			<groupId>org.java-websocket</groupId>
+			<artifactId>Java-WebSocket</artifactId>
+			<version>1.5.4</version>
+		</dependency>
+		
+		<!-- JSON processing -->
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>2.10.1</version>
 		</dependency>
 		
 		<!-- Test dependencies -->

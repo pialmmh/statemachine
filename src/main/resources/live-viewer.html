@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine Live Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .navbar {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav-links a.active {
+            background: #3498db;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .status-connected {
+            background: #27ae60;
+        }
+        
+        .status-disconnected {
+            background: #e74c3c;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+        
+        .sidebar {
+            width: 320px;
+            background: white;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+        }
+        
+        .sidebar-section {
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .sidebar-header {
+            background: #34495e;
+            color: white;
+            padding: 1rem;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .sidebar-body {
+            padding: 1rem;
+        }
+        
+        .event-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .event-item:hover {
+            background: #e9ecef;
+        }
+        
+        .event-item.selected {
+            background: #3498db;
+            color: white;
+        }
+        
+        .event-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+        
+        .event-description {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        
+        .payload-editor {
+            margin-top: 1rem;
+        }
+        
+        .payload-editor label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+        
+        .payload-editor textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        
+        .payload-editor button {
+            margin-top: 1rem;
+            width: 100%;
+            padding: 0.75rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .payload-editor button:hover {
+            background: #2980b9;
+        }
+        
+        .payload-editor button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            background: #34495e;
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+        }
+        
+        .panel-body {
+            padding: 1.5rem;
+        }
+        
+        .info-row {
+            display: flex;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: #7f8c8d;
+            width: 140px;
+            flex-shrink: 0;
+        }
+        
+        .info-value {
+            color: #2c3e50;
+            word-break: break-word;
+        }
+        
+        .state-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .state-idle {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .state-ringing {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .state-connected {
+            background: #3498db;
+            color: white;
+        }
+        
+        .json-viewer {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 4px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transform: translateX(400px);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast-error {
+            background: #e74c3c;
+        }
+        
+        .toast-success {
+            background: #27ae60;
+        }
+        
+        .toast-info {
+            background: #3498db;
+        }
+        
+        .history-log {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #ecf0f1;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .log-time {
+            color: #7f8c8d;
+            font-size: 0.85rem;
+            width: 80px;
+        }
+        
+        .log-message {
+            flex: 1;
+        }
+        
+        .log-type {
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .log-state {
+            background: #3498db;
+            color: white;
+        }
+        
+        .log-event {
+            background: #9b59b6;
+            color: white;
+        }
+        
+        .log-error {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #ddd;
+            }
+            
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>🔴 Live Monitor</h1>
+        <div class="connection-status status-disconnected" id="connectionStatus">
+            <span class="status-indicator"></span>
+            <span id="connectionText">Disconnected</span>
+        </div>
+        <div class="nav-links">
+            <a href="/snapshot-viewer.html">Snapshot Viewer</a>
+            <a href="#" class="active">Live Monitor</a>
+            <a href="#" onclick="showSettings()">Settings</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    Events
+                    <span style="font-size: 0.85rem; opacity: 0.8;">Call Machine</span>
+                </div>
+                <div class="sidebar-body">
+                    <div class="event-item" onclick="selectEvent('INCOMING_CALL')">
+                        <div class="event-name">INCOMING_CALL</div>
+                        <div class="event-description">Initiate an incoming call</div>
+                    </div>
+                    <div class="event-item" onclick="selectEvent('ANSWER')">
+                        <div class="event-name">ANSWER</div>
+                        <div class="event-description">Answer the current call</div>
+                    </div>
+                    <div class="event-item" onclick="selectEvent('HANGUP')">
+                        <div class="event-name">HANGUP</div>
+                        <div class="event-description">End the current call</div>
+                    </div>
+                    <div class="event-item" onclick="selectEvent('SESSION_PROGRESS')">
+                        <div class="event-name">SESSION_PROGRESS</div>
+                        <div class="event-description">Send session progress signal</div>
+                    </div>
+                    <div class="event-item" onclick="selectEvent('HOLD')">
+                        <div class="event-name">HOLD</div>
+                        <div class="event-description">Put call on hold</div>
+                    </div>
+                    <div class="event-item" onclick="selectEvent('UNHOLD')">
+                        <div class="event-name">UNHOLD</div>
+                        <div class="event-description">Resume call from hold</div>
+                    </div>
+                    <div class="event-item" onclick="selectEvent('TRANSFER')">
+                        <div class="event-name">TRANSFER</div>
+                        <div class="event-description">Transfer call to another party</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="sidebar-header">Event Payload</div>
+                <div class="sidebar-body">
+                    <div class="payload-editor">
+                        <label for="eventPayload">JSON Payload:</label>
+                        <textarea id="eventPayload" placeholder='{"callerNumber": "+1-555-9999"}'>{}</textarea>
+                        <button id="sendEventBtn" onclick="sendEvent()" disabled>
+                            Send Event
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <main class="main-content">
+            <div class="content-grid">
+                <div class="panel">
+                    <div class="panel-header">Machine State</div>
+                    <div class="panel-body">
+                        <div class="info-row">
+                            <span class="info-label">Machine ID:</span>
+                            <span class="info-value" id="machineId">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Current State:</span>
+                            <span class="info-value">
+                                <span class="state-badge state-idle" id="currentState">UNKNOWN</span>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Registry Status:</span>
+                            <span class="info-value" id="registryStatus">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Last Update:</span>
+                            <span class="info-value" id="lastUpdate">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <div class="panel-header">Statistics</div>
+                    <div class="panel-body">
+                        <div class="info-row">
+                            <span class="info-label">Total Events:</span>
+                            <span class="info-value" id="totalEvents">0</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">State Changes:</span>
+                            <span class="info-value" id="stateChanges">0</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Connection Time:</span>
+                            <span class="info-value" id="connectionTime">00:00</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Error Count:</span>
+                            <span class="info-value" id="errorCount">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <div class="panel-header">Context Entity (Persistent)</div>
+                    <div class="panel-body">
+                        <div id="contextEntity" class="json-viewer">{}</div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <div class="panel-header">Volatile Context</div>
+                    <div class="panel-body">
+                        <div id="volatileContext" class="json-viewer">{}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">Activity Log</div>
+                <div class="panel-body">
+                    <div class="history-log" id="activityLog">
+                        <div class="log-item">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-message">Waiting for connection...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <div id="toast" class="toast"></div>
+    
+    <script>
+        let ws = null;
+        let connected = false;
+        let selectedEvent = null;
+        let totalEventCount = 0;
+        let stateChangeCount = 0;
+        let errorCount = 0;
+        let connectionStartTime = null;
+        let wsUrl = 'ws://localhost:9999';
+        
+        // Event payload templates
+        const eventTemplates = {
+            'INCOMING_CALL': {
+                callerNumber: '+1-555-9999',
+                callId: 'call-' + Date.now()
+            },
+            'ANSWER': {},
+            'HANGUP': {
+                reason: 'normal'
+            },
+            'SESSION_PROGRESS': {
+                sdp: 'v=0',
+                ringNumber: 1
+            },
+            'HOLD': {},
+            'UNHOLD': {},
+            'TRANSFER': {
+                targetNumber: '+1-555-8888'
+            }
+        };
+        
+        function connect() {
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    connected = true;
+                    connectionStartTime = Date.now();
+                    updateConnectionStatus(true);
+                    document.getElementById('sendEventBtn').disabled = false;
+                    showToast('Connected to WebSocket server', 'success');
+                    addLog('Connected to server', 'event');
+                    
+                    // Request initial state
+                    ws.send(JSON.stringify({ action: 'GET_STATE' }));
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleMessage(data);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                        errorCount++;
+                        document.getElementById('errorCount').textContent = errorCount;
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    showToast('WebSocket connection error', 'error');
+                    addLog('Connection error', 'error');
+                    errorCount++;
+                    document.getElementById('errorCount').textContent = errorCount;
+                };
+                
+                ws.onclose = () => {
+                    connected = false;
+                    updateConnectionStatus(false);
+                    document.getElementById('sendEventBtn').disabled = true;
+                    showToast('Disconnected from server', 'error');
+                    addLog('Disconnected from server', 'error');
+                    
+                    // Attempt to reconnect after 3 seconds
+                    setTimeout(() => {
+                        if (!connected) {
+                            showToast('Attempting to reconnect...', 'info');
+                            connect();
+                        }
+                    }, 3000);
+                };
+                
+            } catch (e) {
+                console.error('Failed to connect:', e);
+                showToast('Failed to connect to WebSocket server', 'error');
+                
+                // Retry connection after 3 seconds
+                setTimeout(connect, 3000);
+            }
+        }
+        
+        function updateConnectionStatus(isConnected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const textElement = document.getElementById('connectionText');
+            
+            if (isConnected) {
+                statusElement.className = 'connection-status status-connected';
+                textElement.textContent = 'Connected';
+            } else {
+                statusElement.className = 'connection-status status-disconnected';
+                textElement.textContent = 'Disconnected';
+            }
+        }
+        
+        function handleMessage(data) {
+            const timestamp = data.timestamp || new Date().toLocaleTimeString();
+            document.getElementById('lastUpdate').textContent = timestamp;
+            
+            switch (data.type) {
+                case 'CURRENT_STATE':
+                case 'PERIODIC_UPDATE':
+                    updateDisplay(data);
+                    break;
+                
+                case 'STATE_CHANGE':
+                    stateChangeCount++;
+                    document.getElementById('stateChanges').textContent = stateChangeCount;
+                    updateDisplay(data);
+                    addLog(`State: ${data.oldState} → ${data.newState}`, 'state');
+                    break;
+                
+                case 'REGISTRY_CREATE':
+                    addLog(`Registry created: ${data.machineId}`, 'event');
+                    break;
+                
+                case 'REGISTRY_REMOVE':
+                    addLog(`Registry removed: ${data.machineId}`, 'event');
+                    break;
+            }
+            
+            totalEventCount++;
+            document.getElementById('totalEvents').textContent = totalEventCount;
+        }
+        
+        function updateDisplay(data) {
+            if (data.machineId) {
+                document.getElementById('machineId').textContent = data.machineId;
+            }
+            
+            if (data.currentState) {
+                const stateElement = document.getElementById('currentState');
+                stateElement.textContent = data.currentState;
+                stateElement.className = 'state-badge state-' + data.currentState.toLowerCase();
+            }
+            
+            if (data.isRegistered !== undefined) {
+                document.getElementById('registryStatus').textContent = 
+                    data.isRegistered ? 'REGISTERED' : 'NOT REGISTERED';
+            }
+            
+            if (data.context) {
+                document.getElementById('contextEntity').textContent = 
+                    JSON.stringify(data.context, null, 2);
+            }
+            
+            // Mock volatile context for now
+            document.getElementById('volatileContext').textContent = 
+                JSON.stringify({
+                    sessionData: {
+                        connected: connected,
+                        lastEvent: data.type
+                    }
+                }, null, 2);
+        }
+        
+        function selectEvent(eventName) {
+            selectedEvent = eventName;
+            
+            // Update selected visual state
+            document.querySelectorAll('.event-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            
+            // Load event template
+            const template = eventTemplates[eventName] || {};
+            document.getElementById('eventPayload').value = JSON.stringify(template, null, 2);
+        }
+        
+        function sendEvent() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected to server', 'error');
+                return;
+            }
+            
+            if (!selectedEvent) {
+                showToast('Please select an event', 'error');
+                return;
+            }
+            
+            try {
+                const payloadText = document.getElementById('eventPayload').value;
+                const payload = JSON.parse(payloadText);
+                
+                const message = {
+                    action: selectedEvent,
+                    payload: payload
+                };
+                
+                ws.send(JSON.stringify(message));
+                showToast(`Sent event: ${selectedEvent}`, 'success');
+                addLog(`Sent: ${selectedEvent}`, 'event');
+                
+            } catch (e) {
+                showToast('Invalid JSON payload', 'error');
+                console.error('Invalid JSON:', e);
+            }
+        }
+        
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast toast-${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        function addLog(message, type = 'info') {
+            const logContainer = document.getElementById('activityLog');
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            
+            const time = new Date().toLocaleTimeString();
+            const typeClass = `log-${type}`;
+            
+            logItem.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-message">${message}</span>
+                <span class="log-type ${typeClass}">${type.toUpperCase()}</span>
+            `;
+            
+            logContainer.insertBefore(logItem, logContainer.firstChild);
+            
+            // Keep only last 50 log items
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+        
+        function showSettings() {
+            const newUrl = prompt('Enter WebSocket URL:', wsUrl);
+            if (newUrl && newUrl !== wsUrl) {
+                wsUrl = newUrl;
+                if (ws) {
+                    ws.close();
+                }
+                connect();
+            }
+        }
+        
+        // Update connection timer
+        setInterval(() => {
+            if (connected && connectionStartTime) {
+                const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('connectionTime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }, 1000);
+        
+        // Auto-connect on load
+        window.addEventListener('load', () => {
+            connect();
+        });
+    </script>
+</body>
+</html>
