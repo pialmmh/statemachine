@@ -689,11 +689,9 @@ public class SimpleMonitoringServer {
             event.target.classList.add('active');
             
             if (mode === 'live') {
-                // Switch to live mode - would need WebSocket implementation
-                alert('Live mode is under development. Please use snapshot mode for now.');
-                setMode('snapshot');
+                switchToLiveMode();
             } else {
-                loadRuns();
+                switchToSnapshotMode();
             }
         }
         
@@ -1077,6 +1075,710 @@ ${formatJson(transition.eventPayloadJson)}</pre>
             if (selectedRunId) {
                 loadHistory(selectedRunId);
             }
+        }
+        
+        // Live Mode Implementation
+        let ws = null;
+        let wsReconnectInterval = null;
+        let liveTransitions = [];
+        let isPaused = false;
+        let currentMachineState = 'UNKNOWN';
+        let transitionCounter = 0;
+        let eventMetadata = {}; // Store event metadata from server
+        
+        function switchToLiveMode() {
+            // Update UI for live mode
+            const leftPanel = document.querySelector('.left-panel');
+            const rightPanel = document.querySelector('.right-panel');
+            
+            // Update left panel with event builder
+            leftPanel.innerHTML = `
+                <div class="panel-header">
+                    <span>🎮 CallMachine Control Panel</span>
+                    <div class="connection-status" id="wsStatus">
+                        <span class="status-dot disconnected"></span>
+                        <span>Disconnected</span>
+                    </div>
+                </div>
+                <div class="machine-status">
+                    <h3>Machine Status</h3>
+                    <div class="current-state">
+                        Current State: <span id="currentState" class="state-badge">UNKNOWN</span>
+                    </div>
+                    <div class="ws-url">WebSocket: ws://localhost:9999</div>
+                </div>
+                <div class="event-builder">
+                    <h3>Send Event to CallMachine</h3>
+                    <div class="event-type-selector">
+                        <label>Event Type:</label>
+                        <select id="eventType" onchange="updateEventPayloadHints()">
+                            <!-- Options will be populated from metadata -->
+                            <option value="" disabled selected>Loading events...</option>
+                        </select>
+                    </div>
+                    <div class="payload-editor">
+                        <label>Event Payload (JSON):</label>
+                        <textarea id="eventPayload" placeholder='Event parameters will appear here based on selected event type'>{}</textarea>
+                    </div>
+                    <button class="send-event-btn" onclick="sendEvent()">📤 Send Event</button>
+                </div>
+                <div class="live-controls">
+                    <button onclick="togglePause()" id="pauseBtn">⏸️ Pause Feed</button>
+                    <button onclick="clearTransitions()">🗑️ Clear</button>
+                    <button onclick="exportSession()">💾 Export</button>
+                </div>
+            `;
+            
+            // Update right panel header
+            rightPanel.innerHTML = `
+                <div class="panel-header">
+                    <span>🔴 Live Transitions (<span id="transitionCount">0</span>)</span>
+                    <span id="liveIndicator" class="live-indicator">● LIVE</span>
+                </div>
+                <div class="history-content" id="liveHistory">
+                    <div class="loading">Connecting to WebSocket...</div>
+                </div>
+            `;
+            
+            // Add custom styles for live mode
+            if (!document.getElementById('liveModeStyles')) {
+                const style = document.createElement('style');
+                style.id = 'liveModeStyles';
+                style.textContent = `
+                    .machine-status {
+                        background: white;
+                        padding: 15px;
+                        margin: 10px;
+                        border-radius: 8px;
+                        border: 1px solid #dee2e6;
+                    }
+                    .current-state {
+                        font-size: 16px;
+                        margin: 10px 0;
+                    }
+                    .state-badge {
+                        background: #007bff;
+                        color: white;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    .ws-url {
+                        color: #6c757d;
+                        font-size: 12px;
+                    }
+                    .event-builder {
+                        background: white;
+                        padding: 15px;
+                        margin: 10px;
+                        border-radius: 8px;
+                        border: 1px solid #dee2e6;
+                    }
+                    .event-builder h3 {
+                        margin-top: 0;
+                        color: #495057;
+                    }
+                    .event-type-selector, .payload-editor {
+                        margin-bottom: 15px;
+                    }
+                    .event-type-selector label, .payload-editor label {
+                        display: block;
+                        margin-bottom: 5px;
+                        color: #495057;
+                        font-weight: 600;
+                    }
+                    .event-type-selector select {
+                        width: 100%;
+                        padding: 8px;
+                        border: 1px solid #ced4da;
+                        border-radius: 4px;
+                    }
+                    .payload-editor textarea {
+                        width: 100%;
+                        height: 100px;
+                        padding: 8px;
+                        border: 1px solid #ced4da;
+                        border-radius: 4px;
+                        font-family: 'Courier New', monospace;
+                    }
+                    .send-event-btn {
+                        width: 100%;
+                        padding: 10px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-weight: bold;
+                        cursor: pointer;
+                    }
+                    .send-event-btn:hover {
+                        opacity: 0.9;
+                    }
+                    .live-controls {
+                        padding: 10px;
+                        display: flex;
+                        gap: 10px;
+                    }
+                    .live-controls button {
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #dee2e6;
+                        background: white;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    }
+                    .live-controls button:hover {
+                        background: #f8f9fa;
+                    }
+                    .connection-status {
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                    }
+                    .status-dot {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                    }
+                    .status-dot.connected {
+                        background: #28a745;
+                        animation: pulse 2s infinite;
+                    }
+                    .status-dot.disconnected {
+                        background: #dc3545;
+                    }
+                    @keyframes pulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                        100% { opacity: 1; }
+                    }
+                    .live-indicator {
+                        color: #dc3545;
+                        animation: blink 1s infinite;
+                    }
+                    @keyframes blink {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.3; }
+                        100% { opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Start WebSocket connection
+            connectWebSocket();
+        }
+        
+        function handleEventMetadataUpdate(message) {
+            console.log('Received event metadata:', message);
+            eventMetadata = message;
+            
+            // Update the event selector with available events
+            const eventSelector = document.getElementById('eventType');
+            if (eventSelector && message.machines && message.machines.length > 0) {
+                // Clear existing options
+                eventSelector.innerHTML = '<option value="" disabled selected>Select an event...</option>';
+                
+                // Get the first machine's supported events
+                const machine = message.machines[0];
+                if (machine.supportedEvents) {
+                    // Store events for later use
+                    window.availableEvents = {};
+                    
+                    machine.supportedEvents.forEach(event => {
+                        const option = document.createElement('option');
+                        option.value = event.eventType;
+                        option.textContent = event.displayName || event.eventType;
+                        
+                        // Store the mock data for this event
+                        window.availableEvents[event.eventType] = event.mockData || {};
+                        
+                        // Add visual indicators
+                        if (event.isStayEvent) {
+                            option.textContent += ' (Stay)';
+                        }
+                        
+                        eventSelector.appendChild(option);
+                    });
+                    
+                    console.log('Populated dropdown with', machine.supportedEvents.length, 'events');
+                }
+                
+                // Update machine info display
+                updateMachineInfo(machine);
+            }
+        }
+        
+        function handleCompleteStatus(message) {
+            console.log('Received complete status:', message);
+            
+            // Update registry info
+            if (message.registry) {
+                const statusEl = document.querySelector('.connection-status');
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <span class="status-dot connected"></span> 
+                        Connected (${message.registry.connectedClients} clients, ${message.registry.machineCount} machines)
+                    `;
+                }
+            }
+            
+            // Update machine states
+            if (message.machines && message.machines.length > 0) {
+                const machine = message.machines[0]; // Focus on first machine
+                if (machine.currentState) {
+                    currentMachineState = machine.currentState;
+                    const stateEl = document.getElementById('currentState');
+                    if (stateEl) {
+                        stateEl.textContent = currentMachineState;
+                    }
+                }
+            }
+        }
+        
+        function updateMachineInfo(machine) {
+            // Update machine ID display if needed
+            const machineIdEl = document.getElementById('machineId');
+            if (machineIdEl && machine.machineId) {
+                machineIdEl.textContent = machine.machineId;
+            }
+            
+            // Update current state
+            if (machine.currentState) {
+                currentMachineState = machine.currentState;
+                const stateEl = document.getElementById('currentState');
+                if (stateEl) {
+                    stateEl.textContent = currentMachineState;
+                }
+            }
+        }
+        
+        function updateEventPayloadHints() {
+            const eventSelector = document.getElementById('eventType');
+            const payloadTextarea = document.getElementById('eventPayload');
+            
+            if (!eventSelector || !payloadTextarea) return;
+            
+            const selectedEventType = eventSelector.value;
+            
+            if (selectedEventType && window.availableEvents) {
+                // Get the mock data for the selected event
+                const mockData = window.availableEvents[selectedEventType] || {};
+                
+                // Format and display the mock data
+                if (Object.keys(mockData).length > 0) {
+                    payloadTextarea.value = JSON.stringify(mockData, null, 2);
+                } else {
+                    // Empty object for events with no payload
+                    payloadTextarea.value = '{}';
+                }
+                
+                console.log('Populated payload for', selectedEventType, 'with:', mockData);
+            } else {
+                // Default empty object
+                payloadTextarea.value = '{}';
+            }
+        }
+        
+        function switchToSnapshotMode() {
+            // Disconnect WebSocket
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (wsReconnectInterval) {
+                clearInterval(wsReconnectInterval);
+                wsReconnectInterval = null;
+            }
+            
+            // Restore snapshot mode UI
+            location.reload(); // Simple way to restore original UI
+        }
+        
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            try {
+                ws = new WebSocket('ws://localhost:9999');
+                
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    updateConnectionStatus(true);
+                    document.getElementById('liveHistory').innerHTML = '<div class="empty-state">Waiting for transitions...</div>';
+                    
+                    // Clear reconnect interval
+                    if (wsReconnectInterval) {
+                        clearInterval(wsReconnectInterval);
+                        wsReconnectInterval = null;
+                    }
+                    
+                    // Request event metadata
+                    ws.send(JSON.stringify({ action: 'GET_EVENT_METADATA' }));
+                };
+                
+                ws.onmessage = function(event) {
+                    handleWebSocketMessage(event.data);
+                };
+                
+                ws.onclose = function() {
+                    console.log('WebSocket disconnected');
+                    updateConnectionStatus(false);
+                    
+                    // Start reconnection attempts
+                    if (!wsReconnectInterval) {
+                        wsReconnectInterval = setInterval(connectWebSocket, 1000);
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus(false);
+                };
+                
+            } catch (error) {
+                console.error('Failed to connect WebSocket:', error);
+                updateConnectionStatus(false);
+                
+                // Start reconnection attempts
+                if (!wsReconnectInterval) {
+                    wsReconnectInterval = setInterval(connectWebSocket, 1000);
+                }
+            }
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('wsStatus');
+            if (statusEl) {
+                if (connected) {
+                    statusEl.innerHTML = `
+                        <span class="status-dot connected"></span>
+                        <span>Connected</span>
+                    `;
+                } else {
+                    statusEl.innerHTML = `
+                        <span class="status-dot disconnected"></span>
+                        <span>Disconnected</span>
+                    `;
+                }
+            }
+        }
+        
+        function handleWebSocketMessage(data) {
+            try {
+                const message = JSON.parse(data);
+                
+                // Handle different message types
+                if (message.type === 'EVENT_METADATA_UPDATE') {
+                    handleEventMetadataUpdate(message);
+                    return;
+                } else if (message.type === 'COMPLETE_STATUS') {
+                    handleCompleteStatus(message);
+                    return;
+                }
+                
+                // Update current state if available
+                if (message.stateAfter) {
+                    currentMachineState = message.stateAfter;
+                    const stateEl = document.getElementById('currentState');
+                    if (stateEl) {
+                        stateEl.textContent = currentMachineState;
+                    }
+                }
+                
+                // Add to transitions if not paused
+                if (!isPaused && (message.type === 'STATE_CHANGE' || message.stateAfter)) {
+                    liveTransitions.unshift(message);
+                    transitionCounter++;
+                    updateLiveHistory();
+                    updateTransitionCount();
+                }
+            } catch (error) {
+                console.error('Failed to parse WebSocket message:', error);
+            }
+        }
+        
+        function updateLiveHistory() {
+            const historyEl = document.getElementById('liveHistory');
+            if (!historyEl) return;
+            
+            if (liveTransitions.length === 0) {
+                historyEl.innerHTML = '<div class="empty-state">No transitions yet...</div>';
+                return;
+            }
+            
+            // Group transitions by state
+            const stateGroups = [];
+            let currentGroup = null;
+            
+            liveTransitions.forEach((transition, index) => {
+                // Check if this is a same-state transition
+                const isSameState = transition.stateBefore === transition.stateAfter;
+                
+                // If we're in the same state as the previous transition, add to current group
+                if (currentGroup && currentGroup.state === transition.stateAfter) {
+                    currentGroup.transitions.push(transition);
+                } else {
+                    // Create a new group for this state
+                    currentGroup = {
+                        state: transition.stateAfter || 'UNKNOWN',
+                        fromState: transition.stateBefore || 'UNKNOWN',
+                        transitions: [transition],
+                        isSameState: isSameState
+                    };
+                    stateGroups.push(currentGroup);
+                }
+            });
+            
+            let html = '';
+            let stepCounter = 1;
+            
+            stateGroups.forEach(group => {
+                // State header
+                html += '<div style="background: #fff; border-radius: 8px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+                html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px;">';
+                html += '<h3 style="margin: 0; font-size: 18px;">State: ' + group.state + '</h3>';
+                html += '<div style="display: flex; align-items: center; gap: 15px; margin-top: 8px; font-size: 14px; opacity: 0.95;">';
+                html += '<span>🔄 ' + group.transitions.length + ' event' + (group.transitions.length > 1 ? 's' : '') + ' in this state</span>';
+                html += '<span>Steps ' + stepCounter + '-' + (stepCounter + group.transitions.length - 1) + '</span>';
+                
+                const latestTime = group.transitions[0].timestamp;
+                if (latestTime) {
+                    const time = new Date(latestTime);
+                    html += '<span>🕒 ' + time.toLocaleTimeString() + '</span>';
+                }
+                html += '</div>';
+                html += '</div>';
+                
+                // Create cards for each event within this state - matching Snapshot viewer format
+                group.transitions.forEach(transition => {
+                    // Event card container
+                    html += '<div style="background: white; border: 1px solid #dee2e6; border-radius: 10px; margin: 15px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">';
+                    
+                    // Event header
+                    const bgColor = transition.stateBefore === transition.stateAfter ? '#fff3cd' : '#d1ecf1';
+                    const badgeColor = transition.stateBefore === transition.stateAfter ? '#ffc107' : '#17a2b8';
+                    
+                    html += '<div style="background: ' + bgColor + '; padding: 10px 15px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">';
+                    html += '<div style="display: flex; align-items: center; gap: 15px;">';
+                    html += '<span style="font-weight: 600; color: #495057;">Step ' + stepCounter + '</span>';
+                    html += '<span style="background: ' + badgeColor + '; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">' + (transition.eventType || transition.type || 'UNKNOWN') + '</span>';
+                    
+                    if (transition.stateBefore !== transition.stateAfter) {
+                        html += '<span style="font-size: 12px; color: #6c757d;">' + (transition.stateBefore || 'UNKNOWN') + ' → ' + (transition.stateAfter || 'UNKNOWN') + '</span>';
+                    } else {
+                        html += '<span style="font-size: 12px; color: #856404;">Stay in ' + (transition.stateAfter || 'UNKNOWN') + '</span>';
+                    }
+                    html += '</div>';
+                    
+                    // Duration if available
+                    if (transition.transitionDuration) {
+                        html += '<div style="font-size: 11px; color: #6c757d;">⏱️ ' + transition.transitionDuration + 'ms</div>';
+                    }
+                    html += '</div>';
+                    
+                    // Event body with three columns
+                    html += '<div style="padding: 15px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">';
+                    
+                    // Column 1: Event Payload (green border)
+                    html += '<div style="background: #f8f9fa; border-radius: 6px; padding: 12px; border-left: 3px solid #28a745;">';
+                    html += '<div style="font-weight: 600; color: #28a745; margin-bottom: 8px; font-size: 13px;">📌 Event Payload</div>';
+                    html += '<pre style="margin: 0; background: white; padding: 8px; border-radius: 4px; overflow-x: auto; font-size: 10px; line-height: 1.3;">';
+                    
+                    let payload = transition.eventPayloadJson || transition.payload;
+                    if (payload) {
+                        if (typeof payload === 'string') {
+                            try {
+                                html += JSON.stringify(JSON.parse(payload), null, 2);
+                            } catch (e) {
+                                html += payload;
+                            }
+                        } else {
+                            html += JSON.stringify(payload, null, 2);
+                        }
+                    } else {
+                        html += '{}';
+                    }
+                    html += '</pre>';
+                    html += '</div>';
+                    
+                    // Column 2: Context Before (red border)
+                    html += '<div style="background: #fff5f5; border-radius: 6px; padding: 12px; border-left: 3px solid #dc3545; font-size: 11px;">';
+                    html += formatLiveContextColumn(transition.contextBefore || transition.context, 'ACTIVE', false, 'Before', '#dc3545');
+                    html += '</div>';
+                    
+                    // Column 3: Context After (blue border)
+                    html += '<div style="background: #f0f8ff; border-radius: 6px; padding: 12px; border-left: 3px solid #17a2b8; font-size: 11px;">';
+                    html += formatLiveContextColumn(transition.contextAfter || transition.context, 'ACTIVE', false, 'After', '#17a2b8');
+                    html += '</div>';
+                    
+                    html += '</div>'; // End of 3-column grid
+                    html += '</div>'; // End of event card
+                    
+                    stepCounter++;
+                });
+                
+                html += '</div>';
+                html += '</div>';
+            });
+            
+            historyEl.innerHTML = html;
+        }
+        
+        function formatLiveContextColumn(contextData, registryStatus, machineHydrated, label, color) {
+            let html = '<div style="font-weight: 600; color: ' + color + '; margin-bottom: 8px;">Registry Status ' + label + ':</div>';
+            
+            // Add registry status information
+            const hydratedIcon = machineHydrated ? '💧' : '🔄';
+            const onlineIcon = '🟢';
+            html += '<div style="font-family: monospace; font-size: 11px; line-height: 1.4; margin-bottom: 12px;">';
+            html += 'Status: ' + registryStatus + '<br>';
+            html += 'Hydrated: ' + hydratedIcon + ' ' + (machineHydrated ? 'Yes' : 'No') + '<br>';
+            html += 'Online: ' + onlineIcon + ' Yes';
+            html += '</div>';
+            
+            // Parse and display context
+            if (contextData) {
+                // Separate persistent and volatile fields
+                const persistentFields = {};
+                const volatileFields = {};
+                
+                // If contextData is a string, try to parse it
+                let contextObj = contextData;
+                if (typeof contextData === 'string') {
+                    try {
+                        contextObj = JSON.parse(contextData);
+                    } catch (e) {
+                        // If parsing fails, show as is
+                        html += '<div style="margin-bottom: 8px;">';
+                        html += '<div style="font-weight: 600; color: #495057; margin-bottom: 4px; font-size: 11px;">Context:</div>';
+                        html += '<pre style="margin: 0; font-size: 10px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; line-height: 1.3;">' + contextData + '</pre>';
+                        html += '</div>';
+                        return html;
+                    }
+                }
+                
+                // Categorize fields
+                if (contextObj && typeof contextObj === 'object') {
+                    Object.entries(contextObj).forEach(([key, value]) => {
+                        // Entity fields for CallContext
+                        if (key.match(/^(callId|fromNumber|toNumber|currentState|callDirection|callStatus|ringCount|recordingEnabled|complete|id|registryStatus)$/i) || 
+                            key.endsWith('Id') || key.endsWith('Status') || key.endsWith('State') || key.endsWith('Time')) {
+                            persistentFields[key] = value;
+                        } else {
+                            volatileFields[key] = value;
+                        }
+                    });
+                }
+                
+                // Display Persistent Context
+                html += '<div style="margin-bottom: 8px;">';
+                html += '<div style="font-weight: 600; color: #495057; margin-bottom: 4px; font-size: 11px;">Persistent Context:</div>';
+                html += '<pre style="margin: 0; font-size: 10px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; line-height: 1.3;">';
+                html += JSON.stringify(persistentFields, null, 2);
+                html += '</pre>';
+                html += '</div>';
+                
+                // Display Volatile Context
+                if (Object.keys(volatileFields).length > 0) {
+                    html += '<div>';
+                    html += '<div style="font-weight: 600; color: #495057; margin-bottom: 4px; font-size: 11px;">Volatile Context:</div>';
+                    html += '<pre style="margin: 0; font-size: 10px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; line-height: 1.3;">';
+                    html += JSON.stringify(volatileFields, null, 2);
+                    html += '</pre>';
+                    html += '</div>';
+                } else {
+                    html += '<div>';
+                    html += '<div style="font-weight: 600; color: #495057; margin-bottom: 4px; font-size: 11px;">Volatile Context:</div>';
+                    html += '<pre style="margin: 0; font-size: 10px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; line-height: 1.3;">{}</pre>';
+                    html += '</div>';
+                }
+            } else {
+                // Still show empty sections
+                html += '<div style="margin-bottom: 8px;">';
+                html += '<div style="font-weight: 600; color: #495057; margin-bottom: 4px; font-size: 11px;">Persistent Context:</div>';
+                html += '<pre style="margin: 0; font-size: 10px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; line-height: 1.3;">{}</pre>';
+                html += '</div>';
+                html += '<div>';
+                html += '<div style="font-weight: 600; color: #495057; margin-bottom: 4px; font-size: 11px;">Volatile Context:</div>';
+                html += '<pre style="margin: 0; font-size: 10px; font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; line-height: 1.3;">{}</pre>';
+                html += '</div>';
+            }
+            
+            return html;
+        }
+        
+        function updateTransitionCount() {
+            const countEl = document.getElementById('transitionCount');
+            if (countEl) {
+                countEl.textContent = transitionCounter;
+            }
+        }
+        
+        function sendEvent() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket is not connected. Please wait for connection...');
+                return;
+            }
+            
+            const eventType = document.getElementById('eventType').value;
+            const payloadText = document.getElementById('eventPayload').value;
+            
+            let payload = {};
+            try {
+                payload = JSON.parse(payloadText);
+            } catch (error) {
+                alert('Invalid JSON payload. Please check your syntax.');
+                return;
+            }
+            
+            const message = {
+                type: 'EVENT',
+                machineId: 'CallMachine',
+                eventType: eventType,
+                payload: payload
+            };
+            
+            ws.send(JSON.stringify(message));
+            console.log('Sent event:', message);
+            
+            // Visual feedback
+            const btn = document.querySelector('.send-event-btn');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Sent!';
+            btn.style.background = '#28a745';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1000);
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtn');
+            if (btn) {
+                btn.textContent = isPaused ? '▶️ Resume Feed' : '⏸️ Pause Feed';
+            }
+        }
+        
+        function clearTransitions() {
+            liveTransitions = [];
+            transitionCounter = 0;
+            updateLiveHistory();
+            updateTransitionCount();
+        }
+        
+        function exportSession() {
+            const dataStr = JSON.stringify(liveTransitions, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'live-session-' + new Date().toISOString() + '.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
         }
     </script>
 </body>

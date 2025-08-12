@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug WebSocket Test</title>
+</head>
+<body>
+    <h1>Debug WebSocket Test</h1>
+    <button onclick="requestMetadata()">Request Event Metadata</button>
+    <div id="log"></div>
+    
+    <script>
+        let ws;
+        const log = document.getElementById('log');
+        
+        function addLog(msg) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toISOString() + ': ' + msg;
+            log.appendChild(div);
+        }
+        
+        function connect() {
+            ws = new WebSocket('ws://localhost:9999');
+            
+            ws.onopen = function() {
+                addLog('Connected!');
+                // Immediately request metadata
+                setTimeout(() => {
+                    addLog('Sending GET_EVENT_METADATA request...');
+                    ws.send(JSON.stringify({ action: 'GET_EVENT_METADATA' }));
+                }, 100);
+            };
+            
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                addLog('Received: ' + message.type);
+                
+                if (message.type === 'EVENT_METADATA_UPDATE') {
+                    addLog('SUCCESS! Got metadata with ' + (message.machines ? message.machines.length : 0) + ' machines');
+                    console.log('Full metadata:', message);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                addLog('Error: ' + error);
+            };
+            
+            ws.onclose = function() {
+                addLog('Disconnected');
+            };
+        }
+        
+        function requestMetadata() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog('Manually requesting metadata...');
+                ws.send(JSON.stringify({ action: 'GET_EVENT_METADATA' }));
+            } else {
+                addLog('Not connected!');
+            }
+        }
+        
+        // Auto-connect
+        connect();
+    </script>
+</body>
+</html>

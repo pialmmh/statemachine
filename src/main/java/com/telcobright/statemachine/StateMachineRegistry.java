@@ -14,67 +14,34 @@ import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
  * Registry for managing state machine instances
  * Used for testing and lifecycle management
  */
-public class StateMachineRegistry {
-    
-    private final Map<String, GenericStateMachine<?, ?>> activeMachines = new ConcurrentHashMap<>();
-    private final TimeoutManager timeoutManager;
-    private boolean debugMode = false;
-    private SimpleDatabaseSnapshotRecorder snapshotRecorder;
-    private final List<StateMachineListener<?, ?>> listeners = new CopyOnWriteArrayList<>();
+public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
     /**
      * Default constructor for testing
      */
     public StateMachineRegistry() {
-        this.timeoutManager = null;
+        super();
     }
     
     /**
      * Constructor with timeout manager
      */
     public StateMachineRegistry(TimeoutManager timeoutManager) {
-        this.timeoutManager = timeoutManager;
+        super(timeoutManager);
     }
     
     /**
-     * Enable debug mode with monitoring for all machines managed by this registry
+     * Constructor with timeout manager and WebSocket port
      */
-    public void enableDebugMode() {
-        this.debugMode = true;
-        this.snapshotRecorder = new SimpleDatabaseSnapshotRecorder();
-        System.out.println("🐛 Debug mode ENABLED for StateMachineRegistry");
-        System.out.println("📊 All machines will automatically use monitoring");
-    }
-    
-    /**
-     * Enable debug mode with custom snapshot recorder
-     */
-    public void enableDebugMode(SimpleDatabaseSnapshotRecorder recorder) {
-        this.debugMode = true;
-        this.snapshotRecorder = recorder;
-        System.out.println("🐛 Debug mode ENABLED for StateMachineRegistry with custom recorder");
-    }
-    
-    /**
-     * Disable debug mode
-     */
-    public void disableDebugMode() {
-        this.debugMode = false;
-        this.snapshotRecorder = null;
-        System.out.println("🐛 Debug mode DISABLED for StateMachineRegistry");
-    }
-    
-    /**
-     * Check if debug mode is enabled
-     */
-    public boolean isDebugMode() {
-        return debugMode;
+    public StateMachineRegistry(TimeoutManager timeoutManager, int webSocketPort) {
+        super(timeoutManager, webSocketPort);
     }
     
     /**
      * Register a state machine
      * Automatically applies debug mode if enabled
      */
+    @Override
     public void register(String id, GenericStateMachine<?, ?> machine) {
         activeMachines.put(id, machine);
         
@@ -93,11 +60,17 @@ public class StateMachineRegistry {
         
         // Notify listeners
         notifyRegistryCreate(id);
+        
+        // Send event metadata update if WebSocket server is running
+        if (isWebSocketServerRunning()) {
+            sendEventMetadataUpdate();
+        }
     }
     
     /**
      * Remove a state machine from the registry
      */
+    @Override
     public void removeMachine(String id) {
         activeMachines.remove(id);
         notifyRegistryRemove(id);
@@ -111,16 +84,17 @@ public class StateMachineRegistry {
     }
     
     /**
-     * Check if a machine is registered (alias for isInMemory)
-     */
-    public boolean isRegistered(String id) {
-        return activeMachines.containsKey(id);
-    }
-    
-    /**
      * Get a machine from memory
      */
     public GenericStateMachine<?, ?> getActiveMachine(String id) {
+        return activeMachines.get(id);
+    }
+    
+    /**
+     * Get a machine from the registry (implements abstract method)
+     */
+    @Override
+    public GenericStateMachine<?, ?> getMachine(String id) {
         return activeMachines.get(id);
     }
     
@@ -209,19 +183,6 @@ public class StateMachineRegistry {
         activeMachines.clear();
     }
     
-    /**
-     * Add a listener for state machine events
-     */
-    public void addListener(StateMachineListener<?, ?> listener) {
-        listeners.add(listener);
-    }
-    
-    /**
-     * Remove a listener
-     */
-    public void removeListener(StateMachineListener<?, ?> listener) {
-        listeners.remove(listener);
-    }
     
     /**
      * Notify listeners of registry create event
@@ -288,17 +249,52 @@ public class StateMachineRegistry {
     }
     
     /**
-     * Shutdown the registry and cleanup resources
+     * Rehydrate a machine from persistence (implements abstract method)
      */
-    public void shutdown() {
-        // Clear all active machines
-        activeMachines.clear();
+    @Override
+    public <T extends StateMachineContextEntity<?>> T rehydrateMachine(
+            String machineId, 
+            Class<T> contextClass, 
+            Supplier<T> contextSupplier, 
+            Function<T, GenericStateMachine<T, ?>> machineBuilder) {
         
-        // Shutdown timeout manager if available
-        if (timeoutManager != null) {
-            timeoutManager.shutdown();
+        // Check if already in memory
+        GenericStateMachine<?, ?> existing = activeMachines.get(machineId);
+        if (existing != null && existing.getPersistingEntity() != null) {
+            try {
+                return contextClass.cast(existing.getPersistingEntity());
+            } catch (ClassCastException e) {
+                // Machine exists but with different context type
+                throw new IllegalStateException("Machine " + machineId + " exists with different context type");
+            }
         }
         
+        // Create new context and machine
+        T context = contextSupplier.get();
+        GenericStateMachine<T, ?> machine = machineBuilder.apply(context);
+        register(machineId, machine);
+        
+        // Notify listeners
+        for (StateMachineListener listener : listeners) {
+            try {
+                listener.onRegistryRehydrate(machineId);
+            } catch (Exception e) {
+                System.err.println("Error notifying listener of registry rehydrate: " + e.getMessage());
+            }
+        }
+        
+        return context;
+    }
+    
+    /**
+     * Shutdown the registry and cleanup resources
+     */
+    @Override
+    public void shutdown() {
+        // Call parent shutdown which handles WebSocket and other cleanup
+        super.shutdown();
+        
+        // Additional cleanup specific to this implementation
         System.out.println("StateMachineRegistry shutdown complete.");
     }
 }
