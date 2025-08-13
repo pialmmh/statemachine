@@ -1653,27 +1653,47 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                 return;
             }
             
-            // Group transitions by state
+            // Group transitions by continuous state periods (not by state name)
+            // This ensures RINGING1 → IDLE → RINGING2 shows as three separate groups
             const stateGroups = [];
             let currentGroup = null;
+            let stateOccurrences = {}; // Track how many times we've seen each state
             
             liveTransitions.forEach((transition, index) => {
                 // Check if this is a same-state transition or initial state
                 const isSameState = transition.stateBefore === transition.stateAfter;
                 const isInitialState = transition.type === 'INITIAL_STATE' || !transition.stateBefore;
                 
-                // If we're in the same state as the previous transition, add to current group
-                if (currentGroup && currentGroup.state === transition.stateAfter) {
-                    currentGroup.transitions.push(transition);
-                } else {
-                    // Create a new group for this state
+                // Determine if we need to start a new group
+                // New group when: 
+                // 1. No current group exists
+                // 2. State changes to a different state
+                // 3. It's a transition that changes state (even if we've seen this state before)
+                const needNewGroup = !currentGroup || 
+                    (currentGroup.state !== transition.stateAfter) ||
+                    (index > 0 && liveTransitions[index-1].stateAfter !== transition.stateAfter);
+                
+                if (needNewGroup) {
+                    // Track occurrences for unique identification
+                    const stateName = transition.stateAfter || 'UNKNOWN';
+                    if (!stateOccurrences[stateName]) {
+                        stateOccurrences[stateName] = 0;
+                    }
+                    stateOccurrences[stateName]++;
+                    
+                    // Create a new group for this state period
                     currentGroup = {
-                        state: transition.stateAfter || 'UNKNOWN',
+                        state: stateName,
                         fromState: transition.stateBefore || 'UNKNOWN',
                         transitions: [transition],
-                        isSameState: isSameState
+                        isSameState: isSameState,
+                        occurrence: stateOccurrences[stateName], // Track which occurrence this is (1st, 2nd, etc.)
+                        uniqueId: stateName + '_' + stateOccurrences[stateName] // Unique identifier
                     };
                     stateGroups.push(currentGroup);
+                } else {
+                    // Add to existing group only if we're still in the same continuous state period
+                    currentGroup.transitions.push(transition);
                 }
             });
             
@@ -1688,11 +1708,17 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                 html += '<div style="background: #fff; border-radius: 8px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
                 html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; position: relative;">';
                 html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
-                html += '<h3 style="margin: 0; font-size: 18px;">State: ' + group.state + '</h3>';
+                
+                // Show state name with occurrence number if this state has appeared multiple times
+                let stateDisplay = group.state;
+                if (group.occurrence > 1) {
+                    stateDisplay += ' <span style="opacity: 0.8; font-size: 14px;">(#' + group.occurrence + ')</span>';
+                }
+                html += '<h3 style="margin: 0; font-size: 18px;">State: ' + stateDisplay + '</h3>';
                 
                 // Add countdown for the current RINGING state (most recent one)
                 if (group.state === 'RINGING' && isCurrentStateGroup) {
-                    html += '<span class="state-countdown" data-state="' + group.state + '" data-group-index="' + groupIndex + '" style="display: none; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold;">';
+                    html += '<span class="state-countdown" data-state="' + group.state + '" data-unique-id="' + group.uniqueId + '" data-group-index="' + groupIndex + '" style="display: none; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold;">';
                     html += 'Timeout in: <span class="countdown-value">30</span>s';
                     html += '</span>';
                 }
