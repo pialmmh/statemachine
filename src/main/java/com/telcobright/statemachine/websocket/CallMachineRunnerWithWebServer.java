@@ -213,6 +213,12 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                     case "HANGUP":
                         sendHangup();
                         break;
+                    case "SESSION_PROGRESS":
+                        int ringNumber = payload != null && payload.has("ringNumber") 
+                            ? payload.get("ringNumber").getAsInt() 
+                            : context.getRingCount() + 1;
+                        sendSessionProgress("v=0", ringNumber);
+                        break;
                     case "GET_STATE":
                         sendCurrentState(conn);
                         break;
@@ -390,29 +396,33 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
             
             machine.setPersistingEntity(context);
             
-            // Set up callback to notify registry on ALL state transitions (including timeouts)
+            // Set up callback to notify registry on ALL state transitions (including same-state transitions)
             // Track state changes properly - currentState is already updated when callback fires
             final String[] previousState = {machine.getCurrentState()};
             machine.setOnStateTransition(newState -> {
                 String oldState = previousState[0];
+                
+                // Check if this is a timeout transition
+                if ("IDLE".equals(newState) && "RINGING".equals(oldState) && lastEventName == null) {
+                    lastEventName = "Timeout";
+                }
+                
+                // Always notify registry about transitions, even same-state transitions (e.g., SESSION_PROGRESS)
+                // This ensures events like SESSION_PROGRESS in RINGING state are recorded
+                registry.notifyStateMachineEvent(MACHINE_ID, oldState, newState, context, null);
+                
+                // Only update previous state and restart timer if state actually changed
                 if (!oldState.equals(newState)) {
-                    // Check if this is a timeout transition
-                    if ("IDLE".equals(newState) && "RINGING".equals(oldState) && lastEventName == null) {
-                        lastEventName = "Timeout";
-                    }
-                    
-                    // Notify registry about the state change (including timeout transitions)
-                    registry.notifyStateMachineEvent(MACHINE_ID, oldState, newState, context, null);
                     previousState[0] = newState;
-                    
-                    // Reset event name after the notification is complete
-                    lastEventName = null;
                     
                     // Start countdown timer if debug mode is enabled and state has timeout
                     if (debugMode) {
                         startCountdownTimer(newState);
                     }
                 }
+                
+                // Reset event name after the notification is complete
+                lastEventName = null;
             });
             
             registry.register(MACHINE_ID, machine);
@@ -480,10 +490,18 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
     private void sendSessionProgress(String sdp, int ringNumber) {
         if (machine != null) {
             lastEventName = "SessionProgress";
+            String currentState = machine.getCurrentState();
             machine.fire(new SessionProgress(sdp, ringNumber));
-            // State change notification now handled by onStateTransition callback
+            
+            // For "stay" transitions (same-state), manually notify registry since onStateTransition won't fire
+            if (currentState.equals(machine.getCurrentState())) {
+                // This is a same-state transition (stay), manually broadcast it
+                registry.notifyStateMachineEvent(MACHINE_ID, currentState, currentState, context, null);
+            }
+            
             System.out.println("[Event] SESSION_PROGRESS -> ring: " + ringNumber);
             // Event name will be reset after the state transition completes
+            lastEventName = null;
         }
     }
     

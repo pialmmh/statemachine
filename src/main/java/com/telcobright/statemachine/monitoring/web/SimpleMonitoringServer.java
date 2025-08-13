@@ -1704,35 +1704,42 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                 // Determine if this is the most recent state group for the current machine state
                 const isCurrentStateGroup = (groupIndex === stateGroups.length - 1) && (group.state === currentMachineState);
                 
-                // State header
+                // State header - all info on one line to save vertical space
                 html += '<div style="background: #fff; border-radius: 8px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
-                html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; position: relative;">';
+                html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; position: relative;">';
                 html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
                 
-                // Show state name with occurrence number if this state has appeared multiple times
+                // Left side: State name with metadata all in one line
+                html += '<div style="display: flex; align-items: center; gap: 20px;">';
+                
+                // State name with occurrence number
                 let stateDisplay = group.state;
                 if (group.occurrence > 1) {
                     stateDisplay += ' <span style="opacity: 0.8; font-size: 14px;">(#' + group.occurrence + ')</span>';
                 }
-                html += '<h3 style="margin: 0; font-size: 18px;">State: ' + stateDisplay + '</h3>';
+                html += '<h3 style="margin: 0; font-size: 16px;">State: ' + stateDisplay + '</h3>';
                 
-                // Add countdown for the current RINGING state (most recent one)
-                if (group.state === 'RINGING' && isCurrentStateGroup) {
-                    html += '<span class="state-countdown" data-state="' + group.state + '" data-unique-id="' + group.uniqueId + '" data-group-index="' + groupIndex + '" style="display: none; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold;">';
-                    html += 'Timeout in: <span class="countdown-value">30</span>s';
-                    html += '</span>';
-                }
-                
-                html += '</div>';
-                html += '<div style="display: flex; align-items: center; gap: 15px; margin-top: 8px; font-size: 14px; opacity: 0.95;">';
-                html += '<span>🔄 ' + group.transitions.length + ' event' + (group.transitions.length > 1 ? 's' : '') + ' in this state</span>';
+                // Metadata - separated by vertical bars for clarity
+                html += '<div style="display: flex; align-items: center; gap: 12px; font-size: 13px; opacity: 0.9;">';
+                html += '<span>🔄 ' + group.transitions.length + ' event' + (group.transitions.length > 1 ? 's' : '') + '</span>';
+                html += '<span style="opacity: 0.7;">|</span>';
                 html += '<span>Steps ' + stepCounter + '-' + (stepCounter + group.transitions.length - 1) + '</span>';
                 
                 const latestTime = group.transitions[0].timestamp;
                 if (latestTime) {
-                    // Timestamp is already in HH:mm:ss.SSS format, use it directly
+                    html += '<span style="opacity: 0.7;">|</span>';
                     html += '<span>🕒 ' + latestTime + '</span>';
                 }
+                html += '</div>';
+                html += '</div>';
+                
+                // Right side: Countdown for RINGING state
+                if (group.state === 'RINGING' && isCurrentStateGroup) {
+                    html += '<span class="state-countdown" data-state="' + group.state + '" data-unique-id="' + group.uniqueId + '" data-group-index="' + groupIndex + '" style="display: none; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-size: 13px; font-weight: bold;">';
+                    html += 'Timeout in: <span class="countdown-value">30</span>s';
+                    html += '</span>';
+                }
+                
                 html += '</div>';
                 html += '</div>';
                 
