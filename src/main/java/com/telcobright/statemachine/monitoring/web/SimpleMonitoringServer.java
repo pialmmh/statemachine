@@ -28,6 +28,7 @@ public class SimpleMonitoringServer {
     private HttpServer server;
     private Connection dbConnection;
     private boolean databaseAvailable = false;
+    private int webSocketPort = 9999; // Default WebSocket port
     
     public static void main(String[] args) throws Exception {
         SimpleMonitoringServer monitor = new SimpleMonitoringServer();
@@ -39,6 +40,10 @@ public class SimpleMonitoringServer {
         
         // Keep server running
         Thread.currentThread().join();
+    }
+    
+    public void setWebSocketPort(int port) {
+        this.webSocketPort = port;
     }
     
     public void start(int port) throws Exception {
@@ -371,8 +376,10 @@ public class SimpleMonitoringServer {
         String dbStatusIcon = databaseAvailable ? "✅" : "⚠️";
         String dbStatusText = databaseAvailable ? "DB Connected" : "Sample Data";
         String dbStatusColor = databaseAvailable ? "#28a745" : "#ffc107";
-            
-        return """
+        
+        // Using StringBuilder to avoid Java string literal size limit
+        StringBuilder page = new StringBuilder();
+        page.append("""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1087,6 +1094,28 @@ ${formatJson(transition.eventPayloadJson)}</pre>
         let eventMetadata = {}; // Store event metadata from server
         
         function switchToLiveMode() {
+            // Clean up any existing WebSocket connection first
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (wsReconnectInterval) {
+                clearInterval(wsReconnectInterval);
+                wsReconnectInterval = null;
+            }
+            
+            // Don't reset transitions - keep the history
+            // Only reset if explicitly clearing or if this is first time
+            if (currentMode !== 'live') {
+                // First time switching to live mode - clear everything
+                liveTransitions = [];
+                transitionCounter = 0;
+                currentMachineState = 'UNKNOWN';
+            }
+            // Always reset these
+            isPaused = false;
+            eventMetadata = {};
+            
             // Update UI for live mode
             const leftPanel = document.querySelector('.left-panel');
             const rightPanel = document.querySelector('.right-panel');
@@ -1103,9 +1132,9 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                 <div class="machine-status">
                     <h3>Machine Status</h3>
                     <div class="current-state">
-                        Current State: <span id="currentState" class="state-badge">UNKNOWN</span>
+                        Current State: <span id="currentState" class="state-badge">${currentMachineState}</span>
                     </div>
-                    <div class="ws-url">WebSocket: ws://localhost:9999</div>
+                    <div class="ws-url">WebSocket: ws://localhost:${webSocketPort}</div>
                 </div>
                 <div class="event-builder">
                     <h3>Send Event to CallMachine</h3>
@@ -1155,6 +1184,9 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                     .current-state {
                         font-size: 16px;
                         margin: 10px 0;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
                     }
                     .state-badge {
                         background: #007bff;
@@ -1167,6 +1199,10 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                         color: #6c757d;
                         font-size: 12px;
                     }
+                    """);
+        
+        // Continue with second part
+        page.append("""
                     .event-builder {
                         background: white;
                         padding: 15px;
@@ -1401,7 +1437,7 @@ ${formatJson(transition.eventPayloadJson)}</pre>
             }
             
             try {
-                ws = new WebSocket('ws://localhost:9999');
+                ws = new WebSocket('ws://localhost:${webSocketPort}');
                 
                 ws.onopen = function() {
                     console.log('WebSocket connected');
@@ -1476,6 +1512,14 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                 } else if (message.type === 'COMPLETE_STATUS') {
                     handleCompleteStatus(message);
                     return;
+                } else if (message.type === 'CURRENT_STATE') {
+                    // Handle initial state display
+                    handleCurrentState(message);
+                    return;
+                } else if (message.type === 'TIMEOUT_COUNTDOWN') {
+                    // Handle countdown timer updates
+                    handleTimeoutCountdown(message);
+                    return;
                 }
                 
                 // Update current state if available
@@ -1487,15 +1531,116 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                     }
                 }
                 
-                // Add to transitions if not paused
-                if (!isPaused && (message.type === 'STATE_CHANGE' || message.stateAfter)) {
-                    liveTransitions.unshift(message);
+                // Add to transitions if not paused (only for STATE_CHANGE events)
+                if (!isPaused && message.type === 'STATE_CHANGE') {
+                    liveTransitions.push(message);  // Add to end for chronological order
                     transitionCounter++;
                     updateLiveHistory();
                     updateTransitionCount();
+                    // Update countdown display after DOM changes
+                    updateCountdownDisplay();
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);
+            }
+        }
+        
+        // Store countdown state globally to persist across updates
+        let currentCountdownState = {
+            remainingSeconds: 0,
+            state: null,
+            isActive: false
+        };
+        
+        function handleTimeoutCountdown(message) {
+            // Update global countdown state
+            if (message.remainingSeconds > 0 && message.debugMode && message.state) {
+                currentCountdownState.remainingSeconds = message.remainingSeconds;
+                currentCountdownState.state = message.state;
+                currentCountdownState.isActive = true;
+            } else {
+                currentCountdownState.isActive = false;
+            }
+            
+            // Update countdown in the state card header
+            updateCountdownDisplay();
+        }
+        
+        function updateCountdownDisplay() {
+            // Find all countdown elements (there may be multiple RINGING states)
+            const countdownElements = document.querySelectorAll('.state-countdown');
+            
+            countdownElements.forEach(countdownEl => {
+                const state = countdownEl.getAttribute('data-state');
+                const countdownValueEl = countdownEl.querySelector('.countdown-value');
+                
+                // Show countdown only for the current active state with a countdown
+                if (currentCountdownState.isActive && 
+                    state === currentCountdownState.state && 
+                    state === currentMachineState) {
+                    
+                    countdownEl.style.display = 'inline-block';
+                    if (countdownValueEl) {
+                        countdownValueEl.textContent = currentCountdownState.remainingSeconds;
+                    }
+                    
+                    // Static colors based on remaining time
+                    if (currentCountdownState.remainingSeconds <= 5) {
+                        countdownEl.style.background = 'rgba(220, 53, 69, 0.3)'; // Red background
+                        countdownEl.style.color = '#fff';
+                    } else if (currentCountdownState.remainingSeconds <= 10) {
+                        countdownEl.style.background = 'rgba(253, 126, 20, 0.3)'; // Orange background
+                        countdownEl.style.color = '#fff';
+                    } else {
+                        countdownEl.style.background = 'rgba(255, 255, 255, 0.2)'; // White transparent
+                        countdownEl.style.color = '#fff';
+                    }
+                } else {
+                    countdownEl.style.display = 'none';
+                }
+            });
+        }
+        
+        function handleCurrentState(message) {
+            console.log('Received CURRENT_STATE:', message);
+            
+            // Update the current state display
+            if (message.currentState) {
+                currentMachineState = message.currentState;
+                const stateEl = document.getElementById('currentState');
+                if (stateEl) {
+                    stateEl.textContent = currentMachineState;
+                }
+            }
+            
+            // Only add initial state entry if we don't have any transitions yet
+            // This prevents duplicate entries when reconnecting
+            if (!isPaused && message.currentState && liveTransitions.length === 0) {
+                // Create a synthetic initial state transition
+                const initialStateEntry = {
+                    type: 'INITIAL_STATE',
+                    timestamp: message.timestamp || new Date().toISOString(),
+                    machineId: message.machineId,
+                    currentState: message.currentState,
+                    stateBefore: null,  // No previous state
+                    stateAfter: message.currentState,
+                    eventType: 'INITIAL',
+                    context: message.context,
+                    contextBefore: null,  // No context before
+                    contextAfter: message.context
+                };
+                
+                liveTransitions.push(initialStateEntry);  // Add to end for chronological order
+                transitionCounter++;
+                updateLiveHistory();
+                updateTransitionCount();
+                // Update countdown display after DOM changes
+                updateCountdownDisplay();
+            } else {
+                // Just update the display without adding to history
+                updateLiveHistory();
+                // Update countdown display after DOM changes
+                updateCountdownDisplay();
             }
         }
         
@@ -1513,8 +1658,9 @@ ${formatJson(transition.eventPayloadJson)}</pre>
             let currentGroup = null;
             
             liveTransitions.forEach((transition, index) => {
-                // Check if this is a same-state transition
+                // Check if this is a same-state transition or initial state
                 const isSameState = transition.stateBefore === transition.stateAfter;
+                const isInitialState = transition.type === 'INITIAL_STATE' || !transition.stateBefore;
                 
                 // If we're in the same state as the previous transition, add to current group
                 if (currentGroup && currentGroup.state === transition.stateAfter) {
@@ -1534,19 +1680,32 @@ ${formatJson(transition.eventPayloadJson)}</pre>
             let html = '';
             let stepCounter = 1;
             
-            stateGroups.forEach(group => {
+            stateGroups.forEach((group, groupIndex) => {
+                // Determine if this is the most recent state group for the current machine state
+                const isCurrentStateGroup = (groupIndex === stateGroups.length - 1) && (group.state === currentMachineState);
+                
                 // State header
                 html += '<div style="background: #fff; border-radius: 8px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
-                html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px;">';
+                html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; position: relative;">';
+                html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
                 html += '<h3 style="margin: 0; font-size: 18px;">State: ' + group.state + '</h3>';
+                
+                // Add countdown for the current RINGING state (most recent one)
+                if (group.state === 'RINGING' && isCurrentStateGroup) {
+                    html += '<span class="state-countdown" data-state="' + group.state + '" data-group-index="' + groupIndex + '" style="display: none; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold;">';
+                    html += 'Timeout in: <span class="countdown-value">30</span>s';
+                    html += '</span>';
+                }
+                
+                html += '</div>';
                 html += '<div style="display: flex; align-items: center; gap: 15px; margin-top: 8px; font-size: 14px; opacity: 0.95;">';
                 html += '<span>🔄 ' + group.transitions.length + ' event' + (group.transitions.length > 1 ? 's' : '') + ' in this state</span>';
                 html += '<span>Steps ' + stepCounter + '-' + (stepCounter + group.transitions.length - 1) + '</span>';
                 
                 const latestTime = group.transitions[0].timestamp;
                 if (latestTime) {
-                    const time = new Date(latestTime);
-                    html += '<span>🕒 ' + time.toLocaleTimeString() + '</span>';
+                    // Timestamp is already in HH:mm:ss.SSS format, use it directly
+                    html += '<span>🕒 ' + latestTime + '</span>';
                 }
                 html += '</div>';
                 html += '</div>';
@@ -1557,15 +1716,20 @@ ${formatJson(transition.eventPayloadJson)}</pre>
                     html += '<div style="background: white; border: 1px solid #dee2e6; border-radius: 10px; margin: 15px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">';
                     
                     // Event header
-                    const bgColor = transition.stateBefore === transition.stateAfter ? '#fff3cd' : '#d1ecf1';
-                    const badgeColor = transition.stateBefore === transition.stateAfter ? '#ffc107' : '#17a2b8';
+                    const isInitialState = transition.type === 'INITIAL_STATE' || !transition.stateBefore;
+                    const bgColor = isInitialState ? '#e8f5e9' : (transition.stateBefore === transition.stateAfter ? '#fff3cd' : '#d1ecf1');
+                    const badgeColor = isInitialState ? '#4caf50' : (transition.stateBefore === transition.stateAfter ? '#ffc107' : '#17a2b8');
                     
                     html += '<div style="background: ' + bgColor + '; padding: 10px 15px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">';
                     html += '<div style="display: flex; align-items: center; gap: 15px;">';
                     html += '<span style="font-weight: 600; color: #495057;">Step ' + stepCounter + '</span>';
-                    html += '<span style="background: ' + badgeColor + '; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">' + (transition.eventType || transition.type || 'UNKNOWN') + '</span>';
+                    // Show event name if available, otherwise fall back to type
+                    let eventDisplay = isInitialState ? 'Initial' : (transition.eventName || transition.eventType || transition.type || 'UNKNOWN');
+                    html += '<span style="background: ' + badgeColor + '; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">' + eventDisplay + '</span>';
                     
-                    if (transition.stateBefore !== transition.stateAfter) {
+                    if (isInitialState) {
+                        html += '<span style="font-size: 12px; color: #2e7d32;">Initial State: ' + (transition.stateAfter || transition.currentState || 'UNKNOWN') + '</span>';
+                    } else if (transition.stateBefore !== transition.stateAfter) {
                         html += '<span style="font-size: 12px; color: #6c757d;">' + (transition.stateBefore || 'UNKNOWN') + ' → ' + (transition.stateAfter || 'UNKNOWN') + '</span>';
                     } else {
                         html += '<span style="font-size: 12px; color: #856404;">Stay in ' + (transition.stateAfter || 'UNKNOWN') + '</span>';
@@ -1783,7 +1947,9 @@ ${formatJson(transition.eventPayloadJson)}</pre>
     </script>
 </body>
 </html>
-        """;
+        """);
+        
+        return page.toString().replace("${webSocketPort}", String.valueOf(webSocketPort));
     }
     
     // Data classes (same as EnhancedMonitoringServer)

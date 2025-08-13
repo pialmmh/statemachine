@@ -143,7 +143,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         long elapsedMillis = elapsed.toMillis();
         
         // Get timeout duration in milliseconds
-        long timeoutMillis = stateConfig.getTimeoutConfig().getDuration();
+        long timeoutMillis = stateConfig.getTimeoutConfig().getDurationInMillis();
         
         System.out.println("Timeout check for state " + currentState + ": elapsed=" + elapsedMillis + "ms, timeout=" + timeoutMillis + "ms");
         
@@ -404,7 +404,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 TimeoutEvent timeoutEvent = new TimeoutEvent(currentState, config.getTimeoutConfig().getTargetState());
                 handleEvent(timeoutEvent);
             },
-            config.getTimeoutConfig().getDuration(),
+            config.getTimeoutConfig().getDurationInMillis(),
             java.util.concurrent.TimeUnit.MILLISECONDS
         );
     }

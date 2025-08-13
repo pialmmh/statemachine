@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Countdown Timer Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .state-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .state-badge {
+            background: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .countdown {
+            background: #ffc107;
+            color: #212529;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+        }
+        .countdown.warning {
+            background: #fd7e14;
+            color: white;
+        }
+        .countdown.danger {
+            background: #dc3545;
+            color: white;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #218838;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕐 Timeout Countdown Timer Demo</h1>
+        
+        <div class="state-display">
+            <div>
+                Current State: <span id="state" class="state-badge">IDLE</span>
+            </div>
+            <div id="countdown" class="countdown" style="display: none;">
+                Timeout in: <span id="time">30</span>s
+            </div>
+        </div>
+        
+        <div>
+            <button onclick="triggerRinging()">📞 Trigger RINGING (30s timeout)</button>
+            <button onclick="answer()">✅ Answer Call</button>
+            <button onclick="hangup()">📵 Hangup</button>
+        </div>
+        
+        <h3>Event Log:</h3>
+        <div id="log" class="log"></div>
+    </div>
+    
+    <script>
+        let ws = null;
+        
+        function connect() {
+            ws = new WebSocket('ws://localhost:9998');
+            
+            ws.onopen = function() {
+                log('✅ Connected to WebSocket');
+            };
+            
+            ws.onmessage = function(event) {
+                const msg = JSON.parse(event.data);
+                
+                if (msg.type === 'STATE_CHANGE') {
+                    document.getElementById('state').textContent = msg.stateAfter;
+                    log(`State: ${msg.stateBefore} → ${msg.stateAfter}`);
+                } else if (msg.type === 'CURRENT_STATE') {
+                    document.getElementById('state').textContent = msg.currentState;
+                } else if (msg.type === 'TIMEOUT_COUNTDOWN') {
+                    updateCountdown(msg);
+                }
+            };
+            
+            ws.onerror = function(err) {
+                log('❌ Connection error');
+            };
+        }
+        
+        function updateCountdown(msg) {
+            const countdownEl = document.getElementById('countdown');
+            const timeEl = document.getElementById('time');
+            
+            if (msg.remainingSeconds > 0) {
+                countdownEl.style.display = 'block';
+                timeEl.textContent = msg.remainingSeconds;
+                
+                // Update styling based on remaining time
+                countdownEl.className = 'countdown';
+                if (msg.remainingSeconds <= 5) {
+                    countdownEl.className = 'countdown danger';
+                } else if (msg.remainingSeconds <= 10) {
+                    countdownEl.className = 'countdown warning';
+                }
+                
+                // Log significant countdown moments
+                if (msg.remainingSeconds === 30 || msg.remainingSeconds === 20 || 
+                    msg.remainingSeconds === 10 || msg.remainingSeconds === 5) {
+                    log(`⏱️ Countdown: ${msg.remainingSeconds}s`);
+                }
+            } else {
+                countdownEl.style.display = 'none';
+            }
+        }
+        
+        function triggerRinging() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    action: "INCOMING_CALL",
+                    payload: { callerNumber: "+1-555-DEMO" }
+                }));
+                log('📞 Sent INCOMING_CALL');
+            }
+        }
+        
+        function answer() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: "ANSWER" }));
+                log('✅ Sent ANSWER');
+            }
+        }
+        
+        function hangup() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: "HANGUP" }));
+                log('📵 Sent HANGUP');
+            }
+        }
+        
+        function log(message) {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logEl.innerHTML = `[${time}] ${message}<br>` + logEl.innerHTML;
+        }
+        
+        // Connect on load
+        connect();
+    </script>
+</body>
+</html>

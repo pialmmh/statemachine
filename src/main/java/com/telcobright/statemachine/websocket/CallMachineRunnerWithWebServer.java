@@ -23,6 +23,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
+
+
+
+
+
+
+
+
+
+
+
 /**
  * CallMachine runner with WebSocket server for real-time monitoring
  */
@@ -46,6 +57,15 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
     
     // Track connected clients
     private final Set<WebSocket> connectedClients = ConcurrentHashMap.newKeySet();
+    
+    // Debug mode and countdown timer
+    private boolean debugMode = true; // Hardcoded to true for countdown timer feature
+    private ScheduledFuture<?> countdownTimer;
+    private int currentCountdown = 0;
+    private String countdownState = null;
+    
+    // Track last event for display
+    private String lastEventName = null;
     
     public CallMachineRunnerWithWebServer() {
         this(DEFAULT_PORT, DEFAULT_UI_PORT);
@@ -78,6 +98,15 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
         
         // Start UI server in debug mode
         startUIServer();
+    }
+    
+    /**
+     * Enable debug mode with countdown timer
+     */
+    public CallMachineRunnerWithWebServer withDebugMode(boolean enabled) {
+        this.debugMode = enabled;
+        System.out.println("[Config] Debug mode " + (enabled ? "enabled" : "disabled"));
+        return this;
     }
     
     @Override
@@ -246,6 +275,12 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
         event.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
         event.addProperty("machineId", machineId);
         
+        // Include the event name if this is a state change
+        if ("STATE_CHANGE".equals(eventType) && lastEventName != null) {
+            event.addProperty("eventName", lastEventName);
+            // Don't reset here - it will be reset after the state transition is complete
+        }
+        
         // Send both formats for compatibility
         if (oldState != null) {
             event.addProperty("oldState", oldState);
@@ -354,6 +389,32 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                 .build();
             
             machine.setPersistingEntity(context);
+            
+            // Set up callback to notify registry on ALL state transitions (including timeouts)
+            // Track state changes properly - currentState is already updated when callback fires
+            final String[] previousState = {machine.getCurrentState()};
+            machine.setOnStateTransition(newState -> {
+                String oldState = previousState[0];
+                if (!oldState.equals(newState)) {
+                    // Check if this is a timeout transition
+                    if ("IDLE".equals(newState) && "RINGING".equals(oldState) && lastEventName == null) {
+                        lastEventName = "Timeout";
+                    }
+                    
+                    // Notify registry about the state change (including timeout transitions)
+                    registry.notifyStateMachineEvent(MACHINE_ID, oldState, newState, context, null);
+                    previousState[0] = newState;
+                    
+                    // Reset event name after the notification is complete
+                    lastEventName = null;
+                    
+                    // Start countdown timer if debug mode is enabled and state has timeout
+                    if (debugMode) {
+                        startCountdownTimer(newState);
+                    }
+                }
+            });
+            
             registry.register(MACHINE_ID, machine);
             machine.start();
             
@@ -364,6 +425,7 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
         
         System.out.println("[CallMachine] Initialized with ID: " + MACHINE_ID);
         System.out.println("[CallMachine] Machine ready with events: INCOMING_CALL, ANSWER, HANGUP, SESSION_PROGRESS, REJECT, BUSY, TIMEOUT");
+        System.out.println("[CallMachine] Debug mode ENABLED - countdown timer will show for states with timeout");
     }
     
     private void registerEventTypes() {
@@ -382,38 +444,32 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
     
     private void sendIncomingCall(String callerNumber) {
         if (machine != null) {
-            String previousState = machine.getCurrentState();
+            lastEventName = "IncomingCall";
             machine.fire(new IncomingCall(callerNumber));
-            String newState = machine.getCurrentState();
-            if (!previousState.equals(newState)) {
-                registry.notifyStateMachineEvent(MACHINE_ID, previousState, newState, context, null);
-            }
+            // State change notification now handled by onStateTransition callback
             System.out.println("[Event] INCOMING_CALL -> caller: " + callerNumber);
+            // Event name will be reset after the state transition completes
         }
     }
     
     private void sendAnswer() {
         if (machine != null) {
-            String previousState = machine.getCurrentState();
+            lastEventName = "Answer";
             machine.fire(new Answer());
             context.setConnectTime(LocalDateTime.now());
-            String newState = machine.getCurrentState();
-            if (!previousState.equals(newState)) {
-                registry.notifyStateMachineEvent(MACHINE_ID, previousState, newState, context, null);
-            }
+            // State change notification now handled by onStateTransition callback
             System.out.println("[Event] ANSWER");
+            // Event name will be reset after the state transition completes
         }
     }
     
     private void sendHangup() {
         if (machine != null) {
-            String previousState = machine.getCurrentState();
+            lastEventName = "Hangup";
             machine.fire(new Hangup());
-            String newState = machine.getCurrentState();
-            if (!previousState.equals(newState)) {
-                registry.notifyStateMachineEvent(MACHINE_ID, previousState, newState, context, null);
-            }
+            // State change notification now handled by onStateTransition callback
             System.out.println("[Event] HANGUP");
+            // Event name will be reset after the state transition completes
         }
     }
     
@@ -423,13 +479,77 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
     
     private void sendSessionProgress(String sdp, int ringNumber) {
         if (machine != null) {
-            String previousState = machine.getCurrentState();
+            lastEventName = "SessionProgress";
             machine.fire(new SessionProgress(sdp, ringNumber));
-            String newState = machine.getCurrentState();
-            if (!previousState.equals(newState)) {
-                registry.notifyStateMachineEvent(MACHINE_ID, previousState, newState, context, null);
-            }
+            // State change notification now handled by onStateTransition callback
             System.out.println("[Event] SESSION_PROGRESS -> ring: " + ringNumber);
+            // Event name will be reset after the state transition completes
+        }
+    }
+    
+    private void startCountdownTimer(String state) {
+        // Cancel any existing countdown timer
+        if (countdownTimer != null && !countdownTimer.isDone()) {
+            countdownTimer.cancel(false);
+            System.out.println("[Countdown] Cancelled existing timer");
+        }
+        
+        // Check if the state has a timeout configured
+        int timeoutSeconds = 0;
+        if ("RINGING".equals(state)) {
+            timeoutSeconds = 30; // RINGING has 30 second timeout
+        }
+        // Add other states with timeouts here as needed
+        
+        if (timeoutSeconds > 0) {
+            currentCountdown = timeoutSeconds;
+            countdownState = state;
+            System.out.println("[Countdown] Starting countdown for state: " + state + " with " + timeoutSeconds + " seconds");
+            
+            // Send initial countdown
+            broadcastCountdown();
+            
+            // Start countdown timer that updates every second
+            countdownTimer = scheduler.scheduleAtFixedRate(() -> {
+                currentCountdown--;
+                if (currentCountdown > 0) {
+                    broadcastCountdown();
+                } else {
+                    // Countdown finished, cancel timer
+                    countdownTimer.cancel(false);
+                    countdownState = null;
+                    currentCountdown = 0;
+                    System.out.println("[Countdown] Timer finished for state: " + state);
+                }
+            }, 1, 1, TimeUnit.SECONDS);
+        } else {
+            // State has no timeout, clear countdown
+            currentCountdown = 0;
+            countdownState = null;
+            broadcastCountdown();
+            System.out.println("[Countdown] No timeout for state: " + state);
+        }
+    }
+    
+    private void broadcastCountdown() {
+        JsonObject countdown = new JsonObject();
+        countdown.addProperty("type", "TIMEOUT_COUNTDOWN");
+        countdown.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+        countdown.addProperty("state", countdownState);
+        countdown.addProperty("remainingSeconds", currentCountdown);
+        countdown.addProperty("debugMode", debugMode);
+        
+        String message = gson.toJson(countdown);
+        
+        // Debug logging
+        if (currentCountdown % 5 == 0 || currentCountdown <= 5) {
+            System.out.println("[Countdown] Broadcasting: " + currentCountdown + "s remaining for state: " + countdownState);
+        }
+        
+        for (WebSocket client : connectedClients) {
+            if (client.isOpen()) {
+                client.send(message);
+            }
         }
     }
     
@@ -447,6 +567,7 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
             
             // Instantiate and start SimpleMonitoringServer
             monitoringServer = new SimpleMonitoringServer();
+            monitoringServer.setWebSocketPort(getPort()); // Set the actual WebSocket port
             monitoringServer.start(uiPort);
             
             // Wait a moment for server to start
@@ -741,7 +862,7 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                 System.out.println("Usage: CallMachineRunnerWithWebServer [options] [port]");
                 System.out.println("Options:");
                 System.out.println("  --skip-cleanup   Skip automatic port cleanup");
-                System.out.println("  --force-cleanup  Force aggressive cleanup (like debug mode)");
+                System.out.println("  --force-cleanup  Force aggressive cleanup");
                 System.out.println("  --help, -h       Show this help message");
                 System.out.println("  [port]           WebSocket port (default: 9999)");
                 System.exit(0);
