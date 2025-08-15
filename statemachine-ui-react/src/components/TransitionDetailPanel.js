@@ -111,6 +111,70 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           </pre>
         </div>
 
+        {/* Registry Status Comparison */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: '1fr 1fr', 
+          gap: '20px',
+          marginBottom: '25px'
+        }}>
+          {/* Registry Status Before */}
+          <div>
+            <h3 style={{ 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: '#dc3545',
+              marginBottom: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              🏛️ Registry Status Before
+            </h3>
+            <div style={{
+              background: '#fff5f5',
+              border: '1px solid #f5c6cb',
+              borderRadius: '6px',
+              padding: '12px',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              lineHeight: '1.5'
+            }}>
+              Status: {(transition.contextBefore?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.contextBefore?.registryStatus?.status}`} | 
+              Hydrated: {transition.contextBefore?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
+              Online: {transition.contextBefore?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
+            </div>
+          </div>
+
+          {/* Registry Status After */}
+          <div>
+            <h3 style={{ 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: '#17a2b8',
+              marginBottom: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              🏛️ Registry Status After
+            </h3>
+            <div style={{
+              background: '#f0f8ff',
+              border: '1px solid #bee5eb',
+              borderRadius: '6px',
+              padding: '12px',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              lineHeight: '1.5'
+            }}>
+              Status: {(transition.contextAfter?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.contextAfter?.registryStatus?.status}`} | 
+              Hydrated: {transition.contextAfter?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
+              Online: {transition.contextAfter?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
+            </div>
+          </div>
+        </div>
+
         {/* Context Comparison */}
         <div style={{ 
           display: 'grid', 
@@ -134,18 +198,6 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               borderRadius: '6px',
               padding: '15px'
             }}>
-              {/* Registry Status */}
-              <div style={{ marginBottom: '15px' }}>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24' }}>
-                  Registry Status
-                </h4>
-                <div style={{ fontSize: '11px', fontFamily: 'monospace', lineHeight: '1.5' }}>
-                  Status: {transition.contextBefore?.registryStatus?.status || 'ACTIVE'}<br />
-                  Hydrated: {transition.contextBefore?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'}<br />
-                  Online: {transition.contextBefore?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
-                </div>
-              </div>
-
               {/* Persistent Context */}
               <div style={{ marginBottom: '15px' }}>
                 <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24' }}>
@@ -160,7 +212,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   fontFamily: 'Consolas, monospace',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '200px',
+                  maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.contextBefore?.persistentContext || {}, null, 2)}
@@ -181,7 +233,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   fontFamily: 'Consolas, monospace',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '200px',
+                  maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.contextBefore?.volatileContext || {}, null, 2)}
@@ -207,18 +259,6 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               borderRadius: '6px',
               padding: '15px'
             }}>
-              {/* Registry Status */}
-              <div style={{ marginBottom: '15px' }}>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085' }}>
-                  Registry Status
-                </h4>
-                <div style={{ fontSize: '11px', fontFamily: 'monospace', lineHeight: '1.5' }}>
-                  Status: {transition.contextAfter?.registryStatus?.status || 'ACTIVE'}<br />
-                  Hydrated: {transition.contextAfter?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'}<br />
-                  Online: {transition.contextAfter?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
-                </div>
-              </div>
-
               {/* Persistent Context */}
               <div style={{ marginBottom: '15px' }}>
                 <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085' }}>
@@ -233,7 +273,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   fontFamily: 'Consolas, monospace',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '200px',
+                  maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.contextAfter?.persistentContext || {}, null, 2)}
@@ -254,7 +294,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   fontFamily: 'Consolas, monospace',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '200px',
+                  maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.contextAfter?.volatileContext || {}, null, 2)}

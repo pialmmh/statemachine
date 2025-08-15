@@ -20,39 +20,26 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
     setExpandedStates(newExpanded);
   };
 
-  // Get icon for state - generic icons
-  const getStateIcon = (state) => {
-    // Use generic state machine icons
-    if (state === 'IDLE' || state === 'INITIAL' || state === 'START') {
-      return '⭕'; // Initial/idle state
-    } else if (state.includes('END') || state.includes('FINAL') || state.includes('COMPLETE')) {
-      return '🏁'; // End state
-    } else if (state.includes('ERROR') || state.includes('FAIL')) {
-      return '⚠️'; // Error state
-    } else if (state.includes('WAIT') || state.includes('PENDING')) {
-      return '⏸️'; // Waiting state
-    } else if (state.includes('PROCESS') || state.includes('RUNNING')) {
-      return '▶️'; // Active/processing state
-    } else {
-      return '◉'; // Generic state
-    }
+  // Get icon for state - Windows folder style
+  const getStateIcon = (isExpanded) => {
+    return isExpanded ? '📂' : '📁'; // Open/closed folder
   };
 
-  // Get icon for event - generic icons
+  // Get icon for event - Windows file style
   const getEventIcon = (event) => {
-    // Use generic event icons
+    // Use Windows-style document icons
     if (event === 'Initial State' || event === 'Initial') {
-      return '🎯'; // Initial/start event
+      return '📄'; // Document icon for initial state
     } else if (event.includes('TIMEOUT') || event.includes('Timeout')) {
-      return '⏱️'; // Timeout event
+      return '⏰'; // Clock icon for timeout
     } else if (event.includes('ERROR') || event.includes('FAIL')) {
-      return '❗'; // Error event
+      return '⚠️'; // Warning icon for errors
     } else if (event.includes('SUCCESS') || event.includes('COMPLETE')) {
-      return '✓'; // Success event
+      return '✅'; // Checkmark for success
     } else if (event.includes('CANCEL') || event.includes('ABORT')) {
-      return '✕'; // Cancel event
+      return '🚫'; // Prohibited sign for cancel
     } else {
-      return '→'; // Generic transition
+      return '📝'; // Generic document icon
     }
   };
 
@@ -63,15 +50,21 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
       padding: '10px',
       height: '100%',
       overflowY: 'auto',
+      overflowX: 'hidden',
       fontSize: '12px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      position: 'relative'
     }}>
       {stateInstances.map((instance, idx) => {
         const stateKey = `${instance.state}-${instance.instanceNumber}`;
         const isExpanded = expandedStates.has(stateKey);
         
         return (
-          <div key={stateKey} style={{ marginBottom: '10px' }}>
+          <div key={stateKey} style={{ 
+            marginBottom: '10px',
+            position: 'relative',
+            zIndex: 1
+          }}>
             {/* State Header */}
             <div 
               style={{ 
@@ -82,18 +75,32 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                 fontWeight: '600',
                 color: '#2c3e50',
                 borderRadius: '4px',
+                background: 'transparent',
                 transition: 'background 0.2s',
-                ':hover': { background: '#f0f0f0' }
+                position: 'relative',
+                zIndex: 2
               }}
               onClick={() => toggleState(stateKey)}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f0f0'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <span style={{ marginRight: '6px', fontSize: '10px', opacity: 0.6 }}>
-                {isExpanded ? '▼' : '▶'}
+              <span style={{ 
+                marginRight: '6px', 
+                fontSize: '11px', 
+                fontFamily: 'monospace',
+                display: 'inline-block',
+                width: '13px',
+                height: '13px',
+                lineHeight: '11px',
+                border: '1px solid #8b8b8b',
+                background: 'white',
+                textAlign: 'center',
+                verticalAlign: 'middle'
+              }}>
+                {isExpanded ? '−' : '+'}
               </span>
               <span style={{ marginRight: '6px', fontSize: '14px' }}>
-                {getStateIcon(instance.state)}
+                {getStateIcon(isExpanded)}
               </span>
               <span style={{ flex: 1 }}>
                 {instance.state}
@@ -114,21 +121,27 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
 
             {/* Transitions */}
             {isExpanded && (
-              <div style={{ marginLeft: '20px', marginTop: '5px' }}>
-                {instance.transitions.map((transition) => (
+              <div style={{ 
+                marginLeft: '19px', 
+                marginTop: '2px',
+                borderLeft: '1px dotted #c0c0c0',
+                paddingLeft: '8px'
+              }}>
+                {instance.transitions.map((transition, tIdx) => (
                   <div key={transition.stepNumber}>
                     {/* Transition Node */}
                     <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        padding: '6px 8px',
-                        marginBottom: '4px',
+                        padding: '4px 8px',
+                        marginBottom: '2px',
                         cursor: 'pointer',
-                        borderRadius: '4px',
-                        border: selectedTransition === transition ? '2px solid #667eea' : '1px solid #e9ecef',
-                        background: selectedTransition === transition ? '#f8f9ff' : '#fafbfc',
-                        transition: 'all 0.2s'
+                        borderRadius: '3px',
+                        border: selectedTransition === transition ? '1px solid #0078d4' : 'none',
+                        background: selectedTransition === transition ? '#e5f1fb' : 'transparent',
+                        transition: 'all 0.15s',
+                        position: 'relative'
                       }}
                       onClick={() => onSelectTransition(transition)}
                       onMouseEnter={(e) => {
@@ -138,11 +151,19 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                       }}
                       onMouseLeave={(e) => {
                         if (selectedTransition !== transition) {
-                          e.currentTarget.style.background = '#fafbfc';
+                          e.currentTarget.style.background = 'transparent';
                         }
                       }}
                     >
-                      <span style={{ marginRight: '8px', fontSize: '14px' }}>
+                      <span style={{ 
+                        position: 'absolute',
+                        left: '-9px',
+                        width: '9px',
+                        height: '1px',
+                        borderTop: '1px dotted #c0c0c0',
+                        top: '50%'
+                      }}></span>
+                      <span style={{ marginRight: '6px', fontSize: '14px' }}>
                         {getEventIcon(transition.event)}
                       </span>
                       <div style={{ flex: 1 }}>
