@@ -21,8 +21,8 @@ public class TestCompleteStatusBroadcast {
         // Create registry with WebSocket support
         StateMachineRegistry registry = new StateMachineRegistry(null, 9999);
         
-        // Enable debug mode with WebSocket server
-        registry.enableDebugMode(true);
+        // Enable live debugging with WebSocket server
+        registry.enableLiveDebug(9999);
         
         System.out.println("\n=== Complete Status Broadcast Test ===");
         System.out.println("WebSocket server running on ws://localhost:9999");

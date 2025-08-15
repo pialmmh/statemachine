@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <button onclick="connect()">Connect</button>
+    <button onclick="getState()">Get State</button>
+    <button onclick="sendEvent()">Send Event</button>
+    <pre id="messages"></pre>
+
+    <script>
+        let ws;
+        const messagesDiv = document.getElementById('messages');
+
+        function log(msg) {
+            messagesDiv.textContent += msg + '\n\n';
+            console.log(msg);
+        }
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:9999');
+            
+            ws.onopen = () => {
+                log('Connected to WebSocket');
+                // Immediately request state
+                const request = { action: 'GET_STATE' };
+                ws.send(JSON.stringify(request));
+                log('Sent: ' + JSON.stringify(request));
+            };
+            
+            ws.onmessage = (event) => {
+                log('Received: ' + event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    log('Parsed: ' + JSON.stringify(data, null, 2));
+                } catch(e) {
+                    log('Parse error: ' + e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log('Error: ' + error);
+            };
+            
+            ws.onclose = () => {
+                log('Disconnected');
+            };
+        }
+
+        function getState() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const request = { action: 'GET_STATE' };
+                ws.send(JSON.stringify(request));
+                log('Sent: ' + JSON.stringify(request));
+            }
+        }
+
+        function sendEvent() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const request = {
+                    type: 'EVENT',
+                    eventType: 'INCOMING_CALL',
+                    payload: { phoneNumber: '+1-555-9999' }
+                };
+                ws.send(JSON.stringify(request));
+                log('Sent: ' + JSON.stringify(request));
+            }
+        }
+    </script>
+</body>
+</html>

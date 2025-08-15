@@ -479,13 +479,13 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     /**
      * Enable debug mode with snapshot recording
      * WARNING: This should only be called by StateMachineRegistry
-     * Direct usage is deprecated - use StateMachineRegistry.enableDebugMode() instead
+     * Direct usage is deprecated - use StateMachineRegistry.enableSnapshotDebug() or enableLiveDebug() instead
      */
     @Deprecated
     public GenericStateMachine<TPersistingEntity, TContext> enableDebug(SnapshotRecorder<TPersistingEntity, TContext> snapshotRecorder) {
         if (!registryControlledDebug) {
             System.err.println("⚠️  WARNING: Direct debug mode enablement is deprecated!");
-            System.err.println("   Use StateMachineRegistry.enableDebugMode() instead.");
+            System.err.println("   Use StateMachineRegistry.enableSnapshotDebug() or enableLiveDebug() instead.");
             System.err.println("   Machine: " + this.id);
         }
         this.debugEnabled = true;
@@ -592,7 +592,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     
     /**
      * Set debug mode with automatic run ID generation and optional database persistence
+     * @deprecated Use StateMachineRegistry.enableSnapshotDebug() or enableLiveDebug() instead
      */
+    @Deprecated
     public GenericStateMachine<TPersistingEntity, TContext> enableDebugMode(boolean enableDb) {
         this.debugEnabled = true;
         this.runId = generateTimestampRunId();

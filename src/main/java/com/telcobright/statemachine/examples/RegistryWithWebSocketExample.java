@@ -18,9 +18,9 @@ public class RegistryWithWebSocketExample {
         int webSocketPort = args.length > 0 ? Integer.parseInt(args[0]) : 9999;
         StateMachineRegistry registry = new StateMachineRegistry(null, webSocketPort);
         
-        // Enable debug mode with WebSocket server
+        // Enable live debugging with WebSocket server
         // This automatically starts WebSocket server on the specified port
-        registry.enableDebugMode(true);  // true = start WebSocket server
+        registry.enableLiveDebug(webSocketPort);
         
         System.out.println("\n=== Registry with WebSocket Debug Mode ===");
         System.out.println("WebSocket server is running on port: " + registry.getWebSocketPort());

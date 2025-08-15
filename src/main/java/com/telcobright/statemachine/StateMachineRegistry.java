@@ -45,16 +45,16 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     public void register(String id, GenericStateMachine<?, ?> machine) {
         activeMachines.put(id, machine);
         
-        // Apply debug mode if enabled
-        if (debugMode && snapshotRecorder != null) {
+        // Apply snapshot debugging if enabled
+        if (snapshotDebug && snapshotRecorder != null) {
             try {
                 @SuppressWarnings("unchecked")
                 GenericStateMachine<?, ?> genericMachine = machine;
                 genericMachine.enableDebugFromRegistry(snapshotRecorder);
                 genericMachine.setDebugSessionId("registry-session-" + System.currentTimeMillis());
-                System.out.println("📊 Applied debug mode to machine: " + id);
+                System.out.println("📸 Applied snapshot debug to machine: " + id);
             } catch (Exception e) {
-                System.err.println("⚠️ Failed to apply debug mode to machine " + id + ": " + e.getMessage());
+                System.err.println("⚠️ Failed to apply snapshot debug to machine " + id + ": " + e.getMessage());
             }
         }
         

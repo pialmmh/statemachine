@@ -188,7 +188,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
         JsonObject state = new JsonObject();
         state.addProperty("type", "REGISTRY_STATE");
         state.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
-        state.addProperty("debugMode", registry.isDebugMode());
+        state.addProperty("debugMode", registry.isDebugEnabled());
         state.addProperty("machineCount", registry.getActiveMachineCount());
         
         // Add machine IDs
@@ -280,7 +280,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
         
         // Registry information
         JsonObject registryInfo = new JsonObject();
-        registryInfo.addProperty("debugMode", registry.isDebugMode());
+        registryInfo.addProperty("debugMode", registry.isDebugEnabled());
         registryInfo.addProperty("webSocketPort", registry.getWebSocketPort());
         registryInfo.addProperty("machineCount", registry.getActiveMachineCount());
         registryInfo.addProperty("connectedClients", connectedClients.size());
