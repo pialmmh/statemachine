@@ -15,11 +15,14 @@ function MonitoringApp() {
   const [eventPayload, setEventPayload] = useState('{\n  "phoneNumber": "+1-555-9999"\n}');
   const [countdownState, setCountdownState] = useState(null);
   const [countdownRemaining, setCountdownRemaining] = useState(0);
+  const [liveMachines, setLiveMachines] = useState([]);
+  const [selectedMachine, setSelectedMachine] = useState(null);
   
   const wsRef = useRef(null);
   const wsUrl = 'ws://localhost:9999';
   const hasReceivedInitialState = useRef(false);
   const countdownIntervalRef = useRef(null);
+  const selectedMachineRef = useRef(null);
 
   useEffect(() => {
     loadRuns();
@@ -163,11 +166,16 @@ function MonitoringApp() {
       wsRef.current.onopen = () => {
         console.log('WebSocket connected for live mode');
         setIsConnected(true);
-        // Request initial state
+        // Request list of machines
         const request = {
-          action: 'GET_STATE'
+          action: 'GET_MACHINES'
         };
         wsRef.current.send(JSON.stringify(request));
+        // Request initial state
+        const stateRequest = {
+          action: 'GET_STATE'
+        };
+        wsRef.current.send(JSON.stringify(stateRequest));
       };
 
       wsRef.current.onmessage = (event) => {
@@ -227,9 +235,27 @@ function MonitoringApp() {
     try {
       const data = JSON.parse(message);
       console.log('Parsed WebSocket message:', data);
+      console.log('Message type:', data.type, 'Selected machine:', selectedMachine);
       
-      // Handle initial CURRENT_STATE message with context
-      if (data.type === 'CURRENT_STATE') {
+      // Handle machine list
+      if (data.type === 'MACHINES_LIST') {
+        const machines = data.machines || [];
+        setLiveMachines(machines);
+        // Auto-select first machine if none selected
+        if (machines.length > 0 && !selectedMachine) {
+          setSelectedMachine(machines[0].id);
+          selectedMachineRef.current = machines[0].id;  // Update ref
+        }
+      } else if (data.type === 'MACHINE_REGISTERED') {
+        // Add new machine to list
+        setLiveMachines(prev => [...prev, { id: data.machineId, type: data.machineType || 'StateMachine' }]);
+      } else if (data.type === 'MACHINE_UNREGISTERED') {
+        // Remove machine from list
+        setLiveMachines(prev => prev.filter(m => m.id !== data.machineId));
+        if (selectedMachine === data.machineId) {
+          setSelectedMachine(null);
+        }
+      } else if (data.type === 'CURRENT_STATE') {
         console.log('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);
         setLiveState(data.currentState || 'IDLE');
         
@@ -261,9 +287,94 @@ function MonitoringApp() {
           
           setLiveHistory([initialTransition]);
         }
+      } else if (data.type === 'MACHINE_STATE') {
+        // Handle single machine state response
+        console.log('MACHINE_STATE received:', data);
+        
+        if (data.machineId === selectedMachine) {
+          setLiveState(data.currentState || 'IDLE');
+          
+          // Always set up initial history entry when we get machine state
+          const initialTransition = {
+            stepNumber: 1,
+            fromState: 'Initial',
+            toState: data.currentState || 'IDLE',
+            event: 'Machine State',
+            timestamp: data.timestamp || new Date().toISOString(),
+            duration: 0,
+            eventData: {},
+            contextBefore: {
+              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+              persistentContext: {},
+              volatileContext: {}
+            },
+            contextAfter: {
+              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+              persistentContext: data.context || {},
+              volatileContext: {}
+            }
+          };
+          
+          setLiveHistory([initialTransition]);
+          hasReceivedInitialState.current = true;
+        }
+      } else if (data.type === 'COMPLETE_STATUS') {
+        // Handle complete status update from server
+        console.log('COMPLETE_STATUS received:', data);
+        
+        // Process machines from complete status
+        if (data.machines && Array.isArray(data.machines)) {
+          // Find the selected machine's data
+          const selectedMachineData = data.machines.find(m => m.machineId === selectedMachine);
+          
+          if (selectedMachineData) {
+            // Update live state for selected machine
+            setLiveState(selectedMachineData.currentState || 'IDLE');
+            
+            // If we haven't received initial state yet, set it up
+            if (!hasReceivedInitialState.current && selectedMachineData.context) {
+              hasReceivedInitialState.current = true;
+              
+              const initialTransition = {
+                stepNumber: 1,
+                fromState: 'Initial',
+                toState: selectedMachineData.currentState || 'IDLE',
+                event: 'Initial State',
+                timestamp: data.timestamp || new Date().toISOString(),
+                duration: 0,
+                eventData: {},
+                contextBefore: {
+                  registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                  persistentContext: {},
+                  volatileContext: {}
+                },
+                contextAfter: {
+                  registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                  persistentContext: selectedMachineData.context || {},
+                  volatileContext: {}
+                }
+              };
+              
+              setLiveHistory([initialTransition]);
+            }
+          }
+        }
       } else if (data.type === 'STATE_CHANGE') {
+        console.log('STATE_CHANGE received for machine:', data.machineId);
+        console.log('Currently selected machine (ref):', selectedMachineRef.current);
+        console.log('Currently selected machine (state):', selectedMachine);
+        
+        // Only process state changes for the selected machine (use ref to avoid closure issues)
+        if (data.machineId !== selectedMachineRef.current) {
+          console.log('Ignoring state change for non-selected machine');
+          return;
+        }
+        
+        console.log('Processing STATE_CHANGE for selected machine');
+        
         // Update live state
-        const newState = data.newState || data.state;
+        const newState = data.newState || data.stateAfter || data.state;
+        console.log('New state:', newState);
         setLiveState(newState);
         
         // Handle countdown if present in message
@@ -283,6 +394,30 @@ function MonitoringApp() {
         setLiveHistory(prev => {
           const updated = [...(Array.isArray(prev) ? prev : [])];
           
+          // If this is the first transition and we're going from IDLE, ensure we have the initial state
+          if (updated.length === 0 && data.stateBefore === 'IDLE') {
+            // Add the initial IDLE state first
+            updated.push({
+              stepNumber: 1,
+              fromState: 'Initial',
+              toState: 'IDLE',
+              event: 'Initial State',
+              timestamp: new Date().toISOString(),
+              duration: 0,
+              eventData: {},
+              contextBefore: {
+                registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                persistentContext: {},
+                volatileContext: {}
+              },
+              contextAfter: {
+                registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                persistentContext: {},
+                volatileContext: {}
+              }
+            });
+          }
+          
           // Get the previous context (from last transition's contextAfter)
           const previousContext = updated.length > 0 
             ? updated[updated.length - 1].contextAfter.persistentContext 
@@ -290,9 +425,9 @@ function MonitoringApp() {
           
           const transition = {
             stepNumber: updated.length + 1,
-            fromState: data.oldState || 'UNKNOWN',
-            toState: data.newState || 'UNKNOWN',
-            event: data.eventName || 'Unknown',
+            fromState: data.stateBefore || data.oldState || 'UNKNOWN',
+            toState: data.stateAfter || data.newState || 'UNKNOWN',
+            event: data.type === 'STATE_CHANGE' ? 'State Transition' : (data.eventName || 'Unknown'),
             timestamp: data.timestamp || new Date().toISOString(),
             duration: data.duration || 0,
             eventData: data.payload || {},
@@ -364,8 +499,13 @@ function MonitoringApp() {
   };
 
   const sendEvent = () => {
-    if (!isConnected || !wsRef.current) {
-      console.error('Not connected to WebSocket');
+    console.log('sendEvent called');
+    console.log('isConnected:', isConnected, 'wsRef.current:', wsRef.current, 'selectedMachine:', selectedMachine);
+    
+    if (!isConnected || !wsRef.current || !selectedMachine) {
+      console.error('Not connected to WebSocket or no machine selected');
+      console.error('Details - isConnected:', isConnected, 'wsRef:', wsRef.current, 'selectedMachine:', selectedMachine);
+      alert('Please ensure WebSocket is connected and a machine is selected');
       return;
     }
 
@@ -373,15 +513,19 @@ function MonitoringApp() {
       const payload = eventPayload ? JSON.parse(eventPayload) : {};
       const message = {
         type: 'EVENT',
+        machineId: selectedMachine,
         eventType: selectedEvent,
         payload: payload
       };
       
-      console.log('Sending event:', message);
-      wsRef.current.send(JSON.stringify(message));
+      console.log('Sending WebSocket event:', message);
+      const messageStr = JSON.stringify(message);
+      console.log('Stringified message:', messageStr);
+      wsRef.current.send(messageStr);
+      console.log('Event sent successfully');
     } catch (error) {
       console.error('Error sending event:', error);
-      alert('Invalid JSON payload');
+      alert('Invalid JSON payload: ' + error.message);
     }
   };
 
@@ -395,7 +539,7 @@ function MonitoringApp() {
         setEventPayload('{\n  "phoneNumber": "+1-555-9999"\n}');
         break;
       case 'SESSION_PROGRESS':
-        setEventPayload('{\n  "ringNumber": 1\n}');
+        setEventPayload('{\n  "sessionData": "v=0",\n  "ringNumber": 1\n}');
         break;
       case 'ANSWER':
       case 'HANGUP':
@@ -440,7 +584,7 @@ function MonitoringApp() {
       <div className="container">
         <div className="left-panel">
           <div className="panel-header">
-            <span>📋 {currentMode === 'live' ? 'Live Sessions' : 'Recent Runs'}</span>
+            <span>📋 {currentMode === 'live' ? `Live Machines: ${liveMachines.length}` : 'Recent Runs'}</span>
             <button className="refresh-btn" onClick={refreshData}>Refresh</button>
           </div>
           <div className="run-list">
@@ -483,6 +627,45 @@ function MonitoringApp() {
                 
                 {isConnected && (
                   <div className="event-trigger-panel">
+                    <div className="panel-subtitle">🖥️ Select Machine</div>
+                    <select 
+                      className="event-select"
+                      value={selectedMachine || ''}
+                      onChange={(e) => {
+                        const machineId = e.target.value;
+                        console.log('Machine selected:', machineId);
+                        setSelectedMachine(machineId);
+                        selectedMachineRef.current = machineId;  // Update ref to avoid closure issues
+                        
+                        // When a machine is selected, reset history and request its state
+                        if (machineId && wsRef.current?.readyState === WebSocket.OPEN) {
+                          console.log('Requesting state for machine:', machineId);
+                          hasReceivedInitialState.current = false;
+                          // Don't clear history completely - keep initial state display
+                          setLiveHistory([]);
+                          
+                          // Request the machine's current state
+                          const request = {
+                            action: 'GET_MACHINE_STATE',
+                            machineId: machineId
+                          };
+                          console.log('Sending WebSocket request:', request);
+                          wsRef.current.send(JSON.stringify(request));
+                        } else {
+                          console.log('Cannot request state - WebSocket not ready or no machine selected');
+                          console.log('machineId:', machineId, 'wsRef.current:', wsRef.current, 'readyState:', wsRef.current?.readyState);
+                        }
+                      }}
+                      style={{ marginBottom: '12px' }}
+                    >
+                      <option value="">-- Select a Machine --</option>
+                      {liveMachines.map(machine => (
+                        <option key={machine.id} value={machine.id}>
+                          {machine.type} - {machine.id}
+                        </option>
+                      ))}
+                    </select>
+                    
                     <div className="panel-subtitle">📮 Send Event</div>
                     <select 
                       className="event-select"
@@ -511,10 +694,14 @@ function MonitoringApp() {
                     
                     <button 
                       className="send-event-btn"
-                      onClick={sendEvent}
-                      disabled={!isConnected}
+                      onClick={() => {
+                        console.log('Button clicked!');
+                        console.log('Current state - isConnected:', isConnected, 'selectedMachine:', selectedMachine);
+                        sendEvent();
+                      }}
+                      disabled={!isConnected || !selectedMachine}
                     >
-                      Send Event →
+                      Send Event → {!isConnected ? '(Not Connected)' : !selectedMachine ? '(No Machine Selected)' : ''}
                     </button>
                   </div>
                 )}
@@ -592,16 +779,34 @@ function MonitoringApp() {
               )
             ) : (
               // Live mode display
-              liveHistory.length > 0 ? (
+              selectedMachine ? (
                 <LiveHistoryDisplay 
-                  liveHistory={liveHistory}
+                  liveHistory={liveHistory.length > 0 ? liveHistory : [{
+                    stepNumber: 1,
+                    fromState: 'Initial',
+                    toState: liveState || 'IDLE',
+                    event: 'Current State',
+                    timestamp: new Date().toISOString(),
+                    duration: 0,
+                    eventData: {},
+                    contextBefore: {
+                      registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                      persistentContext: {},
+                      volatileContext: {}
+                    },
+                    contextAfter: {
+                      registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                      persistentContext: {},
+                      volatileContext: {}
+                    }
+                  }]}
                   countdownState={countdownState}
                   countdownRemaining={countdownRemaining}
                 />
               ) : (
                 <div className="empty-state">
                   <h3>🔴 Live Monitoring Active</h3>
-                  <p>{isConnected ? 'Connected and waiting for state transitions...' : 'Connecting to WebSocket server...'}</p>
+                  <p>{isConnected ? 'Select a machine from the dropdown to view its state' : 'Connecting to WebSocket server...'}</p>
                 </div>
               )
             )}

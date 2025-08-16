@@ -49,6 +49,8 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
     private final int uiPort;
     
     private final StateMachineRegistry registry;
+    private final Map<String, GenericStateMachine<CallContext, Void>> machines = new ConcurrentHashMap<>();
+    private final Map<String, CallContext> contexts = new ConcurrentHashMap<>();
     private GenericStateMachine<CallContext, Void> machine;
     private CallContext context;
     
@@ -157,9 +159,19 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
             // Handle messages from Live Mode UI
             if (request.has("type") && "EVENT".equals(request.get("type").getAsString())) {
                 String eventType = request.get("eventType").getAsString();
+                String machineId = request.has("machineId") ? request.get("machineId").getAsString() : null;
                 JsonObject payload = request.has("payload") ? request.getAsJsonObject("payload") : null;
                 
-                System.out.println("[WS] Received event: " + eventType);
+                System.out.println("[WS] Received event: " + eventType + " for machine: " + machineId);
+                
+                // Get the specific machine and context
+                GenericStateMachine<CallContext, Void> targetMachine = machineId != null ? machines.get(machineId) : machine;
+                CallContext targetContext = machineId != null ? contexts.get(machineId) : context;
+                
+                if (targetMachine == null || targetContext == null) {
+                    System.err.println("[WS] Machine not found: " + machineId);
+                    return;
+                }
                 
                 switch (eventType) {
                     case "DIAL":
@@ -167,24 +179,24 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                         String callerNumber = payload != null && payload.has("phoneNumber") 
                             ? payload.get("phoneNumber").getAsString() 
                             : "+1-555-9999";
-                        sendIncomingCall(callerNumber);
+                        sendIncomingCall(machineId, callerNumber);
                         break;
                     case "ANSWER":
-                        sendAnswer();
+                        sendAnswer(machineId);
                         break;
                     case "HANGUP":
-                        sendHangup();
+                        sendHangup(machineId);
                         break;
                     case "BUSY":
                     case "REJECT":
                     case "TIMEOUT":
-                        sendHangup(); // Treat as hangup for now
+                        sendHangup(machineId); // Treat as hangup for now
                         break;
                     case "SESSION_PROGRESS":
                         int ringNumber = payload != null && payload.has("ringNumber") 
                             ? payload.get("ringNumber").getAsInt() 
-                            : context.getRingCount() + 1;
-                        sendSessionProgress("v=0", ringNumber);
+                            : targetContext.getRingCount() + 1;
+                        sendSessionProgress(machineId, "v=0", ringNumber);
                         break;
                     default:
                         System.out.println("[WS] Unhandled event type: " + eventType);
@@ -221,6 +233,9 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                         break;
                     case "GET_STATE":
                         sendCurrentState(conn);
+                        break;
+                    case "GET_MACHINES":
+                        sendMachinesList(conn);
                         break;
                     case "GET_EVENT_METADATA":
                         System.out.println("[WS] Received GET_EVENT_METADATA request from client");
@@ -348,6 +363,34 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
         }
     }
     
+    private void sendMachinesList(WebSocket conn) {
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "MACHINES_LIST");
+        response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+        
+        com.google.gson.JsonArray machineArray = new com.google.gson.JsonArray();
+        
+        // Add all 3 CallMachine instances
+        JsonObject machine1 = new JsonObject();
+        machine1.addProperty("id", "call-001");
+        machine1.addProperty("type", "CallMachine");
+        machineArray.add(machine1);
+        
+        JsonObject machine2 = new JsonObject();
+        machine2.addProperty("id", "call-002");
+        machine2.addProperty("type", "CallMachine");
+        machineArray.add(machine2);
+        
+        JsonObject machine3 = new JsonObject();
+        machine3.addProperty("id", "call-003");
+        machine3.addProperty("type", "CallMachine");
+        machineArray.add(machine3);
+        
+        response.add("machines", machineArray);
+        conn.send(gson.toJson(response));
+        System.out.println("[WS] Sent machines list with " + machineArray.size() + " CallMachine instances");
+    }
+    
     // Periodic updates disabled - not needed
     // Updates are sent only on:
     // 1. Client connection (initial state)
@@ -357,10 +400,25 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
     }
     
     private void initializeStateMachine() {
-        System.out.println("[Init] Initializing state machine...");
+        System.out.println("[Init] Initializing state machines...");
         registerEventTypes();
         
-        context = new CallContext(MACHINE_ID, "+1-555-0001", "+1-555-0002");
+        // Create 3 call machines - all of the same type (CallMachine)
+        createAndRegisterMachine("call-001", "+1-555-0001", "+1-555-1001", "CallMachine");
+        createAndRegisterMachine("call-002", "+1-555-0002", "+1-555-1002", "CallMachine");
+        createAndRegisterMachine("call-003", "+1-555-0003", "+1-555-1003", "CallMachine");
+        
+        // Set default machine for backward compatibility
+        context = contexts.get("call-001");
+        machine = machines.get("call-001");
+        
+        System.out.println("[CallMachine] Initialized 3 CallMachine instances: call-001, call-002, call-003");
+        System.out.println("[CallMachine] Machines ready with events: INCOMING_CALL, ANSWER, HANGUP, SESSION_PROGRESS, REJECT, BUSY, TIMEOUT");
+        System.out.println("[CallMachine] Debug mode ENABLED - countdown timer will show for states with timeout");
+    }
+    
+    private void createAndRegisterMachine(String machineId, String caller, String callee, String machineType) {
+        CallContext machineContext = new CallContext(machineId, caller, callee);
         
         // Temporarily suppress verbose StateMachine output
         java.io.PrintStream originalOut = System.out;
@@ -372,7 +430,7 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
             // Redirect System.out during machine creation
             System.setOut(dummyOut);
             
-            machine = FluentStateMachineBuilder.<CallContext, Void>create(MACHINE_ID)
+            GenericStateMachine<CallContext, Void> newMachine = FluentStateMachineBuilder.<CallContext, Void>create(machineId)
                 .initialState(CallState.IDLE)
                 
                 .state(CallState.IDLE)
@@ -384,7 +442,7 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                     .on(Answer.class).to(CallState.CONNECTED)
                     .on(Hangup.class).to(CallState.IDLE)
                     .stay(SessionProgress.class, (m, e) -> {
-                        context.setRingCount(context.getRingCount() + 1);
+                        machineContext.setRingCount(machineContext.getRingCount() + 1);
                     })
                     .done()
                     
@@ -394,12 +452,12 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                     
                 .build();
             
-            machine.setPersistingEntity(context);
+            newMachine.setPersistingEntity(machineContext);
             
             // Set up callback to notify registry on ALL state transitions (including same-state transitions)
             // Track state changes properly - currentState is already updated when callback fires
-            final String[] previousState = {machine.getCurrentState()};
-            machine.setOnStateTransition(newState -> {
+            final String[] previousState = {newMachine.getCurrentState()};
+            newMachine.setOnStateTransition(newState -> {
                 String oldState = previousState[0];
                 
                 // Check if this is a timeout transition
@@ -409,7 +467,7 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                 
                 // Always notify registry about transitions, even same-state transitions (e.g., SESSION_PROGRESS)
                 // This ensures events like SESSION_PROGRESS in RINGING state are recorded
-                registry.notifyStateMachineEvent(MACHINE_ID, oldState, newState, context, null);
+                registry.notifyStateMachineEvent(machineId, oldState, newState, machineContext, null);
                 
                 // Only update previous state and restart timer if state actually changed
                 if (!oldState.equals(newState)) {
@@ -425,17 +483,19 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
                 lastEventName = null;
             });
             
-            registry.register(MACHINE_ID, machine);
-            machine.start();
+            registry.register(machineId, newMachine);
+            newMachine.start();
+            
+            // Store the machine and context
+            machines.put(machineId, newMachine);
+            contexts.put(machineId, machineContext);
             
         } finally {
             // Restore original System.out
             System.setOut(originalOut);
         }
         
-        System.out.println("[CallMachine] Initialized with ID: " + MACHINE_ID);
-        System.out.println("[CallMachine] Machine ready with events: INCOMING_CALL, ANSWER, HANGUP, SESSION_PROGRESS, REJECT, BUSY, TIMEOUT");
-        System.out.println("[CallMachine] Debug mode ENABLED - countdown timer will show for states with timeout");
+        System.out.println("[CallMachine] Initialized " + machineType + " with ID: " + machineId);
     }
     
     private void registerEventTypes() {
@@ -462,6 +522,17 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
         }
     }
     
+    private void sendIncomingCall(String machineId, String callerNumber) {
+        GenericStateMachine<CallContext, Void> targetMachine = machineId != null ? machines.get(machineId) : machine;
+        if (targetMachine != null) {
+            lastEventName = "IncomingCall";
+            targetMachine.fire(new IncomingCall(callerNumber));
+            // State change notification now handled by onStateTransition callback
+            System.out.println("[Event] INCOMING_CALL -> machine: " + machineId + ", caller: " + callerNumber);
+            // Event name will be reset after the state transition completes
+        }
+    }
+    
     private void sendAnswer() {
         if (machine != null) {
             lastEventName = "Answer";
@@ -473,12 +544,36 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
         }
     }
     
+    private void sendAnswer(String machineId) {
+        GenericStateMachine<CallContext, Void> targetMachine = machineId != null ? machines.get(machineId) : machine;
+        CallContext targetContext = machineId != null ? contexts.get(machineId) : context;
+        if (targetMachine != null && targetContext != null) {
+            lastEventName = "Answer";
+            targetMachine.fire(new Answer());
+            targetContext.setConnectTime(LocalDateTime.now());
+            // State change notification now handled by onStateTransition callback
+            System.out.println("[Event] ANSWER -> machine: " + machineId);
+            // Event name will be reset after the state transition completes
+        }
+    }
+    
     private void sendHangup() {
         if (machine != null) {
             lastEventName = "Hangup";
             machine.fire(new Hangup());
             // State change notification now handled by onStateTransition callback
             System.out.println("[Event] HANGUP");
+            // Event name will be reset after the state transition completes
+        }
+    }
+    
+    private void sendHangup(String machineId) {
+        GenericStateMachine<CallContext, Void> targetMachine = machineId != null ? machines.get(machineId) : machine;
+        if (targetMachine != null) {
+            lastEventName = "Hangup";
+            targetMachine.fire(new Hangup());
+            // State change notification now handled by onStateTransition callback
+            System.out.println("[Event] HANGUP -> machine: " + machineId);
             // Event name will be reset after the state transition completes
         }
     }
@@ -500,6 +595,26 @@ public class CallMachineRunnerWithWebServer extends WebSocketServer
             }
             
             System.out.println("[Event] SESSION_PROGRESS -> ring: " + ringNumber);
+            // Event name will be reset after the state transition completes
+            lastEventName = null;
+        }
+    }
+    
+    private void sendSessionProgress(String machineId, String sdp, int ringNumber) {
+        GenericStateMachine<CallContext, Void> targetMachine = machineId != null ? machines.get(machineId) : machine;
+        CallContext targetContext = machineId != null ? contexts.get(machineId) : context;
+        if (targetMachine != null && targetContext != null) {
+            lastEventName = "SessionProgress";
+            String currentState = targetMachine.getCurrentState();
+            targetMachine.fire(new SessionProgress(sdp, ringNumber));
+            
+            // For "stay" transitions (same-state), manually notify registry since onStateTransition won't fire
+            if (currentState.equals(targetMachine.getCurrentState())) {
+                // This is a same-state transition (stay), manually broadcast it
+                registry.notifyStateMachineEvent(machineId, currentState, currentState, targetContext, null);
+            }
+            
+            System.out.println("[Event] SESSION_PROGRESS -> machine: " + machineId + ", ring: " + ringNumber);
             // Event name will be reset after the state transition completes
             lastEventName = null;
         }

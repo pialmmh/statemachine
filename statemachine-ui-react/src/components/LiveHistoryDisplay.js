@@ -53,7 +53,7 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining })
           fontSize: '14px',
           fontWeight: '600'
         }}>
-          🌳 State Transition Tree
+          State Transition Tree
           {countdownState && countdownRemaining > 0 && (
             <span style={{ 
               float: 'right',

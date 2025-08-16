@@ -96,6 +96,14 @@ public class StateMachineWebSocketServer extends WebSocketServer
                         // Request event metadata update
                         registry.sendEventMetadataUpdate();
                         break;
+                    case "GET_MACHINES":
+                        // Send list of machines to the client
+                        sendMachinesList(conn);
+                        break;
+                    case "GET_STATE":
+                        // Send current state of all machines
+                        sendCompleteStatus(conn);
+                        break;
                     default:
                         System.out.println("[WS] Unknown action: " + action);
                 }
@@ -150,6 +158,8 @@ public class StateMachineWebSocketServer extends WebSocketServer
     
     private void broadcastEvent(String eventType, String machineId, String oldState, 
                                String newState, StateMachineContextEntity contextEntity, Object volatileContext) {
+        System.out.println("[WS] Broadcasting " + eventType + " for machine " + machineId + ": " + oldState + " -> " + newState);
+        
         JsonObject event = new JsonObject();
         event.addProperty("type", eventType);
         event.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
@@ -199,6 +209,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
     }
     
     private void sendMachineState(WebSocket conn, String machineId) {
+        System.out.println("[WS] GET_MACHINE_STATE request for: " + machineId);
         GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
         if (machine != null) {
             JsonObject state = new JsonObject();
@@ -217,24 +228,95 @@ public class StateMachineWebSocketServer extends WebSocketServer
                 }
             }
             
+            System.out.println("[WS] Sending MACHINE_STATE for " + machineId + " with state: " + machine.getCurrentState());
             conn.send(gson.toJson(state));
+        } else {
+            System.err.println("[WS] Machine not found: " + machineId);
         }
     }
     
     private void routeEventToMachine(String machineId, String eventType, JsonObject payload) {
         GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
         if (machine != null) {
-            // This would need to be extended based on specific machine types
-            // For now, just log the attempt
-            System.out.println("[Event] Would route " + eventType + " to machine: " + machineId);
+            System.out.println("[Event] Routing " + eventType + " to machine: " + machineId);
             
-            // Send confirmation back to client
-            JsonObject response = new JsonObject();
-            response.addProperty("type", "EVENT_RECEIVED");
-            response.addProperty("machineId", machineId);
-            response.addProperty("eventType", eventType);
-            response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
-            broadcastMessage(gson.toJson(response));
+            try {
+                // Create event instance based on event type
+                com.telcobright.statemachine.events.StateMachineEvent event = null;
+                
+                // Handle CallMachine events
+                if (eventType.equals("INCOMING_CALL")) {
+                    String phoneNumber = payload != null && payload.has("phoneNumber") 
+                        ? payload.get("phoneNumber").getAsString() 
+                        : "+1-555-0000";
+                    event = new com.telcobright.statemachineexamples.callmachine.events.IncomingCall(phoneNumber);
+                } else if (eventType.equals("ANSWER")) {
+                    event = new com.telcobright.statemachineexamples.callmachine.events.Answer();
+                } else if (eventType.equals("HANGUP")) {
+                    event = new com.telcobright.statemachineexamples.callmachine.events.Hangup();
+                } else if (eventType.equals("SESSION_PROGRESS")) {
+                    // SessionProgress requires sessionData and ringNumber parameters
+                    String sessionData = payload != null && payload.has("sessionData") 
+                        ? payload.get("sessionData").getAsString() 
+                        : "v=0";
+                    int ringNumber = payload != null && payload.has("ringNumber") 
+                        ? payload.get("ringNumber").getAsInt() 
+                        : 1;
+                    event = new com.telcobright.statemachineexamples.callmachine.events.SessionProgress(sessionData, ringNumber);
+                } else if (eventType.equals("REJECT")) {
+                    // Reject requires a reason parameter
+                    String reason = payload != null && payload.has("reason") 
+                        ? payload.get("reason").getAsString() 
+                        : "User Busy";
+                    event = new com.telcobright.statemachineexamples.callmachine.events.Reject(reason);
+                }
+                
+                if (event != null) {
+                    // Get the old state before firing
+                    String oldState = machine.getCurrentState();
+                    
+                    // Fire the event to the state machine
+                    machine.fire(event);
+                    
+                    // Get the new state after firing
+                    String newState = machine.getCurrentState();
+                    
+                    System.out.println("[Event] Successfully fired " + eventType + " to machine: " + machineId);
+                    System.out.println("[Event] State transition: " + oldState + " -> " + newState);
+                    
+                    // Broadcast the state change immediately
+                    if (!oldState.equals(newState)) {
+                        broadcastEvent("STATE_CHANGE", machineId, oldState, newState, 
+                                      machine.getPersistingEntity(), null);
+                    }
+                    
+                    // Send confirmation back to client
+                    JsonObject response = new JsonObject();
+                    response.addProperty("type", "EVENT_FIRED");
+                    response.addProperty("machineId", machineId);
+                    response.addProperty("eventType", eventType);
+                    response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+                    response.addProperty("success", true);
+                    response.addProperty("oldState", oldState);
+                    response.addProperty("newState", newState);
+                    broadcastMessage(gson.toJson(response));
+                } else {
+                    System.err.println("[Event] Could not create event instance for type: " + eventType);
+                }
+                
+            } catch (Exception e) {
+                System.err.println("[Event] Error firing event: " + e.getMessage());
+                e.printStackTrace();
+                
+                // Send error response
+                JsonObject response = new JsonObject();
+                response.addProperty("type", "EVENT_ERROR");
+                response.addProperty("machineId", machineId);
+                response.addProperty("eventType", eventType);
+                response.addProperty("error", e.getMessage());
+                response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+                broadcastMessage(gson.toJson(response));
+            }
         } else {
             System.err.println("[Event] Machine not found: " + machineId);
         }
@@ -261,6 +343,36 @@ public class StateMachineWebSocketServer extends WebSocketServer
     private void broadcastCompleteStatus() {
         JsonObject status = buildCompleteStatus();
         broadcastMessage(gson.toJson(status));
+    }
+    
+    /**
+     * Send list of machines to a specific client
+     */
+    private void sendMachinesList(WebSocket conn) {
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "MACHINES_LIST");
+        response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+        
+        JsonArray machineArray = new JsonArray();
+        Set<String> machineIds = registry.getActiveMachineIds();
+        
+        for (String machineId : machineIds) {
+            GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
+            if (machine != null) {
+                JsonObject machineInfo = new JsonObject();
+                machineInfo.addProperty("id", machineId);
+                // Try to determine machine type from class name
+                String className = machine.getClass().getSimpleName();
+                String machineType = className.contains("Call") ? "CallMachine" : 
+                                    className.contains("Sms") ? "SmsMachine" : "StateMachine";
+                machineInfo.addProperty("type", machineType);
+                machineArray.add(machineInfo);
+            }
+        }
+        
+        response.add("machines", machineArray);
+        conn.send(gson.toJson(response));
+        System.out.println("[WS] Sent machines list with " + machineArray.size() + " machines");
     }
     
     /**
