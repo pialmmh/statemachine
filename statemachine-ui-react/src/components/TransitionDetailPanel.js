@@ -12,18 +12,19 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
         alignItems: 'center',
         justifyContent: 'center',
         color: '#6c757d',
-        fontSize: '14px'
+        fontSize: '14px',
+        fontFamily: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '15px', opacity: 0.3 }}>📋</div>
-          <p>Select a transition from the tree to view details</p>
+          <p style={{ fontFamily: '"Inter", sans-serif' }}>Select a transition from the tree to view details</p>
         </div>
       </div>
     );
   }
 
-  const eventBgColor = transition.event === 'Initial State' ? '#e8f5e9' : '#d1ecf1';
-  const eventColor = transition.event === 'Initial State' ? '#4caf50' : '#17a2b8';
+  const eventBgColor = '#d1ecf1';
+  const eventColor = '#17a2b8';
 
   return (
     <div style={{
@@ -32,7 +33,8 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
       height: '100%',
       overflowY: 'auto',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      fontFamily: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     }}>
       {/* Header */}
       <div style={{
@@ -49,16 +51,18 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             padding: '5px 12px',
             borderRadius: '4px',
             fontSize: '14px',
-            fontWeight: '600'
+            fontWeight: '600',
+            fontFamily: '"Inter", "SF Pro Display", sans-serif',
+            letterSpacing: '-0.01em'
           }}>
             Step {transition.stepNumber}: {transition.event}
           </span>
-          <span style={{ fontSize: '14px', color: '#495057' }}>
+          <span style={{ fontSize: '14px', color: '#000000', fontFamily: '"Inter", sans-serif', fontWeight: '700' }}>
             {transition.fromState === 'Initial'
               ? `Initial State: ${transition.toState}`
               : `${transition.fromState} → ${transition.toState}`}
           </span>
-          <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d' }}>
+          <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d', fontFamily: '"Inter", sans-serif' }}>
             {transition.timestamp}
           </span>
           {/* Countdown Timer */}
@@ -69,6 +73,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               borderRadius: '15px', 
               fontSize: '13px',
               fontWeight: '600',
+              fontFamily: '"Inter", sans-serif',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -93,7 +98,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             marginBottom: '10px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            fontFamily: '"Inter", "SF Pro Display", sans-serif',
+            letterSpacing: '-0.01em'
           }}>
             📌 Event Payload
           </h3>
@@ -103,7 +110,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             borderRadius: '6px',
             padding: '12px',
             fontSize: '12px',
-            fontFamily: 'Consolas, monospace',
+            fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
             overflowX: 'auto',
             margin: 0
           }}>
@@ -127,7 +134,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               marginBottom: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              fontFamily: '"Inter", "SF Pro Display", sans-serif',
+              letterSpacing: '-0.01em'
             }}>
               🏛️ Registry Status Before
             </h3>
@@ -137,8 +146,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               borderRadius: '6px',
               padding: '12px',
               fontSize: '12px',
-              fontFamily: 'monospace',
-              lineHeight: '1.5'
+              fontFamily: '"Inter", sans-serif',
+              lineHeight: '1.6',
+              letterSpacing: '-0.01em'
             }}>
               Status: {(transition.contextBefore?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.contextBefore?.registryStatus?.status}`} | 
               Hydrated: {transition.contextBefore?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
@@ -155,7 +165,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               marginBottom: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              fontFamily: '"Inter", "SF Pro Display", sans-serif',
+              letterSpacing: '-0.01em'
             }}>
               🏛️ Registry Status After
             </h3>
@@ -165,8 +177,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               borderRadius: '6px',
               padding: '12px',
               fontSize: '12px',
-              fontFamily: 'monospace',
-              lineHeight: '1.5'
+              fontFamily: '"Inter", sans-serif',
+              lineHeight: '1.6',
+              letterSpacing: '-0.01em'
             }}>
               Status: {(transition.contextAfter?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.contextAfter?.registryStatus?.status}`} | 
               Hydrated: {transition.contextAfter?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
@@ -187,7 +200,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               fontSize: '14px', 
               fontWeight: '600', 
               color: '#dc3545',
-              marginBottom: '10px'
+              marginBottom: '10px',
+              fontFamily: '"Inter", "SF Pro Display", sans-serif',
+              letterSpacing: '-0.01em'
             }}>
               🔴 Context Before
             </h3>
@@ -200,7 +215,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             }}>
               {/* Persistent Context */}
               <div style={{ marginBottom: '15px' }}>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24', fontFamily: '"Inter", sans-serif' }}>
                   Persistent Context
                 </h4>
                 <pre style={{
@@ -209,7 +224,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   borderRadius: '4px',
                   padding: '8px',
                   fontSize: '10px',
-                  fontFamily: 'Consolas, monospace',
+                  fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
                   maxHeight: '300px',
@@ -221,7 +236,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
 
               {/* Volatile Context */}
               <div>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24', fontFamily: '"Inter", sans-serif' }}>
                   Volatile Context
                 </h4>
                 <pre style={{
@@ -230,7 +245,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   borderRadius: '4px',
                   padding: '8px',
                   fontSize: '10px',
-                  fontFamily: 'Consolas, monospace',
+                  fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
                   maxHeight: '300px',
@@ -248,7 +263,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               fontSize: '14px', 
               fontWeight: '600', 
               color: '#17a2b8',
-              marginBottom: '10px'
+              marginBottom: '10px',
+              fontFamily: '"Inter", "SF Pro Display", sans-serif',
+              letterSpacing: '-0.01em'
             }}>
               🔵 Context After
             </h3>
@@ -261,7 +278,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             }}>
               {/* Persistent Context */}
               <div style={{ marginBottom: '15px' }}>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085', fontFamily: '"Inter", sans-serif' }}>
                   Persistent Context
                 </h4>
                 <pre style={{
@@ -270,7 +287,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   borderRadius: '4px',
                   padding: '8px',
                   fontSize: '10px',
-                  fontFamily: 'Consolas, monospace',
+                  fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
                   maxHeight: '300px',
@@ -282,7 +299,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
 
               {/* Volatile Context */}
               <div>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085' }}>
+                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085', fontFamily: '"Inter", sans-serif' }}>
                   Volatile Context
                 </h4>
                 <pre style={{
@@ -291,7 +308,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   borderRadius: '4px',
                   padding: '8px',
                   fontSize: '10px',
-                  fontFamily: 'Consolas, monospace',
+                  fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
                   maxHeight: '300px',

@@ -46,7 +46,7 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining })
       }}>
         <div style={{ 
           padding: '10px', 
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
           color: 'white',
           borderRadius: '6px',
           marginBottom: '10px',

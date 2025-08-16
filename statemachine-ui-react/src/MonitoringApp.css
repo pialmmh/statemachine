@@ -16,7 +16,7 @@ body {
 }
 
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
   color: white;
   padding: 15px 20px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -164,7 +164,7 @@ body {
 }
 
 .transition-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
   color: white;
   padding: 12px 15px;
   font-weight: 600;
@@ -227,7 +227,7 @@ body {
   border: 1px solid #e9ecef;
   border-radius: 4px;
   padding: 12px;
-  font-family: 'Courier New', monospace;
+  font-family: 'Inter', 'SF Pro Text', 'Segoe UI', -apple-system, sans-serif;
   font-size: 12px;
   max-height: 200px;
   overflow-y: auto;
@@ -337,7 +337,7 @@ body {
   padding: 8px;
   border: 1px solid #dee2e6;
   border-radius: 4px;
-  font-family: 'Courier New', monospace;
+  font-family: 'Inter', 'SF Pro Text', 'Segoe UI', -apple-system, sans-serif;
   font-size: 12px;
   resize: vertical;
 }
@@ -350,7 +350,7 @@ body {
 .send-event-btn {
   width: 100%;
   padding: 10px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   color: white;
   border: none;
   border-radius: 6px;
@@ -363,7 +363,7 @@ body {
 
 .send-event-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3);
 }
 
 .send-event-btn:disabled {

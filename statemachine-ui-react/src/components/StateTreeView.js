@@ -87,7 +87,7 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
               <span style={{ 
                 marginRight: '6px', 
                 fontSize: '11px', 
-                fontFamily: 'monospace',
+                fontFamily: '"Inter", "SF Pro Text", "Segoe UI", sans-serif',
                 display: 'inline-block',
                 width: '13px',
                 height: '13px',
