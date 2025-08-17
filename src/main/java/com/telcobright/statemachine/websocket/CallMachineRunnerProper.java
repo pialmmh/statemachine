@@ -24,19 +24,27 @@ public class CallMachineRunnerProper {
     private final StateMachineRegistry registry;
     private final Map<String, GenericStateMachine<CallContext, Void>> machines = new ConcurrentHashMap<>();
     private final Map<String, CallContext> contexts = new ConcurrentHashMap<>();
+    private final com.telcobright.statemachine.timeout.TimeoutManager timeoutManager;
     
     /**
      * Create runner with hardcoded settings
      */
     public CallMachineRunnerProper() {
-        // Create registry with hardcoded WebSocket port
-        this.registry = new StateMachineRegistry(null, WS_PORT);
+        // Create timeout manager for handling state timeouts
+        this.timeoutManager = new com.telcobright.statemachine.timeout.TimeoutManager();
+        
+        // Create registry with timeout manager and hardcoded WebSocket port
+        this.registry = new StateMachineRegistry(timeoutManager, WS_PORT);
+        
+        // IMPORTANT: Set the factory's default instances BEFORE creating any state machines
+        // This ensures the FluentStateMachineBuilder uses the correct instances
+        StateMachineFactory.setDefaultInstances(timeoutManager, registry);
         
         // Enable live debug mode (hardcoded)
         registry.enableLiveDebug(WS_PORT);
         System.out.println("🔴 Live debugging ENABLED - WebSocket server started on port " + WS_PORT);
         
-        // Initialize state machines
+        // Initialize state machines AFTER setting factory defaults
         initializeStateMachines();
     }
     
@@ -72,6 +80,8 @@ public class CallMachineRunnerProper {
                 .done()
                 
             .state(CallState.CONNECTED)
+                .timeout(120, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name()) // 2 minute call timeout
+                .offline() // Mark as offline state - machine is removed from online registry
                 .on(Hangup.class).to(CallState.IDLE)
                 .done()
             .build();

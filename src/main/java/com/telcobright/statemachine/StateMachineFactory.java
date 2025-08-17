@@ -103,4 +103,13 @@ public class StateMachineFactory {
         return defaultTimeoutManager;
     }
     
+    /**
+     * Set the default instances to be used by the factory
+     * This allows external code to configure the factory with specific instances
+     */
+    public static synchronized void setDefaultInstances(TimeoutManager timeoutManager, StateMachineRegistry registry) {
+        defaultTimeoutManager = timeoutManager;
+        defaultRegistry = registry;
+    }
+    
 }

@@ -157,6 +157,27 @@ function MonitoringApp() {
     return [];
   };
 
+  // Helper function to safely send WebSocket messages
+  const sendWebSocketMessage = (message) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+        wsRef.current.send(messageStr);
+        return true;
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+        return false;
+      }
+    } else {
+      console.warn('WebSocket not ready, message not sent:', message);
+      // Queue the message to send when connection is ready
+      if (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING) {
+        setTimeout(() => sendWebSocketMessage(message), 100);
+      }
+      return false;
+    }
+  };
+
   const connectWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -166,16 +187,19 @@ function MonitoringApp() {
       wsRef.current.onopen = () => {
         console.log('WebSocket connected for live mode');
         setIsConnected(true);
-        // Request list of machines
-        const request = {
-          action: 'GET_MACHINES'
-        };
-        wsRef.current.send(JSON.stringify(request));
-        // Request initial state
-        const stateRequest = {
-          action: 'GET_STATE'
-        };
-        wsRef.current.send(JSON.stringify(stateRequest));
+        
+        // Use safe send function with a small delay to ensure connection is fully established
+        setTimeout(() => {
+          // Request list of machines
+          sendWebSocketMessage({
+            action: 'GET_MACHINES'
+          });
+          
+          // Request initial state
+          sendWebSocketMessage({
+            action: 'GET_STATE'
+          });
+        }, 50);
       };
 
       wsRef.current.onmessage = (event) => {
@@ -431,6 +455,7 @@ function MonitoringApp() {
             timestamp: data.timestamp || new Date().toISOString(),
             duration: data.duration || 0,
             eventData: data.payload || {},
+            entryActionStatus: data.entryActionStatus || 'none', // Capture entry action status
             contextBefore: {
               registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
               persistentContext: previousContext,
@@ -502,10 +527,13 @@ function MonitoringApp() {
     console.log('sendEvent called');
     console.log('isConnected:', isConnected, 'wsRef.current:', wsRef.current, 'selectedMachine:', selectedMachine);
     
-    if (!isConnected || !wsRef.current || !selectedMachine) {
-      console.error('Not connected to WebSocket or no machine selected');
-      console.error('Details - isConnected:', isConnected, 'wsRef:', wsRef.current, 'selectedMachine:', selectedMachine);
-      alert('Please ensure WebSocket is connected and a machine is selected');
+    if (!selectedMachine) {
+      alert('Please select a machine first');
+      return;
+    }
+
+    if (!isConnected || !wsRef.current) {
+      alert('WebSocket is not connected. Please wait for connection or refresh the page.');
       return;
     }
 
@@ -519,12 +547,14 @@ function MonitoringApp() {
       };
       
       console.log('Sending WebSocket event:', message);
-      const messageStr = JSON.stringify(message);
-      console.log('Stringified message:', messageStr);
-      wsRef.current.send(messageStr);
-      console.log('Event sent successfully');
+      
+      if (sendWebSocketMessage(message)) {
+        console.log('Event sent successfully');
+      } else {
+        alert('Failed to send event. WebSocket connection might be unstable.');
+      }
     } catch (error) {
-      console.error('Error sending event:', error);
+      console.error('Error preparing event:', error);
       alert('Invalid JSON payload: ' + error.message);
     }
   };
@@ -638,19 +668,19 @@ function MonitoringApp() {
                         selectedMachineRef.current = machineId;  // Update ref to avoid closure issues
                         
                         // When a machine is selected, reset history and request its state
-                        if (machineId && wsRef.current?.readyState === WebSocket.OPEN) {
+                        if (machineId) {
                           console.log('Requesting state for machine:', machineId);
                           hasReceivedInitialState.current = false;
                           // Don't clear history completely - keep initial state display
                           setLiveHistory([]);
                           
-                          // Request the machine's current state
+                          // Request the machine's current state using safe send
                           const request = {
                             action: 'GET_MACHINE_STATE',
                             machineId: machineId
                           };
                           console.log('Sending WebSocket request:', request);
-                          wsRef.current.send(JSON.stringify(request));
+                          sendWebSocketMessage(request);
                         } else {
                           console.log('Cannot request state - WebSocket not ready or no machine selected');
                           console.log('machineId:', machineId, 'wsRef.current:', wsRef.current, 'readyState:', wsRef.current?.readyState);

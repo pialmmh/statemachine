@@ -200,6 +200,21 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                           {transition.eventData && Object.keys(transition.eventData).length > 0 && (
                             <span>• 📦 Has payload</span>
                           )}
+                          {/* Entry Action Status */}
+                          {transition.entryActionStatus && (
+                            <span style={{
+                              fontWeight: '600',
+                              color: transition.entryActionStatus === 'executed' ? '#28a745' :
+                                     transition.entryActionStatus === 'skipped' ? '#ffc107' :
+                                     transition.entryActionStatus === 'failed' ? '#dc3545' :
+                                     transition.entryActionStatus === 'none' ? '#6c757d' : '#6c757d'
+                            }}>
+                              {transition.entryActionStatus === 'executed' ? '• ✓ Entry Actions' :
+                               transition.entryActionStatus === 'skipped' ? '• ⟳ Entry Skipped' :
+                               transition.entryActionStatus === 'failed' ? '• ✗ Entry Failed' :
+                               transition.entryActionStatus === 'none' ? '• ○ No Entry Actions' : ''}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

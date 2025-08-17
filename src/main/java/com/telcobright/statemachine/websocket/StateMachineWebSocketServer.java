@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import com.telcobright.statemachine.eventstore.EventStore;
+import com.telcobright.statemachine.eventstore.EventLogEntry;
 
 /**
  * WebSocket server for real-time state machine monitoring
@@ -172,6 +174,13 @@ public class StateMachineWebSocketServer extends WebSocketServer
             event.addProperty("stateAfter", newState);
         }
         
+        // Try to get entry action status from the machine
+        GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
+        if (machine != null) {
+            String entryActionStatus = machine.getEntryActionStatus();
+            event.addProperty("entryActionStatus", entryActionStatus);
+        }
+        
         if (contextEntity != null) {
             try {
                 // Convert context to JSON
@@ -184,6 +193,16 @@ public class StateMachineWebSocketServer extends WebSocketServer
         
         String message = gson.toJson(event);
         broadcastMessage(message);
+        
+        // Log to EventStore if enabled
+        if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
+            Map<String, Object> details = new HashMap<>();
+            details.put("eventType", eventType);
+            details.put("entryActionStatus", machine != null ? machine.getEntryActionStatus() : "unknown");
+            details.put("clientCount", connectedClients.size());
+            
+            EventStore.getInstance().logWebSocketOut(machineId, eventType, oldState, newState, details);
+        }
     }
     
     private void broadcastMessage(String message) {
@@ -236,6 +255,10 @@ public class StateMachineWebSocketServer extends WebSocketServer
     }
     
     private void routeEventToMachine(String machineId, String eventType, JsonObject payload) {
+        // Log incoming WebSocket event
+        String clientAddress = "WebSocketClient"; // You could track actual client addresses if needed
+        Map<String, Object> eventPayload = payload != null ? gson.fromJson(payload, Map.class) : new HashMap<>();
+        
         GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
         if (machine != null) {
             System.out.println("[Event] Routing " + eventType + " to machine: " + machineId);
@@ -284,13 +307,12 @@ public class StateMachineWebSocketServer extends WebSocketServer
                     System.out.println("[Event] Successfully fired " + eventType + " to machine: " + machineId);
                     System.out.println("[Event] State transition: " + oldState + " -> " + newState);
                     
-                    // Broadcast the state change immediately
-                    if (!oldState.equals(newState)) {
-                        broadcastEvent("STATE_CHANGE", machineId, oldState, newState, 
-                                      machine.getPersistingEntity(), null);
-                    }
+                    // NOTE: We don't broadcast STATE_CHANGE here anymore because the registry's
+                    // onStateTransition callback will handle it. This prevents duplicate broadcasts.
+                    // The registry callback ensures ALL state changes (WebSocket events, timeouts, 
+                    // internal transitions) are broadcast consistently.
                     
-                    // Send confirmation back to client
+                    // Send confirmation back to client (this is just acknowledgment, not state change)
                     JsonObject response = new JsonObject();
                     response.addProperty("type", "EVENT_FIRED");
                     response.addProperty("machineId", machineId);
@@ -300,13 +322,31 @@ public class StateMachineWebSocketServer extends WebSocketServer
                     response.addProperty("oldState", oldState);
                     response.addProperty("newState", newState);
                     broadcastMessage(gson.toJson(response));
+                    
+                    // Log successful event to EventStore
+                    if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
+                        EventStore.getInstance().logWebSocketIn(clientAddress, machineId, eventType, 
+                            eventPayload, true, null);
+                    }
                 } else {
                     System.err.println("[Event] Could not create event instance for type: " + eventType);
+                    
+                    // Log error to EventStore
+                    if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
+                        EventStore.getInstance().logWebSocketIn(clientAddress, machineId, eventType, 
+                            eventPayload, false, "Could not create event instance");
+                    }
                 }
                 
             } catch (Exception e) {
                 System.err.println("[Event] Error firing event: " + e.getMessage());
                 e.printStackTrace();
+                
+                // Log error to EventStore
+                if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
+                    EventStore.getInstance().logWebSocketIn(clientAddress, machineId, eventType, 
+                        eventPayload, false, e.getMessage());
+                }
                 
                 // Send error response
                 JsonObject response = new JsonObject();

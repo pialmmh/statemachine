@@ -16,6 +16,9 @@ import com.telcobright.statemachine.monitoring.SnapshotConfig;
 import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.telcobright.statemachine.eventstore.EventStore;
+import com.telcobright.statemachine.eventstore.EventLogEntry;
+import java.util.HashMap;
 
 /**
  * Enhanced Generic State Machine with timeout, persistence, and offline support
@@ -48,11 +51,21 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private Consumer<String> onStateTransition;
     private Consumer<GenericStateMachine<TPersistingEntity, TContext>> onOfflineTransition;
     
+    // Entry action tracking
+    private boolean entryActionExecuted = false;
+    private String entryActionStatus = "none"; // "none", "executed", "skipped", "failed"
+    
     public GenericStateMachine(String id, TimeoutManager timeoutManager, StateMachineRegistry registry) {
         this.id = id;
         this.currentState = "initial";
         this.timeoutManager = timeoutManager;
         this.registry = registry;
+        
+        if (timeoutManager == null) {
+            System.err.println("⚠️ WARNING: GenericStateMachine " + id + " created with NULL TimeoutManager!");
+        } else {
+            System.out.println("✓ GenericStateMachine " + id + " created with valid TimeoutManager");
+        }
         
         // Auto-generate run ID based on timestamp if debug is enabled
         this.runId = generateTimestampRunId();
@@ -111,7 +124,28 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public void restoreState(String state) {
         this.currentState = state;
-        System.out.println("StateMachine " + id + " restored to state: " + currentState);
+        
+        // Enhanced rehydration logging
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("🔄 REHYDRATION SUCCESSFUL");
+        System.out.println("=".repeat(60));
+        System.out.println("📍 Machine ID: " + id);
+        System.out.println("📍 Restored State: " + currentState);
+        System.out.println("📍 Timestamp: " + java.time.LocalDateTime.now());
+        
+        // Check if this is an offline state
+        EnhancedStateConfig config = stateConfigs.get(currentState);
+        if (config != null && config.isOffline()) {
+            System.out.println("⚠️  This is an OFFLINE state - machine was previously removed from registry");
+            System.out.println("   Entry actions will be SKIPPED during rehydration");
+        }
+        
+        if (persistingEntity != null) {
+            System.out.println("📊 Persisted Entity Info:");
+            System.out.println("   Last State Change: " + persistingEntity.getLastStateChange());
+            System.out.println("   Is Complete: " + persistingEntity.isComplete());
+        }
+        System.out.println("=".repeat(60) + "\n");
         
         // Check for timeout after rehydration
         checkAndHandleTimeout();
@@ -175,6 +209,8 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public void transitionTo(String newState) {
         String oldState = currentState;
+        long startTime = System.currentTimeMillis();
+        
         System.out.println("StateMachine " + id + " transitioning from " + oldState + " to " + newState);
         
         // Exit current state
@@ -211,6 +247,19 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             }
         }
         
+        // Log state transition to EventStore if debug is enabled
+        long processingTime = System.currentTimeMillis() - startTime;
+        if (isDebugEnabled() && EventStore.getInstance() != null) {
+            Map<String, Object> details = new HashMap<>();
+            details.put("entryActionStatus", entryActionStatus);
+            if (config != null) {
+                details.put("isOffline", config.isOffline());
+                details.put("isFinal", config.isFinal());
+                details.put("hasTimeout", config.hasTimeout());
+            }
+            EventStore.getInstance().logStateChange(id, oldState, newState, details, processingTime);
+        }
+        
         // Print current state after transition
         System.out.println("📍 Current State: " + newState);
     }
@@ -231,6 +280,8 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      * Handle incoming events with snapshot recording
      */
     private void handleEvent(StateMachineEvent event) {
+        System.out.println("📨 handleEvent called for machine " + id + " with event: " + event.getClass().getSimpleName() + " (type: " + event.getEventType() + ")");
+        
         // Capture before state for snapshot
         String stateBefore = currentState;
         TContext contextBefore = null;
@@ -245,6 +296,10 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             // Special handling for TimeoutEvent - use its embedded target state
             if (event instanceof TimeoutEvent) {
                 TimeoutEvent timeoutEvent = (TimeoutEvent) event;
+                System.out.println("   ⏰ Processing TimeoutEvent:");
+                System.out.println("      Source state: " + timeoutEvent.getSourceState());
+                System.out.println("      Target state: " + timeoutEvent.getTargetState());
+                System.out.println("      Current state: " + currentState);
                 transitionTo(timeoutEvent.getTargetState());
             } else {
                 // Normal event handling through transitions map
@@ -252,19 +307,29 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 if (stateTransitions != null) {
                     String targetState = stateTransitions.get(event.getEventType());
                     if (targetState != null) {
+                        System.out.println("   → Found transition: " + currentState + " --[" + event.getEventType() + "]--> " + targetState);
                         transitionTo(targetState);
                     } else {
+                        System.out.println("   ↻ No transition for event " + event.getEventType() + " in state " + currentState + ", checking stay actions...");
                         // Check for stay actions
                         Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
                         if (stateStayActions != null) {
                             BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
                             if (action != null) {
+                                System.out.println("   ✓ Executing stay action for " + event.getEventType());
                                 action.accept(this, event);
+                            } else {
+                                System.out.println("   ✗ No stay action found for " + event.getEventType());
                             }
                         }
                     }
+                } else {
+                    System.out.println("   ⚠️ No transitions defined for state " + currentState);
                 }
             }
+        } catch (Exception e) {
+            System.err.println("   ✗ Error in handleEvent: " + e.getMessage());
+            e.printStackTrace();
         } finally {
             // Record snapshot if debug is enabled
             if (isDebugEnabled()) {
@@ -350,21 +415,53 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     private void enterState(String state, boolean executeEntryActions) {
         EnhancedStateConfig config = stateConfigs.get(state);
+        
+        // Reset entry action tracking for this state entry
+        entryActionExecuted = false;
+        entryActionStatus = "none";
+        
         if (config != null) {
+            // Check if there are entry actions defined
+            boolean hasEntryActions = (config.getEntryAction() != null || config.getOnEntry() != null);
+            
             // Execute entry actions
-            if (executeEntryActions) {
-                if (config.getEntryAction() != null) {
-                    config.getEntryAction().run();
+            if (executeEntryActions && hasEntryActions) {
+                try {
+                    if (config.getEntryAction() != null) {
+                        config.getEntryAction().run();
+                    }
+                    if (config.getOnEntry() != null) {
+                        config.getOnEntry().accept(state);
+                    }
+                    // All entry actions executed successfully
+                    entryActionExecuted = true;
+                    entryActionStatus = "executed";
+                    System.out.println("✓ Entry actions executed for state: " + state);
+                } catch (Exception e) {
+                    // Entry actions failed
+                    entryActionExecuted = false;
+                    entryActionStatus = "failed";
+                    System.err.println("✗ Entry actions failed for state " + state + ": " + e.getMessage());
                 }
-                if (config.getOnEntry() != null) {
-                    config.getOnEntry().accept(state);
-                }
+            } else if (!executeEntryActions && hasEntryActions) {
+                // Entry actions were skipped (e.g., during rehydration)
+                entryActionExecuted = false;
+                entryActionStatus = "skipped";
+                System.out.println("⟳ Entry actions skipped for state: " + state + " (rehydration)");
+            } else if (!hasEntryActions) {
+                // No entry actions defined for this state
+                entryActionStatus = "none";
+                System.out.println("ℹ️ No entry actions defined for state: " + state);
             }
             
             // Setup timeout
             if (config.hasTimeout()) {
                 setupTimeout(config);
             }
+        } else {
+            // No config for this state
+            entryActionStatus = "none";
+            System.out.println("ℹ️ No configuration found for state: " + state);
         }
     }
     
@@ -398,15 +495,60 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             currentTimeout.cancel(false);
         }
         
+        if (timeoutManager == null) {
+            System.err.println("⚠️ TimeoutManager is null for machine " + id + " - timeouts will not work!");
+            return;
+        }
+        
+        long timeoutMillis = config.getTimeoutConfig().getDurationInMillis();
+        String targetState = config.getTimeoutConfig().getTargetState();
+        
+        System.out.println("⏱️ Setting up timeout for state " + currentState + 
+                         " - will transition to " + targetState + " after " + 
+                         (timeoutMillis/1000) + " seconds");
+        
+        // Capture the current state at setup time to validate later
+        String stateAtSetup = currentState;
+        
         currentTimeout = timeoutManager.scheduleTimeout(
             () -> {
-                // Fire timeout event
-                TimeoutEvent timeoutEvent = new TimeoutEvent(currentState, config.getTimeoutConfig().getTargetState());
-                handleEvent(timeoutEvent);
+                System.out.println("⏰ Timeout callback executing for machine " + id);
+                System.out.println("   State when timeout was set: " + stateAtSetup);
+                System.out.println("   Current state now: " + currentState);
+                System.out.println("   Target state: " + targetState);
+                
+                // Only transition if we're still in the same state
+                if (!currentState.equals(stateAtSetup)) {
+                    System.out.println("   ⚠️ State changed since timeout was set, ignoring timeout");
+                    return;
+                }
+                
+                try {
+                    System.out.println("   🔄 Firing timeout event...");
+                    
+                    // Log timeout event to EventStore if debug is enabled
+                    if (isDebugEnabled() && EventStore.getInstance() != null) {
+                        EventStore.getInstance().logTimeoutEvent(id, currentState, targetState, timeoutMillis);
+                    }
+                    
+                    // Fire timeout event
+                    TimeoutEvent timeoutEvent = new TimeoutEvent(currentState, targetState);
+                    handleEvent(timeoutEvent);
+                    System.out.println("   ✓ Timeout event fired successfully");
+                } catch (Exception e) {
+                    System.err.println("   ✗ Error handling timeout: " + e.getMessage());
+                    e.printStackTrace();
+                }
             },
-            config.getTimeoutConfig().getDurationInMillis(),
+            timeoutMillis,
             java.util.concurrent.TimeUnit.MILLISECONDS
         );
+        
+        if (currentTimeout == null) {
+            System.err.println("⚠️ Failed to schedule timeout!");
+        } else {
+            System.out.println("✓ Timeout scheduled successfully, will fire in " + (timeoutMillis/1000) + " seconds");
+        }
     }
     
     
@@ -417,6 +559,14 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public String getCurrentState() {
         return currentState;
+    }
+    
+    public boolean isEntryActionExecuted() {
+        return entryActionExecuted;
+    }
+    
+    public String getEntryActionStatus() {
+        return entryActionStatus;
     }
     
     /**

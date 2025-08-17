@@ -65,8 +65,8 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d', fontFamily: '"Inter", sans-serif' }}>
             {transition.timestamp}
           </span>
-          {/* Countdown Timer */}
-          {countdownState === transition.toState && countdownRemaining > 0 && (
+          {/* Countdown Timer - Show if there's an active countdown, regardless of selected transition */}
+          {countdownState && countdownRemaining > 0 && (
             <div style={{ 
               background: 'rgba(102, 126, 234, 0.1)', 
               padding: '4px 10px', 
@@ -78,10 +78,11 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               alignItems: 'center',
               gap: '6px',
               color: eventColor,
-              border: `1px solid ${eventColor}`
+              border: `1px solid ${eventColor}`,
+              animation: countdownRemaining <= 5 ? 'pulse 1s infinite' : 'none'
             }}>
               <span>⏱️</span>
-              <span>{countdownRemaining}s remaining</span>
+              <span>{countdownState}: {countdownRemaining}s</span>
             </div>
           )}
         </div>

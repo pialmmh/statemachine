@@ -9,6 +9,8 @@ import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.StateMachineContextEntity;
 import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
+import com.telcobright.statemachine.eventstore.EventStore;
+import java.util.HashMap;
 
 /**
  * Registry for managing state machine instances
@@ -45,6 +47,19 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     public void register(String id, GenericStateMachine<?, ?> machine) {
         activeMachines.put(id, machine);
         
+        // Set up state transition callback to notify listeners (including WebSocket)
+        // This ensures timeout transitions are also broadcast
+        String[] previousState = {machine.getCurrentState()};
+        machine.setOnStateTransition(newState -> {
+            String oldState = previousState[0];
+            previousState[0] = newState;
+            
+            // Notify all listeners of the state change
+            // This will trigger WebSocket broadcast if live debug is enabled
+            notifyStateMachineEvent(id, oldState, newState, 
+                machine.getPersistingEntity(), machine.getContext());
+        });
+        
         // Apply snapshot debugging if enabled
         if (snapshotDebug && snapshotRecorder != null) {
             try {
@@ -61,6 +76,15 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         // Notify listeners
         notifyRegistryCreate(id);
         
+        // Log to EventStore if debug is enabled
+        if (isDebugEnabled() && EventStore.getInstance() != null) {
+            Map<String, Object> details = new HashMap<>();
+            details.put("machineClass", machine.getClass().getSimpleName());
+            details.put("currentState", machine.getCurrentState());
+            details.put("debugEnabled", machine.isDebugEnabled());
+            EventStore.getInstance().logRegistryEvent("CREATE", id, details);
+        }
+        
         // Send event metadata update if WebSocket server is running
         if (isWebSocketServerRunning()) {
             sendEventMetadataUpdate();
@@ -72,8 +96,18 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     @Override
     public void removeMachine(String id) {
-        activeMachines.remove(id);
+        GenericStateMachine<?, ?> machine = activeMachines.remove(id);
         notifyRegistryRemove(id);
+        
+        // Log to EventStore if debug is enabled
+        if (isDebugEnabled() && EventStore.getInstance() != null) {
+            Map<String, Object> details = new HashMap<>();
+            if (machine != null) {
+                details.put("lastState", machine.getCurrentState());
+                details.put("wasComplete", machine.isComplete());
+            }
+            EventStore.getInstance().logRegistryEvent("REMOVE", id, details);
+        }
     }
     
     /**
@@ -281,6 +315,14 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             } catch (Exception e) {
                 System.err.println("Error notifying listener of registry rehydrate: " + e.getMessage());
             }
+        }
+        
+        // Log to EventStore if debug is enabled
+        if (isDebugEnabled() && EventStore.getInstance() != null) {
+            Map<String, Object> details = new HashMap<>();
+            details.put("contextClass", contextClass.getSimpleName());
+            details.put("currentState", machine.getCurrentState());
+            EventStore.getInstance().logRegistryEvent("REHYDRATE", machineId, details);
         }
         
         return context;
