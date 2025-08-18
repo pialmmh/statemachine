@@ -94,3 +94,192 @@
   "success": true,
   "processingTimeMs": 0
 }
+{
+  "id": "bda7046c-8e4f-47f8-98db-edae8fd047bb",
+  "timestamp": "2025-08-17T23:45:27.163495649",
+  "source": "StateMachine:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_REMOVE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_REMOVE",
+    "entryActionStatus": "unknown",
+    "clientCount": 0
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ce55fceb-aa03-45ad-a321-06124d72462b",
+  "timestamp": "2025-08-17T23:45:27.164061567",
+  "source": "Registry",
+  "destination": "StateMachine:call-002",
+  "eventType": "REMOVE",
+  "eventCategory": "REGISTRY_REMOVE",
+  "eventDetails": {
+    "wasComplete": false,
+    "lastState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "92c81ab0-079b-4ee0-8c69-abe5b414f38c",
+  "timestamp": "2025-08-17T23:45:27.164234654",
+  "source": "StateMachine:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_REMOVE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_REMOVE",
+    "entryActionStatus": "unknown",
+    "clientCount": 0
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "bec11363-0fb9-4745-8824-a5ceaf4fbff1",
+  "timestamp": "2025-08-17T23:45:27.164520456",
+  "source": "Registry",
+  "destination": "StateMachine:call-001",
+  "eventType": "REMOVE",
+  "eventCategory": "REGISTRY_REMOVE",
+  "eventDetails": {
+    "wasComplete": false,
+    "lastState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0d5310a0-e0be-414a-a5cc-22e0e1f5bc5c",
+  "timestamp": "2025-08-17T23:45:27.164683103",
+  "source": "StateMachine:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_REMOVE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_REMOVE",
+    "entryActionStatus": "unknown",
+    "clientCount": 0
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "7dda112d-5351-42d1-9f2f-56b66173f6f1",
+  "timestamp": "2025-08-17T23:45:27.16480601",
+  "source": "Registry",
+  "destination": "StateMachine:call-003",
+  "eventType": "REMOVE",
+  "eventCategory": "REGISTRY_REMOVE",
+  "eventDetails": {
+    "wasComplete": false,
+    "lastState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "94466f6f-d045-4026-86af-b78d4f7d7206",
+  "timestamp": "2025-08-17T23:45:49.620345118",
+  "source": "StateMachine:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "641b82f7-3f7b-4149-b01e-671b513102ef",
+  "timestamp": "2025-08-17T23:45:49.627036998",
+  "source": "Registry",
+  "destination": "StateMachine:call-001",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "626e6142-525a-4b29-bf5c-5fc2bccccc01",
+  "timestamp": "2025-08-17T23:45:49.629495208",
+  "source": "StateMachine:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8b244057-0fe0-49ca-ac87-6cbf2784abe0",
+  "timestamp": "2025-08-17T23:45:49.63008126",
+  "source": "Registry",
+  "destination": "StateMachine:call-002",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8b95f1ae-773a-43f5-be03-ab3405efdc2f",
+  "timestamp": "2025-08-17T23:45:49.631980816",
+  "source": "StateMachine:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "c8762d9e-524b-44bf-a958-d4d255aca9e7",
+  "timestamp": "2025-08-17T23:45:49.632658094",
+  "source": "Registry",
+  "destination": "StateMachine:call-003",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}

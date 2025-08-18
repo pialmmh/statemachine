@@ -154,14 +154,14 @@ public class EventStore {
     /**
      * Log a state change event
      */
-    public void logStateChange(String machineId, String stateBefore, String stateAfter, 
+    public void logStateChange(String source, String machineId, String stateBefore, String stateAfter, 
                                Map<String, Object> details, long processingTimeMs) {
         if (!isEnabled.get()) return;
         
         EventLogEntry event = new EventLogEntry.Builder()
             .eventCategory(EventLogEntry.Category.STATE_CHANGE)
             .eventType("STATE_TRANSITION")
-            .source("StateMachine:" + machineId)
+            .source(source + ":" + machineId)
             .destination("Registry")
             .machineId(machineId)
             .stateBefore(stateBefore)
@@ -176,14 +176,14 @@ public class EventStore {
     /**
      * Log a WebSocket incoming event
      */
-    public void logWebSocketIn(String clientAddress, String machineId, String eventType, 
+    public void logWebSocketIn(String source, String clientAddress, String machineId, String eventType, 
                                Map<String, Object> payload, boolean success, String error) {
         if (!isEnabled.get()) return;
         
         EventLogEntry.Builder builder = new EventLogEntry.Builder()
             .eventCategory(EventLogEntry.Category.WEBSOCKET_IN)
             .eventType(eventType)
-            .source("WebSocketClient:" + clientAddress)
+            .source(source + ":" + clientAddress)
             .destination("StateMachine:" + machineId)
             .machineId(machineId)
             .eventDetails(payload)
@@ -197,16 +197,40 @@ public class EventStore {
     }
     
     /**
+     * Generic WebSocket event logging (for client logs)
+     */
+    public void logWebSocketEvent(String source, String destination, String eventType,
+                                  String category, Map<String, Object> details, 
+                                  String machineId, boolean success, long processingTimeMs) {
+        if (!isEnabled.get()) return;
+        
+        EventLogEntry.Builder builder = new EventLogEntry.Builder()
+            .eventCategory(category)
+            .eventType(eventType)
+            .source(source)
+            .destination(destination)
+            .eventDetails(details)
+            .success(success)
+            .processingTimeMs(processingTimeMs);
+        
+        if (machineId != null) {
+            builder.machineId(machineId);
+        }
+        
+        logEvent(builder.build());
+    }
+    
+    /**
      * Log a WebSocket outgoing event
      */
-    public void logWebSocketOut(String machineId, String eventType, String stateBefore, 
+    public void logWebSocketOut(String source, String machineId, String eventType, String stateBefore, 
                                 String stateAfter, Map<String, Object> details) {
         if (!isEnabled.get()) return;
         
         EventLogEntry event = new EventLogEntry.Builder()
             .eventCategory(EventLogEntry.Category.WEBSOCKET_OUT)
             .eventType(eventType)
-            .source("StateMachine:" + machineId)
+            .source(source + ":" + machineId)
             .destination("WebSocketClients")
             .machineId(machineId)
             .stateBefore(stateBefore)
@@ -220,7 +244,7 @@ public class EventStore {
     /**
      * Log a registry event
      */
-    public void logRegistryEvent(String eventType, String machineId, Map<String, Object> details) {
+    public void logRegistryEvent(String source, String eventType, String machineId, Map<String, Object> details) {
         if (!isEnabled.get()) return;
         
         String category;
@@ -241,7 +265,7 @@ public class EventStore {
         EventLogEntry event = new EventLogEntry.Builder()
             .eventCategory(category)
             .eventType(eventType)
-            .source("Registry")
+            .source(source)
             .destination("StateMachine:" + machineId)
             .machineId(machineId)
             .eventDetails(details)
@@ -253,7 +277,7 @@ public class EventStore {
     /**
      * Log a timeout event
      */
-    public void logTimeoutEvent(String machineId, String currentState, String targetState, 
+    public void logTimeoutEvent(String source, String machineId, String currentState, String targetState, 
                                 long timeoutDuration) {
         if (!isEnabled.get()) return;
         
@@ -265,12 +289,34 @@ public class EventStore {
         EventLogEntry event = new EventLogEntry.Builder()
             .eventCategory(EventLogEntry.Category.TIMEOUT)
             .eventType("TIMEOUT_FIRED")
-            .source("TimeoutManager")
+            .source(source)
             .destination("StateMachine:" + machineId)
             .machineId(machineId)
             .stateBefore(currentState)
             .stateAfter(targetState)
             .eventDetails(details)
+            .build();
+        
+        logEvent(event);
+    }
+    
+    /**
+     * Log an entry action execution
+     */
+    public void logEntryAction(String source, String machineId, String state, 
+                               String actionType, Map<String, Object> details) {
+        if (!isEnabled.get()) return;
+        
+        EventLogEntry event = new EventLogEntry.Builder()
+            .eventCategory("ENTRY_ACTION")
+            .eventType(actionType)
+            .source(source)
+            .destination("StateMachine:" + machineId)
+            .machineId(machineId)
+            .stateBefore(state)
+            .stateAfter(state)
+            .eventDetails(details)
+            .success(true)
             .build();
         
         logEvent(event);

@@ -114,8 +114,48 @@ public class CallMachineRunnerProper {
     public void sendEvent(String machineId, StateMachineEvent event) {
         GenericStateMachine<CallContext, Void> machine = machines.get(machineId);
         if (machine != null) {
+            String oldState = machine.getCurrentState();
             machine.fire(event);
+            String newState = machine.getCurrentState();
             System.out.println("[Event] Sent " + event.getClass().getSimpleName() + " to " + machineId);
+            
+            // Check if we transitioned to CONNECTED state (entry action)
+            if (event instanceof Answer && CallState.CONNECTED.name().equals(newState) && !CallState.CONNECTED.name().equals(oldState)) {
+                CallContext context = contexts.get(machineId);
+                if (context != null) {
+                    // Entry action for CONNECTED state - log call connection details
+                    System.out.println("📞 [Entry Action] Call connected for " + machineId);
+                    
+                    // Set call start time
+                    context.setCallStartTime(LocalDateTime.now());
+                    
+                    // Calculate ring duration
+                    long ringDuration = System.currentTimeMillis() - context.getLastStateChangeTime();
+                    context.setRingDuration(ringDuration);
+                    
+                    // Log connection metrics
+                    Map<String, Object> connectionDetails = new HashMap<>();
+                    connectionDetails.put("callerId", context.getCallerId());
+                    connectionDetails.put("calleeId", context.getCalleeId());
+                    connectionDetails.put("ringCount", context.getRingCount());
+                    connectionDetails.put("ringDurationMs", ringDuration);
+                    connectionDetails.put("connectionTime", LocalDateTime.now().toString());
+                    connectionDetails.put("callQuality", "HD"); // Simulated quality
+                    connectionDetails.put("codec", "G.722"); // Simulated codec
+                    connectionDetails.put("billingRate", 0.05); // Simulated rate per minute
+                    
+                    // Log to event store if available
+                    if (registry.isDebugEnabled() && com.telcobright.statemachine.eventstore.EventStore.getInstance() != null) {
+                        com.telcobright.statemachine.eventstore.EventStore.getInstance()
+                                .logEntryAction("CallMachineRunnerProper", machineId,
+                                        CallState.CONNECTED.name(), "CALL_CONNECTED", connectionDetails);
+                    }
+                    
+                    System.out.println("   ✓ Ring duration: " + ringDuration + "ms");
+                    System.out.println("   ✓ Ring count: " + context.getRingCount());
+                    System.out.println("   ✓ Call quality: HD");
+                }
+            }
         } else {
             System.err.println("[Event] Machine not found: " + machineId);
         }

@@ -257,7 +257,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 details.put("isFinal", config.isFinal());
                 details.put("hasTimeout", config.hasTimeout());
             }
-            EventStore.getInstance().logStateChange(id, oldState, newState, details, processingTime);
+            EventStore.getInstance().logStateChange("GenericStateMachine", id, oldState, newState, details, processingTime);
         }
         
         // Print current state after transition
@@ -528,7 +528,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                     
                     // Log timeout event to EventStore if debug is enabled
                     if (isDebugEnabled() && EventStore.getInstance() != null) {
-                        EventStore.getInstance().logTimeoutEvent(id, currentState, targetState, timeoutMillis);
+                        EventStore.getInstance().logTimeoutEvent("TimeoutManager", id, currentState, targetState, timeoutMillis);
                     }
                     
                     // Fire timeout event

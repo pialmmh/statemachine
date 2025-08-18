@@ -65,8 +65,14 @@ public class CallContext implements StateMachineContextEntity<String> {
     @Column("partition_key")
     private String partitionKey; // For sharding - based on callId
     
+    // Additional fields for entry action tracking
+    private LocalDateTime callStartTime;
+    private long ringDuration;
+    private long lastStateChangeTime;
+    
     public CallContext() {
         this.sessionEvents = new ArrayList<>();
+        this.lastStateChangeTime = System.currentTimeMillis();
     }
     
     public CallContext(String callId, String fromNumber, String toNumber) {
@@ -222,6 +228,7 @@ public class CallContext implements StateMachineContextEntity<String> {
     public void setCurrentState(String currentState) { 
         this.currentState = currentState;
         this.lastStateChange = LocalDateTime.now();
+        this.lastStateChangeTime = System.currentTimeMillis();
     }
     
     @Override
@@ -255,6 +262,39 @@ public class CallContext implements StateMachineContextEntity<String> {
     
     public void setPartitionKey(String partitionKey) { 
         this.partitionKey = partitionKey; 
+    }
+    
+    // Methods for entry action tracking
+    public String getCallerId() {
+        return fromNumber;
+    }
+    
+    public String getCalleeId() {
+        return toNumber;
+    }
+    
+    public LocalDateTime getCallStartTime() {
+        return callStartTime;
+    }
+    
+    public void setCallStartTime(LocalDateTime callStartTime) {
+        this.callStartTime = callStartTime;
+    }
+    
+    public long getRingDurationMs() {
+        return ringDuration;
+    }
+    
+    public void setRingDuration(long ringDuration) {
+        this.ringDuration = ringDuration;
+    }
+    
+    public long getLastStateChangeTime() {
+        return lastStateChangeTime;
+    }
+    
+    public void setLastStateChangeTime(long lastStateChangeTime) {
+        this.lastStateChangeTime = lastStateChangeTime;
     }
     
     @Override

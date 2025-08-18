@@ -10,6 +10,80 @@ body {
   color: #333;
 }
 
+.app {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #374151 0%, #4b5563 50%, #374151 100%);
+  color: white;
+  padding: 8px 15px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-title {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-subtitle {
+  font-size: 11px;
+  opacity: 0.85;
+  white-space: nowrap;
+  padding-left: 10px;
+  margin-top: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.tab-navigation {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-button {
+  padding: 5px 12px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.tab-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tab-button.active {
+  background-color: rgba(255, 255, 255, 0.95);
+  color: #374151;
+  border-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.app-content {
+  background-color: white;
+  min-height: calc(100vh - 45px);
+}
+
 .navbar {
   background: #2c3e50;
   color: white;
@@ -105,13 +179,14 @@ body {
 }
 
 .sidebar-header {
-  background: #34495e;
-  color: white;
+  background: white;
+  color: #495057;
   padding: 1rem;
   font-weight: 500;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid #dee2e6;
 }
 
 .sidebar-body {
@@ -212,10 +287,11 @@ body {
 }
 
 .panel-header {
-  background: #34495e;
-  color: white;
+  background: white;
+  color: #495057;
   padding: 1rem 1.5rem;
   font-weight: 500;
+  border-bottom: 1px solid #dee2e6;
 }
 
 .panel-body {

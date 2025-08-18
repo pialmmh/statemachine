@@ -17,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import com.telcobright.statemachine.eventstore.EventStore;
 import com.telcobright.statemachine.eventstore.EventLogEntry;
+import java.time.LocalDate;
 
 /**
  * WebSocket server for real-time state machine monitoring
@@ -30,6 +31,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
     private final Gson gson;
     private final AbstractStateMachineRegistry registry;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final EventStore eventStore = EventStore.getInstance();
     
     public StateMachineWebSocketServer(int port, AbstractStateMachineRegistry registry) {
         super(new InetSocketAddress(port));
@@ -66,7 +68,19 @@ public class StateMachineWebSocketServer extends WebSocketServer
     @Override
     public void onMessage(WebSocket conn, String message) {
         try {
-            JsonObject request = gson.fromJson(message, JsonObject.class);
+            // Skip empty or malformed messages
+            if (message == null || message.trim().isEmpty()) {
+                return;
+            }
+            
+            JsonObject request;
+            try {
+                request = gson.fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                // Log and skip malformed JSON
+                System.err.println("[WS] Failed to parse message as JSON: " + message.substring(0, Math.min(message.length(), 100)));
+                return;
+            }
             
             // Handle messages from Live Mode UI
             if (request.has("type") && "EVENT".equals(request.get("type").getAsString())) {
@@ -106,6 +120,14 @@ public class StateMachineWebSocketServer extends WebSocketServer
                         // Send current state of all machines
                         sendCompleteStatus(conn);
                         break;
+                    case "GET_EVENTS":
+                        // Get events from EventStore
+                        handleGetEvents(conn, request);
+                        break;
+                    case "LOG":
+                        // Handle log messages from React app
+                        handleLogMessage(request);
+                        break;
                     default:
                         System.out.println("[WS] Unknown action: " + action);
                 }
@@ -124,6 +146,47 @@ public class StateMachineWebSocketServer extends WebSocketServer
     public void onStart() {
         // Server started successfully
         // Periodic updates disabled - updates only on connect and events
+    }
+    
+    private void handleLogMessage(JsonObject logData) {
+        try {
+            // Extract log information
+            String source = logData.has("source") ? logData.get("source").getAsString() : "unknown";
+            String direction = logData.has("direction") ? logData.get("direction").getAsString() : null;
+            String timestamp = logData.has("timestamp") ? logData.get("timestamp").getAsString() : null;
+            String selectedMachine = logData.has("selectedMachine") ? logData.get("selectedMachine").getAsString() : null;
+            
+            // Convert JsonObject to Map for event data
+            Map<String, Object> eventData = new HashMap<>();
+            if (logData.has("eventData") && logData.get("eventData").isJsonObject()) {
+                JsonObject eventJson = logData.getAsJsonObject("eventData");
+                for (String key : eventJson.keySet()) {
+                    eventData.put(key, gson.toJson(eventJson.get(key)));
+                }
+            }
+            
+            // Create EventStore entry for React app logs
+            if (eventStore != null && eventStore.isEnabled()) {
+                String eventType = direction != null ? "WEBSOCKET_" + direction.toUpperCase() : "WEBSOCKET_LOG";
+                String destination = direction != null && direction.equals("sent") ? 
+                    "WebSocketServer" : "react_app";
+                String sourceStr = direction != null && direction.equals("sent") ? 
+                    "react_app" : "WebSocketServer";
+                
+                eventStore.logWebSocketEvent(
+                    sourceStr,
+                    destination,
+                    eventType,
+                    "CLIENT_LOG",
+                    eventData,
+                    selectedMachine,
+                    true,
+                    0
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("[WS] Error handling log message: " + e.getMessage());
+        }
     }
     
     // StateMachineListener implementation
@@ -201,7 +264,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
             details.put("entryActionStatus", machine != null ? machine.getEntryActionStatus() : "unknown");
             details.put("clientCount", connectedClients.size());
             
-            EventStore.getInstance().logWebSocketOut(machineId, eventType, oldState, newState, details);
+            EventStore.getInstance().logWebSocketOut("StateMachineWebSocketServer", machineId, eventType, oldState, newState, details);
         }
     }
     
@@ -325,7 +388,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
                     
                     // Log successful event to EventStore
                     if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-                        EventStore.getInstance().logWebSocketIn(clientAddress, machineId, eventType, 
+                        EventStore.getInstance().logWebSocketIn("StateMachineWebSocketServer", clientAddress, machineId, eventType, 
                             eventPayload, true, null);
                     }
                 } else {
@@ -333,7 +396,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
                     
                     // Log error to EventStore
                     if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-                        EventStore.getInstance().logWebSocketIn(clientAddress, machineId, eventType, 
+                        EventStore.getInstance().logWebSocketIn("StateMachineWebSocketServer", clientAddress, machineId, eventType, 
                             eventPayload, false, "Could not create event instance");
                     }
                 }
@@ -344,7 +407,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
                 
                 // Log error to EventStore
                 if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-                    EventStore.getInstance().logWebSocketIn(clientAddress, machineId, eventType, 
+                    EventStore.getInstance().logWebSocketIn("StateMachineWebSocketServer", clientAddress, machineId, eventType, 
                         eventPayload, false, e.getMessage());
                 }
                 
@@ -496,6 +559,121 @@ public class StateMachineWebSocketServer extends WebSocketServer
             this.stop();
         } catch (Exception e) {
             System.err.println("Error during WebSocket server shutdown: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handle GET_EVENTS request from client
+     */
+    private void handleGetEvents(WebSocket conn, JsonObject request) {
+        try {
+            // Parse request parameters
+            int page = request.has("page") ? request.get("page").getAsInt() : 1;
+            int pageSize = request.has("pageSize") ? request.get("pageSize").getAsInt() : 50;
+            String dateStr = request.has("date") ? request.get("date").getAsString() : null;
+            String machineId = request.has("machineId") ? request.get("machineId").getAsString() : null;
+            String category = request.has("category") ? request.get("category").getAsString() : null;
+            
+            // Default to today if no date specified
+            LocalDate date = dateStr != null ? LocalDate.parse(dateStr) : LocalDate.now();
+            
+            // Check if EventStore is initialized
+            if (!EventStore.isInitialized()) {
+                JsonObject error = new JsonObject();
+                error.addProperty("type", "EVENTS_ERROR");
+                error.addProperty("error", "EventStore not initialized");
+                conn.send(gson.toJson(error));
+                return;
+            }
+            
+            // Get events from EventStore
+            List<EventLogEntry> allEvents = EventStore.getInstance().readEvents(date);
+            
+            // Filter events if needed
+            if (machineId != null && !machineId.isEmpty()) {
+                allEvents = allEvents.stream()
+                    .filter(e -> machineId.equals(e.getMachineId()))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            if (category != null && !category.isEmpty()) {
+                allEvents = allEvents.stream()
+                    .filter(e -> category.equals(e.getEventCategory()))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            // Calculate pagination
+            int totalEvents = allEvents.size();
+            int totalPages = (int) Math.ceil((double) totalEvents / pageSize);
+            int startIndex = (page - 1) * pageSize;
+            int endIndex = Math.min(startIndex + pageSize, totalEvents);
+            
+            // Get page of events
+            List<EventLogEntry> pageEvents = startIndex < totalEvents ? 
+                allEvents.subList(startIndex, endIndex) : new ArrayList<>();
+            
+            // Convert events to JSON
+            JsonArray eventsArray = new JsonArray();
+            for (EventLogEntry event : pageEvents) {
+                JsonObject eventJson = new JsonObject();
+                eventJson.addProperty("id", event.getId());
+                eventJson.addProperty("timestamp", event.getFormattedTimestamp());
+                eventJson.addProperty("source", event.getSource());
+                eventJson.addProperty("destination", event.getDestination());
+                eventJson.addProperty("eventType", event.getEventType());
+                eventJson.addProperty("eventCategory", event.getEventCategory());
+                eventJson.addProperty("machineId", event.getMachineId());
+                eventJson.addProperty("stateBefore", event.getStateBefore());
+                eventJson.addProperty("stateAfter", event.getStateAfter());
+                eventJson.addProperty("success", event.isSuccess());
+                eventJson.addProperty("errorMessage", event.getErrorMessage());
+                eventJson.addProperty("processingTimeMs", event.getProcessingTimeMs());
+                
+                // Add event details as JSON
+                if (event.getEventDetails() != null) {
+                    eventJson.add("details", gson.toJsonTree(event.getEventDetails()));
+                }
+                
+                eventsArray.add(eventJson);
+            }
+            
+            // Create response
+            JsonObject response = new JsonObject();
+            response.addProperty("type", "EVENTS_DATA");
+            response.add("events", eventsArray);
+            response.addProperty("page", page);
+            response.addProperty("pageSize", pageSize);
+            response.addProperty("totalEvents", totalEvents);
+            response.addProperty("totalPages", totalPages);
+            response.addProperty("date", date.toString());
+            
+            // Add available categories and machines for filtering
+            Set<String> categories = new HashSet<>();
+            Set<String> machines = new HashSet<>();
+            for (EventLogEntry event : allEvents) {
+                if (event.getEventCategory() != null) categories.add(event.getEventCategory());
+                if (event.getMachineId() != null) machines.add(event.getMachineId());
+            }
+            
+            JsonArray categoriesArray = new JsonArray();
+            categories.stream().sorted().forEach(categoriesArray::add);
+            response.add("availableCategories", categoriesArray);
+            
+            JsonArray machinesArray = new JsonArray();
+            machines.stream().sorted().forEach(machinesArray::add);
+            response.add("availableMachines", machinesArray);
+            
+            // Send response
+            conn.send(gson.toJson(response));
+            
+        } catch (Exception e) {
+            System.err.println("[WS] Error handling GET_EVENTS: " + e.getMessage());
+            e.printStackTrace();
+            
+            JsonObject error = new JsonObject();
+            error.addProperty("type", "EVENTS_ERROR");
+            error.addProperty("error", e.getMessage());
+            conn.send(gson.toJson(error));
         }
     }
 }

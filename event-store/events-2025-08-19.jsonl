@@ -1,0 +1,1398 @@
+{
+  "id": "19d9d51a-f612-4c81-87a7-1bc3546910b2",
+  "timestamp": "2025-08-19T00:03:24.2556961",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 13
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0fd57931-f849-403d-a063-f8b3274ceb0b",
+  "timestamp": "2025-08-19T00:03:24.261318539",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "a9420f26-abeb-47a4-b788-024442fbd738",
+  "timestamp": "2025-08-19T00:03:54.256266632",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 13
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "c86fd315-7223-4de9-b47a-963338f203eb",
+  "timestamp": "2025-08-19T01:01:29.898678486",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 13
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "58c87520-6d00-4ea5-8529-f4f35b671fb3",
+  "timestamp": "2025-08-19T01:01:29.900818056",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ab0c6200-7ad8-4359-9b68-46d5e0871730",
+  "timestamp": "2025-08-19T01:01:59.898481878",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 13
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "9588b8db-441e-4e4e-bdc0-af2517778b81",
+  "timestamp": "2025-08-19T01:04:54.304902695",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 13
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b54e2b25-6ee5-49a8-9602-c9e0c6b07b2d",
+  "timestamp": "2025-08-19T01:04:54.306726618",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0831c1ea-1f02-4c6c-8227-e503f597fea0",
+  "timestamp": "2025-08-19T01:05:24.30479406",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 13
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "77f9879f-9149-4d8b-9603-2e94f7daed90",
+  "timestamp": "2025-08-19T01:20:31.586045081",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "c374238d-a3e2-4f92-9e62-f1e82f57f467",
+  "timestamp": "2025-08-19T01:20:31.587552407",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8f4c4a60-f8a4-4696-8d27-aaf9f628f6d5",
+  "timestamp": "2025-08-19T01:21:01.586494117",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "3be4f97b-af1c-4791-afc5-ddfbac2ee209",
+  "timestamp": "2025-08-19T01:22:35.03287032",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "f3caaf9e-13ed-4084-8ae2-d7f7e011f15d",
+  "timestamp": "2025-08-19T01:22:35.033504787",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "4977f373-f262-47f4-9adb-82d6f49069ce",
+  "timestamp": "2025-08-19T01:22:38.283376135",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "d9375454-5ed4-4c4a-8d78-86fa1e26f5ff",
+  "timestamp": "2025-08-19T01:22:38.68267766",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "26dbae8d-4a19-4963-aae7-7d1a70407d6e",
+  "timestamp": "2025-08-19T01:22:38.897219811",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "e57e3702-6a61-4bc3-b145-823a6067af71",
+  "timestamp": "2025-08-19T01:22:39.208999075",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ae15aded-f604-47ec-b4a6-117616e2c864",
+  "timestamp": "2025-08-19T01:22:39.432798439",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "28e3ca50-7231-40b9-b46c-9e8889b475df",
+  "timestamp": "2025-08-19T01:22:39.626751483",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "d40ec8bf-3d4f-4d50-aa1b-07406f542cba",
+  "timestamp": "2025-08-19T01:22:39.763010424",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "402b47ec-c133-4f77-aca6-f4af3c603e03",
+  "timestamp": "2025-08-19T01:22:39.930656891",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "a7d19bd8-dfe1-4624-991c-1eb315dcce80",
+  "timestamp": "2025-08-19T01:22:40.234960953",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "3afc43d9-dbf6-4589-9a93-5888c7742721",
+  "timestamp": "2025-08-19T01:22:40.450453148",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "4a92376a-590c-4aef-98d7-652343cdcdd5",
+  "timestamp": "2025-08-19T01:22:40.722597193",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ea20b0fd-5ba5-455d-b816-581ba206a3e5",
+  "timestamp": "2025-08-19T01:22:40.955032714",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "349ddb86-0f54-4f5f-81f3-4a11942cda80",
+  "timestamp": "2025-08-19T01:23:05.033071865",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "7a3027a9-6750-421f-b26e-fa86472c6957",
+  "timestamp": "2025-08-19T01:29:39.350456892",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "6fd5328a-1924-4dbd-9974-dab54c16f029",
+  "timestamp": "2025-08-19T01:29:39.351798338",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "351d0365-fa94-41f1-abf4-14ecc92af200",
+  "timestamp": "2025-08-19T01:30:09.351177878",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "1002c669-af9e-452f-9a96-5d3ac889cc0c",
+  "timestamp": "2025-08-19T01:33:41.177779699",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b6ef909a-834f-4c2b-8b5a-064708d85d0b",
+  "timestamp": "2025-08-19T01:33:41.178284255",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "63f9ed4d-e327-4705-bc4b-7e5c86cfd6bc",
+  "timestamp": "2025-08-19T01:33:45.174155004",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "f280adfd-3e67-41d8-b186-457158b8cad2",
+  "timestamp": "2025-08-19T01:33:45.36679391",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "4b6c8e59-4b59-4b80-81d0-62c3130a306d",
+  "timestamp": "2025-08-19T01:34:11.177930598",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ee9fe4b4-ee6b-4aa2-9b9b-1825494568b8",
+  "timestamp": "2025-08-19T01:53:00.191029386",
+  "source": "StateMachineWebSocketServer:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0f1e9425-1f9c-41be-89cd-abefe03e6166",
+  "timestamp": "2025-08-19T01:53:00.200923272",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-001",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "274e19d1-77b1-4318-999f-bf3aaa9fbe13",
+  "timestamp": "2025-08-19T01:53:00.20355522",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b826a9cb-1dd2-408f-85c4-084bea940f98",
+  "timestamp": "2025-08-19T01:53:00.204511465",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-002",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "51721f76-ab32-4325-98a1-b13af3b15e62",
+  "timestamp": "2025-08-19T01:53:00.206576509",
+  "source": "StateMachineWebSocketServer:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "5b2d9895-feec-4cdc-a407-52a46301c5fe",
+  "timestamp": "2025-08-19T01:53:00.207625053",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-003",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8828f887-312b-45d2-8f5e-0f8ec36acd03",
+  "timestamp": "2025-08-19T02:09:40.366837423",
+  "source": "StateMachineWebSocketServer:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 1
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "781afbd1-38af-42dd-9559-fd3f334663ea",
+  "timestamp": "2025-08-19T02:09:40.374086019",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-001",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "433d3a0c-2b19-4f75-9ef2-c663c6ced8e9",
+  "timestamp": "2025-08-19T02:09:40.376588022",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 1
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "16bdf612-acca-41c0-9867-d6dc5abb1a3a",
+  "timestamp": "2025-08-19T02:09:40.377479253",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-002",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "f303cf36-b8ce-4507-927a-b3f8a446aefd",
+  "timestamp": "2025-08-19T02:09:40.379429967",
+  "source": "StateMachineWebSocketServer:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 1
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "697cccf8-2ad1-46ef-a86e-2d84954f70de",
+  "timestamp": "2025-08-19T02:09:40.380707042",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-003",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "5e5ed3df-604c-466b-9c87-eb8b11cc988c",
+  "timestamp": "2025-08-19T02:11:26.158567187",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b1a6197c-8228-4b72-acda-860eb57100c0",
+  "timestamp": "2025-08-19T02:11:26.160460728",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0d5e2e9c-f353-43fe-be50-0ef04834c5c5",
+  "timestamp": "2025-08-19T02:11:56.156688522",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b44b0395-9eba-4818-92be-d6d3e8de5d25",
+  "timestamp": "2025-08-19T02:35:31.458251151",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "a78bb2ee-dfab-4772-adb3-f42aceabe61c",
+  "timestamp": "2025-08-19T02:35:31.460636178",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "dc63b185-52ec-473f-bad5-45f54c7a7f0f",
+  "timestamp": "2025-08-19T02:36:01.45815073",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "40e06fd6-4f79-4ec5-a708-4f4a78bdcb46",
+  "timestamp": "2025-08-19T02:41:20.814175756",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8ddd1a09-acaa-4417-9669-0a788728370b",
+  "timestamp": "2025-08-19T02:41:20.815172735",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "43c61a12-abcb-45b6-ac42-d5b38bc48edb",
+  "timestamp": "2025-08-19T02:41:50.814189117",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ac05869b-09d5-45ed-9273-d9249f7dfc85",
+  "timestamp": "2025-08-19T02:47:29.394069391",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0ad4445c-b4d4-4794-af83-6cc569161b44",
+  "timestamp": "2025-08-19T02:47:29.397222041",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "1a9d6d74-ca2c-450e-8ce6-08e1839f7784",
+  "timestamp": "2025-08-19T02:47:59.392798245",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8ce01860-129e-4422-9b4f-a7ea4cb1b349",
+  "timestamp": "2025-08-19T02:50:59.619467145",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "a0f7d5e1-0efd-421e-b87b-ec650956702f",
+  "timestamp": "2025-08-19T02:50:59.620603056",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b4e99d97-a5d6-47b7-9dc4-e92c6c802ae4",
+  "timestamp": "2025-08-19T02:51:29.619587573",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 11
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "3099ee6d-968e-4c94-9cf5-1691b739cfd8",
+  "timestamp": "2025-08-19T02:57:08.071277754",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "bc43d0a7-0c38-4449-a92c-d91e7910902f",
+  "timestamp": "2025-08-19T02:57:08.072747427",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "34cf2c39-d899-4c46-a19f-b78fd5476776",
+  "timestamp": "2025-08-19T02:57:38.071549184",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "11ecbaeb-b7a9-46ac-a845-6f5bd742dc83",
+  "timestamp": "2025-08-19T03:04:52.363434276",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 9
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "115df4a4-f264-46ab-b803-600be3d9bab4",
+  "timestamp": "2025-08-19T03:04:52.364081818",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "5976979a-e544-41e3-b251-61b20c574a51",
+  "timestamp": "2025-08-19T03:05:22.363701903",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 9
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "1ecc9b01-48ec-451f-b602-b9a7a1a20cc2",
+  "timestamp": "2025-08-19T03:07:42.248093567",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "6125efbd-4b52-47d2-b36d-1dabbde40820",
+  "timestamp": "2025-08-19T03:07:42.249373382",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "d8ad9e41-b6dc-46b7-8257-83b934a07f23",
+  "timestamp": "2025-08-19T03:08:12.248675078",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "adefc504-6daf-4892-ba0d-ca459a8e1bee",
+  "timestamp": "2025-08-19T03:13:32.405729416",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "c2214dca-c9f5-4b9a-b900-4e6c3ba5f955",
+  "timestamp": "2025-08-19T03:13:32.406143995",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "bac27948-0bb8-4fbc-a4a9-9b858a1d5c13",
+  "timestamp": "2025-08-19T03:14:02.406716553",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "3a92412e-36c9-4127-83ca-496ba0ef91c3",
+  "timestamp": "2025-08-19T03:16:50.448388152",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ffb732d4-1273-4aa8-9a87-b9a2814f3a50",
+  "timestamp": "2025-08-19T03:16:50.449496837",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "9694afa0-a351-4b88-bd89-b642e1dc0b1d",
+  "timestamp": "2025-08-19T03:16:56.151527329",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "85f97a80-2350-4dce-b14c-864dbb44510f",
+  "timestamp": "2025-08-19T03:17:08.391253673",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0e7fb182-bd93-4eaf-b8a1-40765f244c32",
+  "timestamp": "2025-08-19T03:17:20.448890836",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "f4c34722-50bf-4709-b351-402f884bf8ca",
+  "timestamp": "2025-08-19T03:20:31.554482074",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0a0a8833-488e-4ea6-be0a-246519cb7a5f",
+  "timestamp": "2025-08-19T03:20:31.555491934",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "14bb14b7-fab0-43a4-9c53-5edde5796781",
+  "timestamp": "2025-08-19T03:21:01.554947482",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "f477bbbc-7f94-4c70-80c8-70f5bc9a6d00",
+  "timestamp": "2025-08-19T03:21:21.322470401",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "51e307ea-0776-4a9d-b8a0-8c275b6310b8",
+  "timestamp": "2025-08-19T03:21:21.323385668",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "07483787-f481-4aab-a299-7dec4bd2fbf3",
+  "timestamp": "2025-08-19T03:21:51.322540595",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "2b971182-a4eb-48a6-886b-f154a9cc1a88",
+  "timestamp": "2025-08-19T03:26:24.149793304",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 7
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "e3eef1e1-6fa7-428b-beda-39e5804d2ede",
+  "timestamp": "2025-08-19T03:26:24.150266037",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}

@@ -82,7 +82,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             details.put("machineClass", machine.getClass().getSimpleName());
             details.put("currentState", machine.getCurrentState());
             details.put("debugEnabled", machine.isDebugEnabled());
-            EventStore.getInstance().logRegistryEvent("CREATE", id, details);
+            EventStore.getInstance().logRegistryEvent("StateMachineRegistry", "CREATE", id, details);
         }
         
         // Send event metadata update if WebSocket server is running
@@ -106,7 +106,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
                 details.put("lastState", machine.getCurrentState());
                 details.put("wasComplete", machine.isComplete());
             }
-            EventStore.getInstance().logRegistryEvent("REMOVE", id, details);
+            EventStore.getInstance().logRegistryEvent("StateMachineRegistry", "REMOVE", id, details);
         }
     }
     
@@ -322,7 +322,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             Map<String, Object> details = new HashMap<>();
             details.put("contextClass", contextClass.getSimpleName());
             details.put("currentState", machine.getCurrentState());
-            EventStore.getInstance().logRegistryEvent("REHYDRATE", machineId, details);
+            EventStore.getInstance().logRegistryEvent("StateMachineRegistry", "REHYDRATE", machineId, details);
         }
         
         return context;

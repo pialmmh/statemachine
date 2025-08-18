@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import './MonitoringApp.css';
 import LiveHistoryDisplay from './components/LiveHistoryDisplay';
 
-function MonitoringApp() {
-  const [currentMode, setCurrentMode] = useState('snapshot');
+function MonitoringApp({ mode = 'snapshot' }) {
+  const [currentMode, setCurrentMode] = useState(mode);
   const [runs, setRuns] = useState([]);
   const [selectedRun, setSelectedRun] = useState(null);
   const [history, setHistory] = useState([]);
@@ -23,6 +23,17 @@ function MonitoringApp() {
   const hasReceivedInitialState = useRef(false);
   const countdownIntervalRef = useRef(null);
   const selectedMachineRef = useRef(null);
+
+  // Update currentMode when prop changes
+  useEffect(() => {
+    setCurrentMode(mode);
+  }, [mode]);
+  
+  // Keep selectedMachineRef in sync with selectedMachine
+  useEffect(() => {
+    selectedMachineRef.current = selectedMachine;
+    console.log('Updated selectedMachineRef to:', selectedMachine);
+  }, [selectedMachine]);
 
   useEffect(() => {
     loadRuns();
@@ -157,12 +168,37 @@ function MonitoringApp() {
     return [];
   };
 
+  // Helper function to log WebSocket events back to server
+  const logWebSocketEvent = (direction, eventData) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        const logMessage = {
+          type: 'LOG',
+          source: 'react_app',
+          direction: direction, // 'sent' or 'received'
+          timestamp: new Date().toISOString(),
+          selectedMachine: selectedMachineRef.current,
+          eventData: eventData
+        };
+        wsRef.current.send(JSON.stringify(logMessage));
+      } catch (error) {
+        console.error('Error logging WebSocket event:', error);
+      }
+    }
+  };
+
   // Helper function to safely send WebSocket messages
   const sendWebSocketMessage = (message) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
         const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
         wsRef.current.send(messageStr);
+        
+        // Log the sent message (but not if it's already a LOG message)
+        if (typeof message === 'object' && message.type !== 'LOG') {
+          logWebSocketEvent('sent', message);
+        }
+        
         return true;
       } catch (error) {
         console.error('Error sending WebSocket message:', error);
@@ -204,6 +240,18 @@ function MonitoringApp() {
 
       wsRef.current.onmessage = (event) => {
         console.log('Raw WebSocket message:', event.data);
+        
+        // Log received message (but not LOG messages to avoid loops)
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type !== 'LOG') {
+            logWebSocketEvent('received', data);
+          }
+        } catch (e) {
+          // If not JSON, still log it
+          logWebSocketEvent('received', { rawData: event.data });
+        }
+        
         handleWebSocketMessage(event.data);
       };
 
@@ -264,11 +312,15 @@ function MonitoringApp() {
       // Handle machine list
       if (data.type === 'MACHINES_LIST') {
         const machines = data.machines || [];
+        console.log('MACHINES_LIST received:', machines.map(m => m.id));
         setLiveMachines(machines);
         // Auto-select first machine if none selected
         if (machines.length > 0 && !selectedMachine) {
+          console.log('Auto-selecting first machine:', machines[0].id);
           setSelectedMachine(machines[0].id);
           selectedMachineRef.current = machines[0].id;  // Update ref
+        } else if (selectedMachine) {
+          console.log('Machine already selected:', selectedMachine);
         }
       } else if (data.type === 'MACHINE_REGISTERED') {
         // Add new machine to list
@@ -283,9 +335,9 @@ function MonitoringApp() {
         console.log('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);
         setLiveState(data.currentState || 'IDLE');
         
-        // If we have context and haven't received initial state yet
-        if (data.context && !hasReceivedInitialState.current) {
-          console.log('Adding initial state with context:', data.context);
+        // If we haven't received initial state yet, add it
+        if (!hasReceivedInitialState.current) {
+          console.log('Adding initial state');
           hasReceivedInitialState.current = true;
           
           // Add initial state to history
@@ -383,6 +435,39 @@ function MonitoringApp() {
             }
           }
         }
+      } else if (data.type === 'EVENT_SENT') {
+        // Track the event that was sent to the state machine
+        console.log('EVENT_SENT received:', data);
+        
+        // Add event to history as a separate entry
+        setLiveHistory(prev => {
+          const updated = [...(Array.isArray(prev) ? prev : [])];
+          const event = {
+            stepNumber: updated.length + 1,
+            fromState: data.currentState || liveState,
+            toState: data.currentState || liveState, // Event doesn't change state yet
+            event: data.eventType || 'Unknown Event',
+            eventSent: true, // Mark this as an event that was sent
+            timestamp: data.timestamp || new Date().toISOString(),
+            duration: 0,
+            eventData: data.payload || {},
+            entryActionStatus: 'none',
+            contextBefore: {
+              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
+              volatileContext: {}
+            },
+            contextAfter: {
+              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
+              volatileContext: {}
+            }
+          };
+          
+          console.log('Adding event to history:', event.event);
+          updated.push(event);
+          return updated;
+        });
       } else if (data.type === 'STATE_CHANGE') {
         console.log('STATE_CHANGE received for machine:', data.machineId);
         console.log('Currently selected machine (ref):', selectedMachineRef.current);
@@ -390,7 +475,7 @@ function MonitoringApp() {
         
         // Only process state changes for the selected machine (use ref to avoid closure issues)
         if (data.machineId !== selectedMachineRef.current) {
-          console.log('Ignoring state change for non-selected machine');
+          console.log(`Ignoring state change: machineId=${data.machineId}, selected=${selectedMachineRef.current}`);
           return;
         }
         
@@ -418,40 +503,45 @@ function MonitoringApp() {
         setLiveHistory(prev => {
           const updated = [...(Array.isArray(prev) ? prev : [])];
           
-          // If this is the first transition and we're going from IDLE, ensure we have the initial state
-          if (updated.length === 0 && data.stateBefore === 'IDLE') {
-            // Add the initial IDLE state first
-            updated.push({
-              stepNumber: 1,
-              fromState: 'Initial',
-              toState: 'IDLE',
-              event: 'Initial State',
-              timestamp: new Date().toISOString(),
-              duration: 0,
-              eventData: {},
-              contextBefore: {
-                registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-                persistentContext: {},
-                volatileContext: {}
-              },
-              contextAfter: {
-                registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-                persistentContext: {},
-                volatileContext: {}
-              }
-            });
-          }
+          // Don't add initial state here - let COMPLETE_STATUS handle it
+          // Just add the actual state transition
           
           // Get the previous context (from last transition's contextAfter)
           const previousContext = updated.length > 0 
             ? updated[updated.length - 1].contextAfter.persistentContext 
             : {};
           
+          // Check if we already have this exact transition to avoid duplicates
+          const isDuplicate = updated.some(t => 
+            t.fromState === (data.stateBefore || data.oldState) && 
+            t.toState === (data.stateAfter || data.newState)
+          );
+          
+          if (isDuplicate) {
+            console.log('Duplicate transition detected, skipping:', data.stateBefore, '->', data.stateAfter);
+            return updated;
+          }
+          
+          // Detect timeout transitions by pattern
+          const fromState = data.stateBefore || data.oldState || 'UNKNOWN';
+          const toState = data.stateAfter || data.newState || 'UNKNOWN';
+          let eventName = data.eventName || 'State Change';
+          
+          // Common timeout patterns
+          if (!data.eventName) {
+            if (fromState === 'RINGING' && toState === 'IDLE') {
+              eventName = 'Timeout'; // RINGING timeout after 30s
+            } else if (fromState === 'CONNECTED' && toState === 'IDLE') {
+              eventName = 'Timeout'; // CONNECTED timeout after 120s
+            }
+          }
+          
           const transition = {
             stepNumber: updated.length + 1,
-            fromState: data.stateBefore || data.oldState || 'UNKNOWN',
-            toState: data.stateAfter || data.newState || 'UNKNOWN',
-            event: data.type === 'STATE_CHANGE' ? 'State Transition' : (data.eventName || 'Unknown'),
+            fromState: fromState,
+            toState: toState,
+            event: eventName,
+            stateChange: true, // Mark this as a state change
             timestamp: data.timestamp || new Date().toISOString(),
             duration: data.duration || 0,
             eventData: data.payload || {},
@@ -467,6 +557,9 @@ function MonitoringApp() {
               volatileContext: {}
             }
           };
+          
+          console.log('Adding transition:', transition.fromState, '->', transition.toState);
+          console.log('Current history length:', updated.length);
           updated.push(transition);
           return updated;
         });
@@ -550,6 +643,36 @@ function MonitoringApp() {
       
       if (sendWebSocketMessage(message)) {
         console.log('Event sent successfully');
+        
+        // Add event to history immediately
+        setLiveHistory(prev => {
+          const updated = [...(Array.isArray(prev) ? prev : [])];
+          const eventEntry = {
+            stepNumber: updated.length + 1,
+            fromState: liveState,
+            toState: liveState, // Event doesn't change state immediately
+            event: selectedEvent,
+            eventSent: true, // Mark this as an event that was sent
+            timestamp: new Date().toISOString(),
+            duration: 0,
+            eventData: payload,
+            entryActionStatus: 'none',
+            contextBefore: {
+              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
+              volatileContext: {}
+            },
+            contextAfter: {
+              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
+              volatileContext: {}
+            }
+          };
+          
+          console.log('Adding sent event to history:', eventEntry.event);
+          updated.push(eventEntry);
+          return updated;
+        });
       } else {
         alert('Failed to send event. WebSocket connection might be unstable.');
       }
@@ -585,32 +708,6 @@ function MonitoringApp() {
 
   return (
     <div className="monitoring-app">
-      <div className="header">
-        <div className="header-left">
-          <h1>📊 TelcoBright State Machine Monitoring</h1>
-          <p>Real-time monitoring of CallMachine and SmsMachine state transitions</p>
-        </div>
-        <div className="header-right">
-          <div className="mode-buttons">
-            <button 
-              className={`mode-btn ${currentMode === 'snapshot' ? 'active' : ''}`}
-              onClick={() => setCurrentMode('snapshot')}
-            >
-              📸 Snapshot Viewer
-            </button>
-            <button 
-              className={`mode-btn ${currentMode === 'live' ? 'active' : ''}`}
-              onClick={() => {
-                setCurrentMode('live');
-                switchToLiveMode();
-              }}
-            >
-              🔴 Live Viewer
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="container">
         <div className="left-panel">
           <div className="panel-header">
