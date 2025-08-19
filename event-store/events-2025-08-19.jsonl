@@ -1396,3 +1396,171 @@
   "success": true,
   "processingTimeMs": 0
 }
+{
+  "id": "461076db-8816-487d-b418-96c406987fe3",
+  "timestamp": "2025-08-19T03:26:54.150495876",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 7
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "945fa8b2-c88a-4198-a800-5326b16cc5b2",
+  "timestamp": "2025-08-19T03:26:57.919399061",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 7
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "42905530-cf41-43be-a6bf-f00c48b4b04b",
+  "timestamp": "2025-08-19T03:26:57.920643111",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "72ad12d1-9dc9-4508-b6e1-9cbbff114ea0",
+  "timestamp": "2025-08-19T03:27:27.919306386",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 7
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "07cffee6-ccb4-4a76-96b5-28d631f0320a",
+  "timestamp": "2025-08-19T03:30:31.602810051",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "8fb24c4e-8e9a-448b-9f58-10a437a93d29",
+  "timestamp": "2025-08-19T03:30:31.603785376",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "12c40061-b0a7-4ebb-afbf-2bf294732052",
+  "timestamp": "2025-08-19T03:31:01.602914578",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "ff13aaa3-5f8a-447f-916d-f75206c6317b",
+  "timestamp": "2025-08-19T23:40:10.187861587",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "IDLE",
+  "stateAfter": "RINGING",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "03fbcfca-81e0-4398-9e26-8ed4363d5e6c",
+  "timestamp": "2025-08-19T23:40:10.188618892",
+  "source": "StateMachineWebSocketServer:WebSocketClient",
+  "destination": "StateMachine:call-002",
+  "eventType": "INCOMING_CALL",
+  "eventCategory": "WEBSOCKET_IN",
+  "eventDetails": {
+    "phoneNumber": "+1-555-9999"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "49603e92-99ae-47da-984f-cdbf82004764",
+  "timestamp": "2025-08-19T23:40:40.18803879",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "STATE_CHANGE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "STATE_CHANGE",
+    "entryActionStatus": "none",
+    "clientCount": 5
+  },
+  "machineId": "call-002",
+  "stateBefore": "RINGING",
+  "stateAfter": "IDLE",
+  "success": true,
+  "processingTimeMs": 0
+}

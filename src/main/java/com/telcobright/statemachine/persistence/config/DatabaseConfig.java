@@ -233,4 +233,41 @@ public class DatabaseConfig {
     public void setAdditionalProperties(Properties additionalProperties) { 
         this.additionalProperties = additionalProperties; 
     }
+    
+    // MySQL specific getters
+    public long getValidationTimeout() { return validationTimeout; }
+    public void setValidationTimeout(long validationTimeout) { this.validationTimeout = validationTimeout; }
+    
+    public long getLeakDetectionThreshold() { return leakDetectionThreshold; }
+    public void setLeakDetectionThreshold(long leakDetectionThreshold) { this.leakDetectionThreshold = leakDetectionThreshold; }
+    
+    public boolean isCachePrepStmts() { return cachePrepStmts; }
+    public void setCachePrepStmts(boolean cachePrepStmts) { this.cachePrepStmts = cachePrepStmts; }
+    
+    public int getPrepStmtCacheSize() { return prepStmtCacheSize; }
+    public void setPrepStmtCacheSize(int prepStmtCacheSize) { this.prepStmtCacheSize = prepStmtCacheSize; }
+    
+    public int getPrepStmtCacheSqlLimit() { return prepStmtCacheSqlLimit; }
+    public void setPrepStmtCacheSqlLimit(int prepStmtCacheSqlLimit) { this.prepStmtCacheSqlLimit = prepStmtCacheSqlLimit; }
+    
+    public boolean isUseServerPrepStmts() { return useServerPrepStmts; }
+    public void setUseServerPrepStmts(boolean useServerPrepStmts) { this.useServerPrepStmts = useServerPrepStmts; }
+    
+    public boolean isUseLocalSessionState() { return useLocalSessionState; }
+    public void setUseLocalSessionState(boolean useLocalSessionState) { this.useLocalSessionState = useLocalSessionState; }
+    
+    public boolean isRewriteBatchedStatements() { return rewriteBatchedStatements; }
+    public void setRewriteBatchedStatements(boolean rewriteBatchedStatements) { this.rewriteBatchedStatements = rewriteBatchedStatements; }
+    
+    public boolean isCacheResultSetMetadata() { return cacheResultSetMetadata; }
+    public void setCacheResultSetMetadata(boolean cacheResultSetMetadata) { this.cacheResultSetMetadata = cacheResultSetMetadata; }
+    
+    public boolean isCacheServerConfiguration() { return cacheServerConfiguration; }
+    public void setCacheServerConfiguration(boolean cacheServerConfiguration) { this.cacheServerConfiguration = cacheServerConfiguration; }
+    
+    public boolean isElideSetAutoCommits() { return elideSetAutoCommits; }
+    public void setElideSetAutoCommits(boolean elideSetAutoCommits) { this.elideSetAutoCommits = elideSetAutoCommits; }
+    
+    public boolean isMaintainTimeStats() { return maintainTimeStats; }
+    public void setMaintainTimeStats(boolean maintainTimeStats) { this.maintainTimeStats = maintainTimeStats; }
 }

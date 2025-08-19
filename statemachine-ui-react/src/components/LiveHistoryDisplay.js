@@ -5,6 +5,10 @@ import TransitionDetailPanel from './TransitionDetailPanel';
 function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining }) {
   const [selectedTransition, setSelectedTransition] = useState(null);
 
+  console.log('LiveHistoryDisplay rendering with history:', liveHistory.map(t => 
+    `Step #${t.stepNumber}: ${t.fromState} -> ${t.toState} (${t.event})`
+  ));
+
   if (liveHistory.length === 0) {
     return null;
   }
@@ -121,8 +125,11 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining })
     // Add transitions
     // For state changes, add both outgoing and incoming
     if (transition.stateChange || transition.fromState !== transition.toState) {
+      console.log(`Processing state change: ${transition.fromState} -> ${transition.toState}, Step #${transition.stepNumber}`);
+      
       // Add outgoing transition to fromState
       if (fromInstanceKey && stateInstanceMap.has(fromInstanceKey)) {
+        console.log(`  Adding as outgoing to ${fromInstanceKey}`);
         stateInstanceMap.get(fromInstanceKey).transitions.push({
           ...transition,
           direction: 'outgoing'
@@ -131,6 +138,7 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining })
       
       // Add incoming transition to toState
       if (stateInstanceMap.has(toInstanceKey)) {
+        console.log(`  Adding as incoming to ${toInstanceKey}`);
         stateInstanceMap.get(toInstanceKey).transitions.push({
           ...transition,
           direction: 'incoming'

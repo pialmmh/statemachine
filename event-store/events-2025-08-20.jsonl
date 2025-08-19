@@ -1,0 +1,288 @@
+{
+  "id": "29d8846b-7765-47c3-aea8-81106913b130",
+  "timestamp": "2025-08-20T00:03:10.282630044",
+  "source": "StateMachineWebSocketServer:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "afb1bf55-da2a-4c49-aefa-aa425511de85",
+  "timestamp": "2025-08-20T00:03:10.291232502",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-001",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "628ec8ac-eef8-4110-be3f-a430b3b1b114",
+  "timestamp": "2025-08-20T00:03:10.295032592",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "aaf3d22f-e4d1-4756-9ab5-3cebb8825ad0",
+  "timestamp": "2025-08-20T00:03:10.295960015",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-002",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0b4d315c-5e6e-4a62-996d-1a02542642c1",
+  "timestamp": "2025-08-20T00:03:10.298608769",
+  "source": "StateMachineWebSocketServer:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "d9e1247b-c6a1-4693-b34e-8d30f717fb6b",
+  "timestamp": "2025-08-20T00:03:10.299723051",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-003",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "7b1fba43-a32a-4c7a-9c7c-f0aa895527dc",
+  "timestamp": "2025-08-20T00:04:59.496401936",
+  "source": "StateMachineWebSocketServer:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "0d8b8eb1-8174-42d1-a186-0c8f6fa15324",
+  "timestamp": "2025-08-20T00:04:59.50463456",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-001",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "34374ab4-dfd2-4e2b-ab3c-a567f7fef5e7",
+  "timestamp": "2025-08-20T00:04:59.508383127",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "b47a4391-ea3f-427c-8843-50150ccacbd7",
+  "timestamp": "2025-08-20T00:04:59.509254996",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-002",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "32666ff1-e295-490b-8a21-4c6775b2b292",
+  "timestamp": "2025-08-20T00:04:59.512300305",
+  "source": "StateMachineWebSocketServer:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "aee22302-464d-4929-90f6-e9a6e1dede24",
+  "timestamp": "2025-08-20T00:04:59.513262945",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-003",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "e3eef379-c12b-44ce-bff5-024b6d07ab32",
+  "timestamp": "2025-08-20T01:03:06.498327486",
+  "source": "StateMachineWebSocketServer:call-001",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "49703c91-00d2-4534-95d5-61397123e1a9",
+  "timestamp": "2025-08-20T01:03:06.505465622",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-001",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-001",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "705b498b-3a37-43a1-97b1-9cdb3de5b270",
+  "timestamp": "2025-08-20T01:03:06.50838614",
+  "source": "StateMachineWebSocketServer:call-002",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "f3e90f71-af02-40d2-9939-b64d44aea4e6",
+  "timestamp": "2025-08-20T01:03:06.509430265",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-002",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-002",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "c82798f3-2e51-4013-bced-46b164d31294",
+  "timestamp": "2025-08-20T01:03:06.512164735",
+  "source": "StateMachineWebSocketServer:call-003",
+  "destination": "WebSocketClients",
+  "eventType": "REGISTRY_CREATE",
+  "eventCategory": "WEBSOCKET_OUT",
+  "eventDetails": {
+    "eventType": "REGISTRY_CREATE",
+    "entryActionStatus": "none",
+    "clientCount": 0
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}
+{
+  "id": "36e489dc-cc32-432a-82ed-397593f16a1e",
+  "timestamp": "2025-08-20T01:03:06.513395777",
+  "source": "StateMachineRegistry",
+  "destination": "StateMachine:call-003",
+  "eventType": "CREATE",
+  "eventCategory": "REGISTRY_CREATE",
+  "eventDetails": {
+    "machineClass": "GenericStateMachine",
+    "debugEnabled": false,
+    "currentState": "IDLE"
+  },
+  "machineId": "call-003",
+  "success": true,
+  "processingTimeMs": 0
+}

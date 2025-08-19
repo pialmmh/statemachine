@@ -1,0 +1,30 @@
+{
+  "stepNumber": 1,
+  "type": "INITIAL_STATE",
+  "timestamp": "2025-08-20T00:04:59.514384956",
+  "machineId": "call-003",
+  "state": "IDLE",
+  "persistentContext": {
+    "callId": "call-003",
+    "currentState": "IDLE",
+    "lastStateChange": "2025-08-20T00:04:59.51097638",
+    "fromNumber": "+1-555-0003",
+    "toNumber": "+1-555-1003",
+    "startTime": "2025-08-20T00:04:59.510964421",
+    "endTime": null,
+    "connectTime": null,
+    "callDirection": "INBOUND",
+    "callStatus": "INITIALIZING",
+    "sessionEvents": [
+      "[2025-08-20T00:04:59.510990586] Call initialized from +1-555-0003 to +1-555-1003"
+    ],
+    "ringCount": 0,
+    "disconnectReason": null,
+    "recordingEnabled": false,
+    "isComplete": false,
+    "partitionKey": "call-003",
+    "callStartTime": null,
+    "ringDuration": 0,
+    "lastStateChangeTime": 1755626699510
+  }
+}

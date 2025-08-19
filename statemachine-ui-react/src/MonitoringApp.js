@@ -342,6 +342,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
           
           // Add initial state to history
           const initialTransition = {
+            id: `initial-${Date.now()}-${Math.random()}`,
             stepNumber: 1,
             fromState: 'Initial',
             toState: data.currentState || 'IDLE',
@@ -372,6 +373,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
           
           // Always set up initial history entry when we get machine state
           const initialTransition = {
+            id: `machine-state-${Date.now()}-${Math.random()}`,
             stepNumber: 1,
             fromState: 'Initial',
             toState: data.currentState || 'IDLE',
@@ -396,7 +398,13 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
       } else if (data.type === 'COMPLETE_STATUS') {
         // Handle complete status update from server
-        console.log('COMPLETE_STATUS received:', data);
+        console.log('COMPLETE_STATUS received - machines count:', data.machines ? data.machines.length : 0);
+        console.log('Currently selected machine:', selectedMachine);
+        console.log('hasReceivedInitialState:', hasReceivedInitialState.current);
+        
+        // Don't process COMPLETE_STATUS for history - it causes duplicates
+        // We only use it for updating the machine list and current state
+        // History should only be updated by explicit STATE_CHANGE events
         
         // Process machines from complete status
         if (data.machines && Array.isArray(data.machines)) {
@@ -407,32 +415,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
             // Update live state for selected machine
             setLiveState(selectedMachineData.currentState || 'IDLE');
             
-            // If we haven't received initial state yet, set it up
-            if (!hasReceivedInitialState.current && selectedMachineData.context) {
-              hasReceivedInitialState.current = true;
-              
-              const initialTransition = {
-                stepNumber: 1,
-                fromState: 'Initial',
-                toState: selectedMachineData.currentState || 'IDLE',
-                event: 'Initial State',
-                timestamp: data.timestamp || new Date().toISOString(),
-                duration: 0,
-                eventData: {},
-                contextBefore: {
-                  registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-                  persistentContext: {},
-                  volatileContext: {}
-                },
-                contextAfter: {
-                  registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-                  persistentContext: selectedMachineData.context || {},
-                  volatileContext: {}
-                }
-              };
-              
-              setLiveHistory([initialTransition]);
-            }
+            // Skip adding initial state from COMPLETE_STATUS
+            // Let MACHINE_STATE handle initial state setup
           }
         }
       } else if (data.type === 'EVENT_SENT') {
@@ -472,6 +456,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         console.log('STATE_CHANGE received for machine:', data.machineId);
         console.log('Currently selected machine (ref):', selectedMachineRef.current);
         console.log('Currently selected machine (state):', selectedMachine);
+        console.log('Full STATE_CHANGE data:', JSON.stringify(data));
         
         // Only process state changes for the selected machine (use ref to avoid closure issues)
         if (data.machineId !== selectedMachineRef.current) {
@@ -500,8 +485,13 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
         
         // Add to live history with full context
+        console.log('Adding STATE_CHANGE to history');
+        console.log('Current liveHistory before update:', liveHistory.length, 'items');
+        
         setLiveHistory(prev => {
           const updated = [...(Array.isArray(prev) ? prev : [])];
+          console.log('Inside setLiveHistory - current length:', updated.length);
+          console.log('Last item in history:', updated.length > 0 ? updated[updated.length - 1] : 'empty');
           
           // Don't add initial state here - let COMPLETE_STATUS handle it
           // Just add the actual state transition
@@ -511,21 +501,22 @@ function MonitoringApp({ mode = 'snapshot' }) {
             ? updated[updated.length - 1].contextAfter.persistentContext 
             : {};
           
-          // Check if we already have this exact transition to avoid duplicates
-          const isDuplicate = updated.some(t => 
-            t.fromState === (data.stateBefore || data.oldState) && 
-            t.toState === (data.stateAfter || data.newState)
-          );
-          
-          if (isDuplicate) {
-            console.log('Duplicate transition detected, skipping:', data.stateBefore, '->', data.stateAfter);
-            return updated;
-          }
-          
           // Detect timeout transitions by pattern
           const fromState = data.stateBefore || data.oldState || 'UNKNOWN';
           const toState = data.stateAfter || data.newState || 'UNKNOWN';
           let eventName = data.eventName || 'State Change';
+          
+          // Check if we just added this exact transition (check for duplicates)
+          const lastTransition = updated.length > 0 ? updated[updated.length - 1] : null;
+          
+          if (lastTransition && 
+              lastTransition.fromState === fromState && 
+              lastTransition.toState === toState &&
+              !lastTransition.eventSent &&
+              Math.abs(new Date() - new Date(lastTransition.timestamp)) < 100) { // Within 100ms
+            console.log('WARNING: Duplicate state transition detected, skipping:', fromState, '->', toState);
+            return updated; // Skip duplicate
+          }
           
           // Common timeout patterns
           if (!data.eventName) {
@@ -537,6 +528,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
           }
           
           const transition = {
+            id: `${Date.now()}-${Math.random()}`, // Add unique ID for debugging
             stepNumber: updated.length + 1,
             fromState: fromState,
             toState: toState,
@@ -558,9 +550,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
             }
           };
           
-          console.log('Adding transition:', transition.fromState, '->', transition.toState);
-          console.log('Current history length:', updated.length);
+          console.log('Adding transition:', transition.fromState, '->', transition.toState, 'ID:', transition.id);
+          console.log('History length before push:', updated.length);
+          console.log('All transitions in history:', updated.map(t => `${t.fromState}->${t.toState} (ID: ${t.id})`));
           updated.push(transition);
+          console.log('History length after push:', updated.length);
           return updated;
         });
       } else if (data.type === 'CONNECTION_TEST') {
@@ -644,35 +638,9 @@ function MonitoringApp({ mode = 'snapshot' }) {
       if (sendWebSocketMessage(message)) {
         console.log('Event sent successfully');
         
-        // Add event to history immediately
-        setLiveHistory(prev => {
-          const updated = [...(Array.isArray(prev) ? prev : [])];
-          const eventEntry = {
-            stepNumber: updated.length + 1,
-            fromState: liveState,
-            toState: liveState, // Event doesn't change state immediately
-            event: selectedEvent,
-            eventSent: true, // Mark this as an event that was sent
-            timestamp: new Date().toISOString(),
-            duration: 0,
-            eventData: payload,
-            entryActionStatus: 'none',
-            contextBefore: {
-              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
-              volatileContext: {}
-            },
-            contextAfter: {
-              registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
-              volatileContext: {}
-            }
-          };
-          
-          console.log('Adding sent event to history:', eventEntry.event);
-          updated.push(eventEntry);
-          return updated;
-        });
+        // Don't add the event to history here - let the backend STATE_CHANGE handle it
+        // This was causing duplicate entries
+        // The backend will send us the proper state change event
       } else {
         alert('Failed to send event. WebSocket connection might be unstable.');
       }

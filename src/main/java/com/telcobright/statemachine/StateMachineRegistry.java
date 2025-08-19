@@ -9,6 +9,7 @@ import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.StateMachineContextEntity;
 import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
+import com.telcobright.statemachine.persistence.MysqlConnectionProvider;
 import com.telcobright.statemachine.eventstore.EventStore;
 import java.util.HashMap;
 
@@ -18,11 +19,15 @@ import java.util.HashMap;
  */
 public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
+    // MySQL connection provider for history tracking
+    private MysqlConnectionProvider connectionProvider;
+    
     /**
      * Default constructor for testing
      */
     public StateMachineRegistry() {
         super();
+        initializeConnectionProvider();
     }
     
     /**
@@ -30,6 +35,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public StateMachineRegistry(TimeoutManager timeoutManager) {
         super(timeoutManager);
+        initializeConnectionProvider();
     }
     
     /**
@@ -37,6 +43,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public StateMachineRegistry(TimeoutManager timeoutManager, int webSocketPort) {
         super(timeoutManager, webSocketPort);
+        initializeConnectionProvider();
     }
     
     /**
@@ -97,6 +104,12 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     @Override
     public void removeMachine(String id) {
         GenericStateMachine<?, ?> machine = activeMachines.remove(id);
+        
+        // Close history tracker if machine has one
+        if (machine != null) {
+            machine.closeHistoryTracker();
+        }
+        
         notifyRegistryRemove(id);
         
         // Log to EventStore if debug is enabled
@@ -329,10 +342,39 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     }
     
     /**
+     * Initialize MySQL connection provider
+     */
+    private void initializeConnectionProvider() {
+        try {
+            // Only initialize if debug mode is enabled (which includes snapshot mode)
+            if (isDebugEnabled()) {
+                connectionProvider = new MysqlConnectionProvider();
+                System.out.println("[Registry] Initialized MySQL connection provider for history tracking");
+            }
+        } catch (Exception e) {
+            System.err.println("[Registry] Failed to initialize MySQL connection provider: " + e.getMessage());
+            connectionProvider = null;
+        }
+    }
+    
+    /**
+     * Get the MySQL connection provider
+     */
+    public MysqlConnectionProvider getConnectionProvider() {
+        return connectionProvider;
+    }
+    
+    /**
      * Shutdown the registry and cleanup resources
      */
     @Override
     public void shutdown() {
+        // Close connection provider if it exists
+        if (connectionProvider != null) {
+            connectionProvider.close();
+            System.out.println("[Registry] Closed MySQL connection provider");
+        }
+        
         // Call parent shutdown which handles WebSocket and other cleanup
         super.shutdown();
         

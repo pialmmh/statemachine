@@ -19,6 +19,11 @@ import java.time.format.DateTimeFormatter;
 import com.telcobright.statemachine.eventstore.EventStore;
 import com.telcobright.statemachine.eventstore.EventLogEntry;
 import java.util.HashMap;
+import com.telcobright.statemachine.history.MachineHistoryTracker;
+import com.telcobright.statemachine.history.MachineHistoryMySQLTracker;
+import com.telcobright.statemachine.persistence.MysqlConnectionProvider;
+import java.io.IOException;
+import java.sql.SQLException;
 
 /**
  * Enhanced Generic State Machine with timeout, persistence, and offline support
@@ -55,6 +60,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private boolean entryActionExecuted = false;
     private String entryActionStatus = "none"; // "none", "executed", "skipped", "failed"
     
+    // History tracking - use MySQL tracker
+    private MachineHistoryMySQLTracker historyTracker;
+    
     public GenericStateMachine(String id, TimeoutManager timeoutManager, StateMachineRegistry registry) {
         this.id = id;
         this.currentState = "initial";
@@ -69,6 +77,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         
         // Auto-generate run ID based on timestamp if debug is enabled
         this.runId = generateTimestampRunId();
+        
+        // Initialize history tracker if debug is enabled
+        initializeHistoryTracker();
     }
     
     /**
@@ -115,6 +126,12 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public void start() {
         System.out.println("StateMachine " + id + " started in state: " + currentState);
+        
+        // Record initial state in history
+        if (historyTracker != null && historyTracker.isActive()) {
+            historyTracker.recordInitialState(currentState, persistingEntity, context);
+        }
+        
         enterState(currentState, false);
     }
     
@@ -331,9 +348,14 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             System.err.println("   ✗ Error in handleEvent: " + e.getMessage());
             e.printStackTrace();
         } finally {
+            long transitionDuration = System.currentTimeMillis() - startTime;
+            
+            // Record in history
+            boolean transitioned = !stateBefore.equals(currentState);
+            recordEventInHistory(event, stateBefore, currentState, transitionDuration, transitioned);
+            
             // Record snapshot if debug is enabled
             if (isDebugEnabled()) {
-                long transitionDuration = System.currentTimeMillis() - startTime;
                 recordSnapshot(stateBefore, currentState, event, contextBefore, context, transitionDuration);
             }
         }
@@ -763,5 +785,117 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public boolean isSnapshotPersistenceEnabled() {
         return persistSnapshotsToDb && snapshotRepository != null;
+    }
+    
+    /**
+     * Initialize history tracker if debug or snapshot mode is enabled
+     */
+    private void initializeHistoryTracker() {
+        // Check if debug or snapshot mode is enabled through registry or local settings
+        boolean shouldTrackHistory = false;
+        
+        if (registry != null && registry instanceof AbstractStateMachineRegistry) {
+            AbstractStateMachineRegistry abstractRegistry = (AbstractStateMachineRegistry) registry;
+            // Enable history for both debug mode and snapshot mode
+            shouldTrackHistory = abstractRegistry.isDebugEnabled();
+        } else {
+            // Fallback to local debug setting or snapshot persistence
+            shouldTrackHistory = debugEnabled || persistSnapshotsToDb;
+        }
+        
+        if (shouldTrackHistory) {
+            try {
+                // Close any existing tracker for this machine
+                if (historyTracker != null) {
+                    historyTracker.close();
+                }
+                
+                // Get MySQL connection provider from registry
+                MysqlConnectionProvider connectionProvider = null;
+                if (registry != null && registry instanceof StateMachineRegistry) {
+                    StateMachineRegistry smRegistry = (StateMachineRegistry) registry;
+                    connectionProvider = smRegistry.getConnectionProvider();
+                }
+                
+                if (connectionProvider != null) {
+                    // Create new MySQL history tracker
+                    historyTracker = new MachineHistoryMySQLTracker(id, connectionProvider, true);
+                    
+                    // Record initial state
+                    if (persistingEntity != null || context != null) {
+                        historyTracker.recordInitialState(currentState, persistingEntity, context);
+                    }
+                } else {
+                    System.err.println("[History] No MySQL connection provider available for history tracking");
+                }
+            } catch (SQLException e) {
+                System.err.println("[History] Failed to initialize MySQL history tracker for machine " + id + ": " + e.getMessage());
+                historyTracker = null;
+            }
+        }
+    }
+    
+    /**
+     * Record event and state transition in history
+     */
+    private void recordEventInHistory(StateMachineEvent event, String stateBefore, String stateAfter, 
+                                     long duration, boolean transitioned) {
+        if (historyTracker == null || !historyTracker.isActive()) {
+            return;
+        }
+        
+        try {
+            // Record the event received
+            historyTracker.recordEventReceived(stateBefore, event.getEventType(), event, persistingEntity, context);
+            
+            if (transitioned) {
+                // Record state transition
+                historyTracker.recordStateTransition(stateBefore, stateAfter, event.getEventType(), 
+                                                    event, persistingEntity, context, duration, entryActionStatus);
+            } else {
+                // Record event with no transition
+                historyTracker.recordEventNoTransition(stateBefore, event.getEventType(), 
+                                                      event, persistingEntity, context, duration);
+            }
+        } catch (Exception e) {
+            System.err.println("[History] Error recording event: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Record timeout in history
+     */
+    private void recordTimeoutInHistory(String fromState, String toState, long timeoutDuration) {
+        if (historyTracker == null || !historyTracker.isActive()) {
+            return;
+        }
+        
+        try {
+            historyTracker.recordTimeout(fromState, toState, timeoutDuration, persistingEntity, context);
+        } catch (Exception e) {
+            System.err.println("[History] Error recording timeout: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Close history tracker when machine is destroyed or completed
+     */
+    public void closeHistoryTracker() {
+        if (historyTracker != null) {
+            // Record completion if machine is in a final/complete state
+            if (persistingEntity != null && persistingEntity.isComplete()) {
+                historyTracker.recordCompletion(currentState, persistingEntity, context);
+            }
+            
+            historyTracker.close();
+            historyTracker = null;
+        }
+    }
+    
+    /**
+     * Get the history tracker (for testing/debugging)
+     */
+    public MachineHistoryMySQLTracker getHistoryTracker() {
+        return historyTracker;
     }
 }
