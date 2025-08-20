@@ -15,6 +15,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 /**
  * MySQL-based history tracker for state machines with asynchronous writing
@@ -43,6 +48,7 @@ public class MachineHistoryMySQLTracker {
     private final BlockingQueue<HistoryEntry> writeQueue;
     private final AtomicBoolean isActive;
     private final Future<?> writerTask;
+    private final Map<String, Integer> stateTransitionCounters;  // Track transition counter per state
     
     // History entry for async writing
     private static class HistoryEntry {
@@ -55,10 +61,11 @@ public class MachineHistoryMySQLTracker {
         final String transitionToState;
         final String persistentContext;
         final String volatileContext;
+        final int transitionCounter;  // Track which instance of this state
         
         HistoryEntry(String state, String event, boolean eventIgnored, Object eventPayloadObj,
                     boolean transitionOrStay, String transitionToState,
-                    Object persistentContextObj, Object volatileContextObj) {
+                    Object persistentContextObj, Object volatileContextObj, int transitionCounter) {
             this.datetime = new Timestamp(System.currentTimeMillis());
             this.state = state;
             this.event = event;
@@ -68,6 +75,7 @@ public class MachineHistoryMySQLTracker {
             this.transitionToState = transitionToState;
             this.persistentContext = encodeToBase64(persistentContextObj);
             this.volatileContext = encodeToBase64(volatileContextObj);
+            this.transitionCounter = transitionCounter;
         }
         
         private static String encodeToBase64(Object obj) {
@@ -92,6 +100,7 @@ public class MachineHistoryMySQLTracker {
             this.writeQueue = null;
             this.isActive = new AtomicBoolean(false);
             this.writerTask = null;
+            this.stateTransitionCounters = null;
             return;
         }
         
@@ -101,6 +110,7 @@ public class MachineHistoryMySQLTracker {
         this.connectionProvider = connectionProvider;
         this.writeQueue = new LinkedBlockingQueue<>();
         this.isActive = new AtomicBoolean(true);
+        this.stateTransitionCounters = new ConcurrentHashMap<>();
         
         // Create single-threaded executor for async writes
         this.executorService = Executors.newSingleThreadExecutor(r -> {
@@ -136,11 +146,13 @@ public class MachineHistoryMySQLTracker {
                 "event_payload TEXT, " +  // Base64 encoded JSON
                 "transition_or_stay BOOLEAN DEFAULT FALSE, " +  // TRUE = transition, FALSE = stay
                 "transition_to_state VARCHAR(100), " +
+                "transition_counter INT NOT NULL DEFAULT 1, " +  // Track state instance
                 "persistent_context MEDIUMTEXT, " +  // Base64 encoded JSON
                 "volatile_context MEDIUMTEXT, " +  // Base64 encoded JSON
                 "INDEX idx_datetime (datetime), " +
                 "INDEX idx_state (state), " +
-                "INDEX idx_event (event)" +
+                "INDEX idx_event (event), " +
+                "INDEX idx_state_counter (state, transition_counter)" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
                 
             try (Statement stmt = conn.createStatement()) {
@@ -170,8 +182,8 @@ public class MachineHistoryMySQLTracker {
     private void writeEntryToDatabase(HistoryEntry entry) {
         String insertSQL = "INSERT INTO " + tableName + 
             " (datetime, state, event, event_ignored, event_payload, transition_or_stay, " +
-            "transition_to_state, persistent_context, volatile_context) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            "transition_to_state, transition_counter, persistent_context, volatile_context) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
@@ -183,8 +195,9 @@ public class MachineHistoryMySQLTracker {
             pstmt.setString(5, entry.eventPayload);
             pstmt.setBoolean(6, entry.transitionOrStay);
             pstmt.setString(7, entry.transitionToState);
-            pstmt.setString(8, entry.persistentContext);
-            pstmt.setString(9, entry.volatileContext);
+            pstmt.setInt(8, entry.transitionCounter);
+            pstmt.setString(9, entry.persistentContext);
+            pstmt.setString(10, entry.volatileContext);
             
             pstmt.executeUpdate();
             
@@ -194,20 +207,37 @@ public class MachineHistoryMySQLTracker {
     }
     
     /**
+     * Get or increment the transition counter for a state
+     */
+    private int getStateCounter(String state) {
+        return stateTransitionCounters.computeIfAbsent(state, k -> 1);
+    }
+    
+    /**
+     * Increment and get the transition counter for entering a state
+     */
+    private int incrementStateCounter(String state) {
+        return stateTransitionCounters.compute(state, (k, v) -> (v == null) ? 1 : v + 1);
+    }
+    
+    /**
      * Record the initial state of the machine
      */
     public void recordInitialState(String state, StateMachineContextEntity contextEntity, Object volatileContext) {
         if (!isActive.get()) return;
         
+        int counter = getStateCounter(state);
+        
         HistoryEntry entry = new HistoryEntry(
             state,
-            "INITIAL",
+            "ENTRY",  // Changed from INITIAL to ENTRY
             false,  // not ignored
             null,   // no event payload
             false,  // stay (not a transition)
             null,   // no transition
             contextEntity,
-            volatileContext
+            volatileContext,
+            counter
         );
         
         writeQueue.offer(entry);
@@ -223,14 +253,20 @@ public class MachineHistoryMySQLTracker {
     }
     
     /**
-     * Record a state transition
+     * Record a state transition with entry action support
      */
     public void recordStateTransition(String fromState, String toState, String eventType, Object eventPayload,
                                      StateMachineContextEntity contextAfter, Object volatileContextAfter,
                                      long transitionDurationMs, String entryActionStatus) {
         if (!isActive.get()) return;
         
-        // Record the event in the source state
+        // Get current counter for the from state
+        int fromCounter = getStateCounter(fromState);
+        
+        // Increment counter for the target state (re-entering)
+        int toCounter = incrementStateCounter(toState);
+        
+        // Record the event in the source state (showing transition)
         HistoryEntry fromEntry = new HistoryEntry(
             fromState,
             eventType,
@@ -239,22 +275,79 @@ public class MachineHistoryMySQLTracker {
             true,   // transition
             toState,
             contextAfter,  // Context after transition
-            volatileContextAfter
+            volatileContextAfter,
+            fromCounter
         );
         writeQueue.offer(fromEntry);
         
-        // Record arrival in the target state
-        HistoryEntry toEntry = new HistoryEntry(
+        // Now record the entry into the target state (after the transition)
+        HistoryEntry entryRecord = new HistoryEntry(
             toState,
-            eventType + "_ARRIVAL",  // Mark as arrival from event
+            "ENTRY",
             false,  // not ignored
-            eventPayload,
-            false,  // stay (this is the arrival record)
-            null,   // no further transition
-            contextAfter,  // Same context as after transition
-            volatileContextAfter
+            null,   // no event payload
+            false,  // stay
+            null,   // no transition
+            contextAfter,
+            volatileContextAfter,
+            toCounter
         );
-        writeQueue.offer(toEntry);
+        writeQueue.offer(entryRecord);
+    }
+    
+    /**
+     * Record entry into a state (with or without entry actions)
+     */
+    public void recordStateEntry(String state, StateMachineContextEntity contextBefore, Object volatileContextBefore,
+                                StateMachineContextEntity contextAfter, Object volatileContextAfter, 
+                                String entryActionStatus) {
+        if (!isActive.get()) return;
+        
+        int counter = getStateCounter(state);
+        
+        if (entryActionStatus != null && entryActionStatus.equals("executed")) {
+            // Record "Before Entry Actions" with context before entry actions
+            HistoryEntry beforeEntry = new HistoryEntry(
+                state,
+                "BEFORE_ENTRY_ACTIONS",
+                false,  // not ignored
+                null,   // no event payload
+                false,  // stay
+                null,   // no transition
+                contextBefore,
+                volatileContextBefore,
+                counter
+            );
+            writeQueue.offer(beforeEntry);
+            
+            // Record "After Entry Actions" with context after entry actions
+            HistoryEntry afterEntry = new HistoryEntry(
+                state,
+                "AFTER_ENTRY_ACTIONS",
+                false,  // not ignored
+                null,   // no event payload
+                false,  // stay
+                null,   // no transition
+                contextAfter,
+                volatileContextAfter,
+                counter
+            );
+            writeQueue.offer(afterEntry);
+        } else {
+            // No entry actions or not executed - just record "Entry"
+            HistoryEntry entry = new HistoryEntry(
+                state,
+                "ENTRY",
+                false,  // not ignored
+                null,   // no event payload
+                false,  // stay
+                null,   // no transition
+                contextAfter,
+                volatileContextAfter,
+                counter
+            );
+            writeQueue.offer(entry);
+        }
     }
     
     /**
@@ -265,6 +358,8 @@ public class MachineHistoryMySQLTracker {
                                        long processingDurationMs) {
         if (!isActive.get()) return;
         
+        int counter = getStateCounter(currentState);
+        
         HistoryEntry entry = new HistoryEntry(
             currentState,
             eventType,
@@ -273,7 +368,8 @@ public class MachineHistoryMySQLTracker {
             false,  // stay (no transition)
             null,   // no transition
             contextAfter,
-            volatileContextAfter
+            volatileContextAfter,
+            counter
         );
         
         writeQueue.offer(entry);
@@ -286,6 +382,8 @@ public class MachineHistoryMySQLTracker {
                                   StateMachineContextEntity context, Object volatileContext) {
         if (!isActive.get()) return;
         
+        int counter = getStateCounter(currentState);
+        
         HistoryEntry entry = new HistoryEntry(
             currentState,
             eventType,
@@ -294,7 +392,8 @@ public class MachineHistoryMySQLTracker {
             false,  // stay
             null,   // no transition
             context,
-            volatileContext
+            volatileContext,
+            counter
         );
         
         writeQueue.offer(entry);
@@ -307,6 +406,9 @@ public class MachineHistoryMySQLTracker {
                              StateMachineContextEntity contextAfter, Object volatileContextAfter) {
         if (!isActive.get()) return;
         
+        int fromCounter = getStateCounter(fromState);
+        int toCounter = incrementStateCounter(toState);
+        
         // Record timeout as a transition
         HistoryEntry fromEntry = new HistoryEntry(
             fromState,
@@ -316,7 +418,8 @@ public class MachineHistoryMySQLTracker {
             true,   // transition
             toState,
             contextAfter,
-            volatileContextAfter
+            volatileContextAfter,
+            fromCounter
         );
         writeQueue.offer(fromEntry);
         
@@ -329,7 +432,8 @@ public class MachineHistoryMySQLTracker {
             false,  // stay
             null,
             contextAfter,
-            volatileContextAfter
+            volatileContextAfter,
+            toCounter
         );
         writeQueue.offer(toEntry);
     }
@@ -340,6 +444,8 @@ public class MachineHistoryMySQLTracker {
     public void recordCompletion(String finalState, StateMachineContextEntity finalContext, Object finalVolatileContext) {
         if (!isActive.get()) return;
         
+        int counter = getStateCounter(finalState);
+        
         HistoryEntry entry = new HistoryEntry(
             finalState,
             "COMPLETION",
@@ -348,7 +454,8 @@ public class MachineHistoryMySQLTracker {
             false,  // stay
             null,   // no transition
             finalContext,
-            finalVolatileContext
+            finalVolatileContext,
+            counter
         );
         
         writeQueue.offer(entry);
@@ -361,6 +468,8 @@ public class MachineHistoryMySQLTracker {
                            StateMachineContextEntity context, Object volatileContext) {
         if (!isActive.get()) return;
         
+        int counter = getStateCounter(currentState);
+        
         HistoryEntry entry = new HistoryEntry(
             currentState,
             "ERROR_" + errorType,
@@ -369,7 +478,8 @@ public class MachineHistoryMySQLTracker {
             false,  // stay
             null,
             context,
-            volatileContext
+            volatileContext,
+            counter
         );
         
         writeQueue.offer(entry);
@@ -416,5 +526,171 @@ public class MachineHistoryMySQLTracker {
      */
     public String getTableName() {
         return tableName;
+    }
+    
+    /**
+     * Read all history entries for this machine
+     */
+    public List<Map<String, Object>> readHistory() {
+        List<Map<String, Object>> history = new ArrayList<>();
+        
+        if (connectionProvider == null || tableName == null) {
+            return history;
+        }
+        
+        String query = "SELECT * FROM " + tableName + " ORDER BY datetime ASC, id ASC";
+        
+        try (Connection conn = connectionProvider.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("id", rs.getInt("id"));
+                entry.put("datetime", rs.getTimestamp("datetime"));
+                entry.put("state", rs.getString("state"));
+                entry.put("event", rs.getString("event"));
+                entry.put("eventIgnored", rs.getBoolean("event_ignored"));
+                entry.put("eventPayload", decodeFromBase64(rs.getString("event_payload")));
+                entry.put("transitionOrStay", rs.getBoolean("transition_or_stay"));
+                entry.put("transitionToState", rs.getString("transition_to_state"));
+                entry.put("transitionCounter", rs.getInt("transition_counter"));
+                entry.put("persistentContext", decodeFromBase64(rs.getString("persistent_context")));
+                entry.put("volatileContext", decodeFromBase64(rs.getString("volatile_context")));
+                history.add(entry);
+            }
+        } catch (SQLException e) {
+            System.err.println("[History] Error reading history: " + e.getMessage());
+        }
+        
+        return history;
+    }
+    
+    /**
+     * Read history entries since a specific ID (for incremental updates)
+     */
+    public List<Map<String, Object>> readHistorySince(int lastId) {
+        List<Map<String, Object>> history = new ArrayList<>();
+        
+        if (connectionProvider == null || tableName == null) {
+            return history;
+        }
+        
+        String query = "SELECT * FROM " + tableName + " WHERE id > ? ORDER BY datetime ASC, id ASC";
+        
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+            
+            pstmt.setInt(1, lastId);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("id", rs.getInt("id"));
+                    entry.put("datetime", rs.getTimestamp("datetime"));
+                    entry.put("state", rs.getString("state"));
+                    entry.put("event", rs.getString("event"));
+                    entry.put("eventIgnored", rs.getBoolean("event_ignored"));
+                    entry.put("eventPayload", decodeFromBase64(rs.getString("event_payload")));
+                    entry.put("transitionOrStay", rs.getBoolean("transition_or_stay"));
+                    entry.put("transitionToState", rs.getString("transition_to_state"));
+                    entry.put("transitionCounter", rs.getInt("transition_counter"));
+                    entry.put("persistentContext", decodeFromBase64(rs.getString("persistent_context")));
+                    entry.put("volatileContext", decodeFromBase64(rs.getString("volatile_context")));
+                    history.add(entry);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[History] Error reading history since ID " + lastId + ": " + e.getMessage());
+        }
+        
+        return history;
+    }
+    
+    /**
+     * Get the latest history entry ID
+     */
+    public int getLatestHistoryId() {
+        if (connectionProvider == null || tableName == null) {
+            return 0;
+        }
+        
+        String query = "SELECT MAX(id) as max_id FROM " + tableName;
+        
+        try (Connection conn = connectionProvider.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            if (rs.next()) {
+                return rs.getInt("max_id");
+            }
+        } catch (SQLException e) {
+            System.err.println("[History] Error getting latest ID: " + e.getMessage());
+        }
+        
+        return 0;
+    }
+    
+    /**
+     * Build grouped history structure for frontend
+     * Groups history entries by state and transition_counter
+     */
+    public List<Map<String, Object>> readGroupedHistory() {
+        System.out.println("[History] readGroupedHistory called for machine: " + machineId);
+        List<Map<String, Object>> rawHistory = readHistory();
+        System.out.println("[History] Raw history size: " + rawHistory.size());
+        List<Map<String, Object>> groupedHistory = new ArrayList<>();
+        
+        // Map to track state instances: key = "state-counter", value = list of events
+        Map<String, List<Map<String, Object>>> stateInstances = new LinkedHashMap<>();
+        
+        for (Map<String, Object> entry : rawHistory) {
+            String state = (String) entry.get("state");
+            Integer counter = (Integer) entry.get("transitionCounter");
+            String instanceKey = state + "-" + counter;
+            
+            // Get or create the list for this state instance
+            List<Map<String, Object>> instanceEvents = stateInstances.computeIfAbsent(
+                instanceKey, k -> new ArrayList<>()
+            );
+            
+            // Add this entry to the instance
+            instanceEvents.add(entry);
+        }
+        
+        // Convert to the format expected by frontend
+        for (Map.Entry<String, List<Map<String, Object>>> instance : stateInstances.entrySet()) {
+            Map<String, Object> stateInstance = new HashMap<>();
+            String[] parts = instance.getKey().split("-");
+            stateInstance.put("state", parts[0]);
+            stateInstance.put("instanceNumber", Integer.parseInt(parts[1]));
+            stateInstance.put("transitions", instance.getValue());
+            groupedHistory.add(stateInstance);
+        }
+        
+        System.out.println("[History] Grouped history size: " + groupedHistory.size() + " state instances");
+        for (Map<String, Object> group : groupedHistory) {
+            System.out.println("[History] State instance: " + group.get("state") + "-" + group.get("instanceNumber") +
+                " has " + ((List)group.get("transitions")).size() + " transitions");
+        }
+        
+        return groupedHistory;
+    }
+    
+    /**
+     * Decode from Base64
+     */
+    private static Object decodeFromBase64(String base64) {
+        if (base64 == null || base64.isEmpty()) {
+            return null;
+        }
+        try {
+            byte[] decoded = Base64.getDecoder().decode(base64);
+            String json = new String(decoded);
+            return gson.fromJson(json, Object.class);
+        } catch (Exception e) {
+            System.err.println("[History] Error decoding from Base64: " + e.getMessage());
+            return null;
+        }
     }
 }

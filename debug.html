@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine Debugging & History Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-left: 4px solid #3498db;
+            padding-left: 10px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .inline-code {
+            background: #ecf0f1;
+            color: #e74c3c;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .important {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        .feature-box {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .class-info {
+            background: #e8f5e9;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .method-sig {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 10px;
+            border-left: 3px solid #4caf50;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 State Machine Debugging & History Documentation</h1>
+    
+    <div class="important">
+        <strong>⚠️ Important:</strong> This documentation is designed for both human developers and AI assistants. 
+        It contains all necessary information to understand and work with the state machine debugging and history features.
+    </div>
+
+    <h2>📋 Table of Contents</h2>
+    <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#mysql-setup">MySQL Setup</a></li>
+        <li><a href="#debug-modes">Debug Modes</a></li>
+        <li><a href="#history-tracking">History Tracking</a></li>
+        <li><a href="#key-classes">Key Classes & Methods</a></li>
+        <li><a href="#websocket-api">WebSocket API</a></li>
+        <li><a href="#frontend-integration">Frontend Integration</a></li>
+        <li><a href="#testing">Testing & Usage</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ul>
+
+    <h2 id="overview">📊 Overview</h2>
+    <div class="feature-box">
+        <p>The State Machine framework provides comprehensive debugging and history tracking capabilities:</p>
+        <ul>
+            <li><strong>Real-time WebSocket monitoring</strong> - Live state transitions and events</li>
+            <li><strong>MySQL history persistence</strong> - Complete audit trail in database</li>
+            <li><strong>Asynchronous history writing</strong> - No performance impact</li>
+            <li><strong>React UI for visualization</strong> - Interactive state machine monitoring</li>
+            <li><strong>No configuration files required</strong> - All settings hardcoded or via constructors</li>
+        </ul>
+    </div>
+
+    <h2 id="architecture">🏗️ Architecture</h2>
+    <div class="code-block">
+State Machine → Event → State Transition
+      ↓                        ↓
+History Tracker → MySQL (Async Write)
+      ↓
+WebSocket Server → Browser (React UI)
+      ↓
+History Request ← MySQL Query
+    </div>
+
+    <h2 id="mysql-setup">💾 MySQL Setup</h2>
+    <div class="feature-box">
+        <h3>Database Configuration (Hardcoded)</h3>
+        <table>
+            <tr><th>Setting</th><th>Value</th></tr>
+            <tr><td>Host</td><td class="inline-code">127.0.0.1</td></tr>
+            <tr><td>Port</td><td class="inline-code">3306</td></tr>
+            <tr><td>Username</td><td class="inline-code">root</td></tr>
+            <tr><td>Password</td><td class="inline-code">123456</td></tr>
+            <tr><td>Database</td><td class="inline-code">statedb</td></tr>
+        </table>
+
+        <h3>Create Database</h3>
+        <div class="code-block">
+mysql -u root -p123456 -e "CREATE DATABASE IF NOT EXISTS statedb;"
+        </div>
+
+        <h3>History Table Schema</h3>
+        <p>Tables are created automatically with naming pattern: <span class="inline-code">history_{machineId}</span></p>
+        <div class="code-block">
+CREATE TABLE history_call_001 (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    datetime TIMESTAMP(3) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    event VARCHAR(100) NOT NULL,
+    event_ignored BOOLEAN DEFAULT FALSE,
+    event_payload TEXT,                    -- Base64 encoded JSON
+    transition_or_stay BOOLEAN DEFAULT FALSE,
+    transition_to_state VARCHAR(100),
+    persistent_context MEDIUMTEXT,         -- Base64 encoded JSON
+    volatile_context MEDIUMTEXT,           -- Base64 encoded JSON
+    INDEX idx_datetime (datetime),
+    INDEX idx_state (state),
+    INDEX idx_event (event)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        </div>
+    </div>
+
+    <h2 id="debug-modes">🔧 Debug Modes</h2>
+    <div class="feature-box">
+        <h3>Enable Debug Mode in Registry</h3>
+        <div class="method-sig">
+// In your initialization code
+StateMachineRegistry registry = new StateMachineRegistry(timeoutManager, 9999);
+registry.enableSnapshotDebug();  // Enables history tracking
+registry.enableLiveDebug(9999);  // Enables WebSocket monitoring
+        </div>
+
+        <div class="important">
+            <strong>Note:</strong> Both debug modes must be enabled for full functionality:
+            <ul>
+                <li><span class="inline-code">enableSnapshotDebug()</span> - Activates MySQL history tracking</li>
+                <li><span class="inline-code">enableLiveDebug(port)</span> - Starts WebSocket server on specified port</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2 id="history-tracking">📜 History Tracking</h2>
+    <div class="feature-box">
+        <h3>Key Features</h3>
+        <ul>
+            <li>Automatic table creation per machine instance</li>
+            <li>Tables are dropped and recreated on each run (fresh start)</li>
+            <li>Asynchronous writing with queue (no blocking)</li>
+            <li>Base64 encoding for JSON payloads</li>
+            <li>Complete context preservation</li>
+        </ul>
+
+        <h3>Event Types Tracked</h3>
+        <table>
+            <tr><th>Event Type</th><th>Description</th><th>Data Captured</th></tr>
+            <tr><td>INITIAL</td><td>Machine initialization</td><td>Initial state, context</td></tr>
+            <tr><td>STATE_TRANSITION</td><td>State change</td><td>From/to states, event, contexts</td></tr>
+            <tr><td>EVENT_NO_TRANSITION</td><td>Event without state change</td><td>Current state, event, context</td></tr>
+            <tr><td>TIMEOUT</td><td>Timeout-triggered transition</td><td>From/to states, timeout duration</td></tr>
+            <tr><td>COMPLETION</td><td>Machine reaches final state</td><td>Final state, final context</td></tr>
+        </table>
+    </div>
+
+    <h2 id="key-classes">🔑 Key Classes & Methods</h2>
+    <div class="feature-box">
+        <div class="class-info">
+            <h3>1. MachineHistoryMySQLTracker</h3>
+            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine.history</span></p>
+            <p><strong>Purpose:</strong> Handles MySQL history persistence with async writing</p>
+            
+            <h4>Key Methods:</h4>
+            <div class="method-sig">
+public MachineHistoryMySQLTracker(String machineId, MysqlConnectionProvider provider, boolean enabled)
+public void recordInitialState(String state, StateMachineContextEntity context, Object volatileContext)
+public void recordStateTransition(String from, String to, String event, ...)
+public List&lt;Map&lt;String, Object&gt;&gt; readHistory()
+public List&lt;Map&lt;String, Object&gt;&gt; readHistorySince(int lastId)
+public void close()
+            </div>
+        </div>
+
+        <div class="class-info">
+            <h3>2. MysqlConnectionProvider</h3>
+            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine.persistence</span></p>
+            <p><strong>Purpose:</strong> Manages MySQL connections with HikariCP pool</p>
+            
+            <h4>Hardcoded Defaults:</h4>
+            <div class="code-block">
+DEFAULT_JDBC_URL = "jdbc:mysql://127.0.0.1:3306/statedb"
+DEFAULT_USERNAME = "root"
+DEFAULT_PASSWORD = "123456"
+DEFAULT_DRIVER = "com.mysql.cj.jdbc.Driver"
+            </div>
+
+            <h4>Constructor:</h4>
+            <div class="method-sig">
+public MysqlConnectionProvider() // Uses hardcoded defaults
+public MysqlConnectionProvider(String jdbcUrl, String username, String password)
+            </div>
+        </div>
+
+        <div class="class-info">
+            <h3>3. StateMachineRegistry</h3>
+            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine</span></p>
+            <p><strong>Purpose:</strong> Manages state machine instances and debug settings</p>
+            
+            <h4>Key Methods:</h4>
+            <div class="method-sig">
+public void enableSnapshotDebug()        // Enable history tracking
+public void enableLiveDebug(int port)    // Start WebSocket server
+public boolean isDebugEnabled()          // Check debug status
+public MysqlConnectionProvider getConnectionProvider()
+            </div>
+        </div>
+
+        <div class="class-info">
+            <h3>4. GenericStateMachine</h3>
+            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine</span></p>
+            <p><strong>Purpose:</strong> Core state machine with history integration</p>
+            
+            <h4>History-Related Methods:</h4>
+            <div class="method-sig">
+private void initializeHistoryTracker()   // Called automatically
+public MachineHistoryMySQLTracker getHistoryTracker()
+public void closeHistoryTracker()         // Called on machine removal
+            </div>
+        </div>
+
+        <div class="class-info">
+            <h3>5. StateMachineWebSocketServer</h3>
+            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine.websocket</span></p>
+            <p><strong>Purpose:</strong> WebSocket server for real-time monitoring</p>
+            
+            <h4>History Endpoints:</h4>
+            <div class="method-sig">
+// Request full history
+{ "action": "GET_HISTORY", "machineId": "call-001" }
+
+// Request incremental updates
+{ "action": "GET_HISTORY_SINCE", "machineId": "call-001", "lastId": 10 }
+
+// Response formats
+{ "type": "HISTORY_DATA", "machineId": "...", "history": [...] }
+{ "type": "HISTORY_UPDATE", "machineId": "...", "newEntries": [...] }
+            </div>
+        </div>
+    </div>
+
+    <h2 id="websocket-api">🔌 WebSocket API</h2>
+    <div class="feature-box">
+        <h3>Connection</h3>
+        <div class="code-block">
+WebSocket URL: ws://localhost:9999
+        </div>
+
+        <h3>Message Types</h3>
+        <table>
+            <tr><th>Type</th><th>Direction</th><th>Purpose</th></tr>
+            <tr><td>EVENT</td><td>Client→Server</td><td>Send event to state machine</td></tr>
+            <tr><td>GET_HISTORY</td><td>Client→Server</td><td>Request full history</td></tr>
+            <tr><td>GET_HISTORY_SINCE</td><td>Client→Server</td><td>Request incremental history</td></tr>
+            <tr><td>STATE_CHANGE</td><td>Server→Client</td><td>Broadcast state transition</td></tr>
+            <tr><td>HISTORY_DATA</td><td>Server→Client</td><td>Full history response</td></tr>
+            <tr><td>HISTORY_UPDATE</td><td>Server→Client</td><td>Incremental history update</td></tr>
+        </table>
+
+        <h3>Example Messages</h3>
+        <div class="code-block">
+// Send event
+{
+    "type": "EVENT",
+    "machineId": "call-002",
+    "eventType": "INCOMING_CALL",
+    "payload": { "phoneNumber": "+1-555-1234" }
+}
+
+// Request history
+{
+    "action": "GET_HISTORY",
+    "machineId": "call-002"
+}
+
+// History response
+{
+    "type": "HISTORY_DATA",
+    "machineId": "call-002",
+    "history": [
+        {
+            "id": 1,
+            "datetime": "2025-08-20T02:52:32.557",
+            "state": "IDLE",
+            "event": "INITIAL",
+            "persistentContext": {...},
+            "volatileContext": null
+        }
+    ]
+}
+        </div>
+    </div>
+
+    <h2 id="frontend-integration">🖥️ Frontend Integration</h2>
+    <div class="feature-box">
+        <h3>React UI Components</h3>
+        <ul>
+            <li><strong>MonitoringApp.js</strong> - Main component with WebSocket connection</li>
+            <li><strong>LiveHistoryDisplay.js</strong> - Displays state transition tree</li>
+            <li><strong>StateTreeView.js</strong> - Interactive tree visualization</li>
+        </ul>
+
+        <h3>Key Frontend Functions</h3>
+        <div class="code-block">
+// Request history from backend
+requestMachineHistory(machineId)
+
+// Start polling for updates (500ms interval)
+startHistoryPolling(machineId)
+
+// Transform backend history to frontend format
+transformBackendHistory(backendHistory)
+
+// WebSocket message handler
+if (data.type === 'HISTORY_DATA') {
+    const transformedHistory = transformBackendHistory(data.history);
+    setLiveHistory(transformedHistory);
+    startHistoryPolling(data.machineId);
+}
+        </div>
+
+        <h3>Running the Frontend</h3>
+        <div class="code-block">
+cd statemachine-ui-react
+npm install
+npm start
+# Opens at http://localhost:4001
+        </div>
+    </div>
+
+    <h2 id="testing">🧪 Testing & Usage</h2>
+    <div class="feature-box">
+        <h3>1. Start Backend with Debug Mode</h3>
+        <div class="code-block">
+// CallMachineRunnerProper.java
+public CallMachineRunnerProper() {
+    this.registry = new StateMachineRegistry(timeoutManager, WS_PORT);
+    registry.enableSnapshotDebug();  // Enable history
+    registry.enableLiveDebug(WS_PORT); // Enable WebSocket
+    initializeStateMachines();
+}
+
+// Run with Maven
+mvn compile
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.CallMachineRunnerProper"
+        </div>
+
+        <h3>2. Verify MySQL Tables</h3>
+        <div class="code-block">
+mysql -u root -p123456 statedb -e "SHOW TABLES LIKE 'history%';"
+mysql -u root -p123456 statedb -e "SELECT * FROM history_call_002 LIMIT 10;"
+        </div>
+
+        <h3>3. Decode Base64 Context</h3>
+        <div class="code-block">
+# In Linux/Mac terminal
+echo "BASE64_STRING_HERE" | base64 -d | jq .
+        </div>
+
+        <h3>4. Test via UI</h3>
+        <ol>
+            <li>Open <a href="http://localhost:4001">http://localhost:4001</a></li>
+            <li>Click "Live Viewer"</li>
+            <li>Select a machine from dropdown</li>
+            <li>Send events (INCOMING_CALL, ANSWER, HANGUP)</li>
+            <li>History is automatically displayed and updated</li>
+        </ol>
+    </div>
+
+    <h2 id="troubleshooting">🔨 Troubleshooting</h2>
+    <div class="feature-box">
+        <h3>Common Issues & Solutions</h3>
+        
+        <div class="important">
+            <strong>Issue: MySQL connection fails</strong>
+            <ul>
+                <li>Ensure MySQL is running: <span class="inline-code">sudo systemctl start mysql</span></li>
+                <li>Check credentials match: root/123456</li>
+                <li>Verify database exists: <span class="inline-code">CREATE DATABASE statedb;</span></li>
+            </ul>
+        </div>
+
+        <div class="important">
+            <strong>Issue: History not being recorded</strong>
+            <ul>
+                <li>Verify debug mode is enabled: <span class="inline-code">registry.enableSnapshotDebug()</span></li>
+                <li>Check MySQL connection provider is initialized</li>
+                <li>Look for "[History] Created MySQL history tracker" in logs</li>
+            </ul>
+        </div>
+
+        <div class="important">
+            <strong>Issue: WebSocket connection fails</strong>
+            <ul>
+                <li>Ensure port 9999 is not in use</li>
+                <li>Check WebSocket server started: "WebSocket server started on port 9999"</li>
+                <li>Verify frontend URL: ws://localhost:9999</li>
+            </ul>
+        </div>
+
+        <div class="important">
+            <strong>Issue: UI not showing history</strong>
+            <ul>
+                <li>Check browser console for errors</li>
+                <li>Verify WebSocket connected: "Client connected" in backend logs</li>
+                <li>Ensure machine is selected in dropdown</li>
+                <li>Check GET_HISTORY request is sent</li>
+            </ul>
+        </div>
+
+        <h3>Debug Checklist</h3>
+        <ol>
+            <li>✅ MySQL running and accessible</li>
+            <li>✅ Database 'statedb' exists</li>
+            <li>✅ Backend compiled successfully</li>
+            <li>✅ Debug modes enabled in registry</li>
+            <li>✅ WebSocket server started on port 9999</li>
+            <li>✅ History tables created (history_*)</li>
+            <li>✅ Frontend connected to WebSocket</li>
+            <li>✅ Machine selected in UI dropdown</li>
+        </ol>
+    </div>
+
+    <h2>📚 Quick Reference</h2>
+    <div class="feature-box">
+        <h3>Essential Commands</h3>
+        <div class="code-block">
+# Start MySQL
+sudo systemctl start mysql
+
+# Create database
+mysql -u root -p123456 -e "CREATE DATABASE IF NOT EXISTS statedb;"
+
+# Run backend
+mvn compile
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.CallMachineRunnerProper"
+
+# Run frontend
+cd statemachine-ui-react
+npm start
+
+# Check history
+mysql -u root -p123456 statedb -e "SELECT * FROM history_call_002;"
+
+# Decode Base64 context
+echo "BASE64_STRING" | base64 -d | jq .
+        </div>
+
+        <h3>Key Files</h3>
+        <table>
+            <tr><th>File</th><th>Purpose</th></tr>
+            <tr><td>MachineHistoryMySQLTracker.java</td><td>MySQL history persistence</td></tr>
+            <tr><td>MysqlConnectionProvider.java</td><td>Database connection management</td></tr>
+            <tr><td>StateMachineWebSocketServer.java</td><td>WebSocket server & history API</td></tr>
+            <tr><td>MonitoringApp.js</td><td>React frontend main component</td></tr>
+            <tr><td>CallMachineRunnerProper.java</td><td>Example implementation</td></tr>
+        </table>
+    </div>
+
+    <div class="important">
+        <h3>📝 Notes for AI Assistants</h3>
+        <p>When working with this system:</p>
+        <ul>
+            <li>Always ensure MySQL is accessible before running the backend</li>
+            <li>Debug modes must be enabled explicitly in the registry</li>
+            <li>History tables are recreated on each run (data is not persistent across runs)</li>
+            <li>All database credentials are hardcoded - no config files needed</li>
+            <li>The system uses asynchronous writing - there may be a slight delay before history appears</li>
+            <li>WebSocket port 9999 is hardcoded in multiple places - ensure consistency</li>
+            <li>Frontend polling interval is 500ms for history updates</li>
+        </ul>
+    </div>
+
+    <footer style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #7f8c8d;">
+        <p>State Machine Debugging & History Documentation - Version 1.0</p>
+        <p>Last Updated: August 2025</p>
+    </footer>
+</body>
+</html>

@@ -13,13 +13,6 @@
     <bytecodeTargetLevel>
       <module name="StateMachine.main" target="17" />
       <module name="StateMachine.test" target="17" />
-      <module name="statemachinerunner" target="21" />
-      <module name="statemachinerunner.integrationTest" target="21" />
-      <module name="statemachinerunner.main" target="21" />
-      <module name="statemachinerunner.native-test" target="21" />
-      <module name="statemachinerunner.quarkus-generated-sources" target="21" />
-      <module name="statemachinerunner.quarkus-test-generated-sources" target="21" />
-      <module name="statemachinerunner.test" target="21" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">

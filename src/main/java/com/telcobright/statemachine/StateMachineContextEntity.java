@@ -49,6 +49,17 @@ public interface StateMachineContextEntity<TKey> {
     }
     
     /**
+     * Create a deep copy of this entity for history tracking.
+     * Default implementation returns this (assumes immutability).
+     * Override if the entity is mutable.
+     * 
+     * @return a deep copy of this entity
+     */
+    default StateMachineContextEntity<TKey> deepCopy() {
+        return this;  // Default assumes immutability
+    }
+    
+    /**
      * Get the current state of the state machine.
      * This field is persisted and updated after each state transition.
      * 

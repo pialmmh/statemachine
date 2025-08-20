@@ -16,7 +16,6 @@ import com.telcobright.statemachine.monitoring.SnapshotConfig;
 import com.telcobright.statemachine.persistence.StateMachineSnapshotRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import com.telcobright.statemachine.eventstore.EventStore;
 import com.telcobright.statemachine.eventstore.EventLogEntry;
 import java.util.HashMap;
 import com.telcobright.statemachine.history.MachineHistoryTracker;
@@ -127,10 +126,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     public void start() {
         System.out.println("StateMachine " + id + " started in state: " + currentState);
         
-        // Record initial state in history
-        if (historyTracker != null && historyTracker.isActive()) {
-            historyTracker.recordInitialState(currentState, persistingEntity, context);
-        }
+        // Don't record initial state here - enterState will handle it via recordStateEntry
         
         enterState(currentState, false);
     }
@@ -236,8 +232,8 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         // Change state
         this.currentState = newState;
         
-        // Enter new state
-        enterState(newState, true);
+        // Enter new state (but don't record entry yet - it will be done after transition is recorded)
+        enterState(newState, true, false);  // Added flag to delay entry recording
         
         // Notify callback
         if (onStateTransition != null) {
@@ -264,18 +260,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             }
         }
         
-        // Log state transition to EventStore if debug is enabled
-        long processingTime = System.currentTimeMillis() - startTime;
-        if (isDebugEnabled() && EventStore.getInstance() != null) {
-            Map<String, Object> details = new HashMap<>();
-            details.put("entryActionStatus", entryActionStatus);
-            if (config != null) {
-                details.put("isOffline", config.isOffline());
-                details.put("isFinal", config.isFinal());
-                details.put("hasTimeout", config.hasTimeout());
-            }
-            EventStore.getInstance().logStateChange("GenericStateMachine", id, oldState, newState, details, processingTime);
-        }
+        // State transition logging handled by MySQL history tracker
         
         // Print current state after transition
         System.out.println("📍 Current State: " + newState);
@@ -436,11 +421,22 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      * Enter a state and execute entry actions
      */
     private void enterState(String state, boolean executeEntryActions) {
+        enterState(state, executeEntryActions, true);  // Default to recording entry
+    }
+    
+    /**
+     * Enter a state and execute entry actions with control over recording
+     */
+    private void enterState(String state, boolean executeEntryActions, boolean recordEntry) {
         EnhancedStateConfig config = stateConfigs.get(state);
         
         // Reset entry action tracking for this state entry
         entryActionExecuted = false;
         entryActionStatus = "none";
+        
+        // Capture context before entry actions
+        StateMachineContextEntity contextBeforeEntry = persistingEntity != null ? persistingEntity.deepCopy() : null;
+        Object volatileContextBeforeEntry = context;  // Assuming volatile context is immutable or we clone it if needed
         
         if (config != null) {
             // Check if there are entry actions defined
@@ -474,6 +470,16 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 // No entry actions defined for this state
                 entryActionStatus = "none";
                 System.out.println("ℹ️ No entry actions defined for state: " + state);
+            }
+            
+            // Record state entry in history (with before/after context if entry actions were executed)
+            if (recordEntry && historyTracker != null && historyTracker.isActive()) {
+                try {
+                    historyTracker.recordStateEntry(state, contextBeforeEntry, volatileContextBeforeEntry,
+                                                   persistingEntity, context, entryActionStatus);
+                } catch (Exception e) {
+                    System.err.println("[History] Error recording state entry: " + e.getMessage());
+                }
             }
             
             // Setup timeout
@@ -548,10 +554,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 try {
                     System.out.println("   🔄 Firing timeout event...");
                     
-                    // Log timeout event to EventStore if debug is enabled
-                    if (isDebugEnabled() && EventStore.getInstance() != null) {
-                        EventStore.getInstance().logTimeoutEvent("TimeoutManager", id, currentState, targetState, timeoutMillis);
-                    }
+                    // Timeout logging handled by MySQL history tracker
                     
                     // Fire timeout event
                     TimeoutEvent timeoutEvent = new TimeoutEvent(currentState, targetState);
@@ -821,10 +824,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                     // Create new MySQL history tracker
                     historyTracker = new MachineHistoryMySQLTracker(id, connectionProvider, true);
                     
-                    // Record initial state
-                    if (persistingEntity != null || context != null) {
-                        historyTracker.recordInitialState(currentState, persistingEntity, context);
-                    }
+                    // Initial state is already recorded in the constructor, don't duplicate it here
                 } else {
                     System.err.println("[History] No MySQL connection provider available for history tracking");
                 }

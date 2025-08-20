@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './MonitoringApp.css';
 import LiveHistoryDisplay from './components/LiveHistoryDisplay';
+import wsLogger from './wsLogger';
 
 function MonitoringApp({ mode = 'snapshot' }) {
   const [currentMode, setCurrentMode] = useState(mode);
@@ -23,6 +24,9 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const hasReceivedInitialState = useRef(false);
   const countdownIntervalRef = useRef(null);
   const selectedMachineRef = useRef(null);
+  const lastHistoryId = useRef(0);
+  const historyPollInterval = useRef(null);
+  const historySessionId = useRef(null); // Track current history session
 
   // Update currentMode when prop changes
   useEffect(() => {
@@ -32,7 +36,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
   // Keep selectedMachineRef in sync with selectedMachine
   useEffect(() => {
     selectedMachineRef.current = selectedMachine;
-    console.log('Updated selectedMachineRef to:', selectedMachine);
+    wsLogger.debug('Updated selectedMachineRef to: ' + selectedMachine);
   }, [selectedMachine]);
 
   useEffect(() => {
@@ -53,6 +57,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         clearInterval(countdownIntervalRef.current);
         countdownIntervalRef.current = null;
       }
+      stopHistoryPolling();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMode]);
@@ -70,7 +75,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         setRuns(getSampleRuns());
       }
     } catch (error) {
-      console.log('Using sample data:', error);
+      wsLogger.debug('Using sample data:', error);
       setRuns(getSampleRuns());
     } finally {
       setLoading(false);
@@ -113,7 +118,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         setHistory(getSampleHistory(runId));
       }
     } catch (error) {
-      console.log('Using sample history:', error);
+      wsLogger.debug('Using sample history:', error);
       setHistory(getSampleHistory(runId));
     } finally {
       setLoading(false);
@@ -182,7 +187,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         };
         wsRef.current.send(JSON.stringify(logMessage));
       } catch (error) {
-        console.error('Error logging WebSocket event:', error);
+        wsLogger.error('Error logging WebSocket event:', error);
       }
     }
   };
@@ -201,11 +206,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
         
         return true;
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        wsLogger.error('Error sending WebSocket message:', error);
         return false;
       }
     } else {
-      console.warn('WebSocket not ready, message not sent:', message);
+      wsLogger.debug('WebSocket not ready, message not sent:', message);
       // Queue the message to send when connection is ready
       if (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING) {
         setTimeout(() => sendWebSocketMessage(message), 100);
@@ -221,8 +226,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket connected for live mode');
+        wsLogger.debug('WebSocket connected for live mode');
         setIsConnected(true);
+        
+        // Set WebSocket reference in logger
+        wsLogger.setWebSocket(wsRef.current);
         
         // Use safe send function with a small delay to ensure connection is fully established
         setTimeout(() => {
@@ -239,7 +247,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
       };
 
       wsRef.current.onmessage = (event) => {
-        console.log('Raw WebSocket message:', event.data);
+        // Disabled to reduce console noise
+        // wsLogger.debug('Raw WebSocket message:', event.data);
         
         // Log received message (but not LOG messages to avoid loops)
         try {
@@ -256,7 +265,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
       };
 
       wsRef.current.onclose = () => {
-        console.log('WebSocket disconnected');
+        wsLogger.debug('WebSocket disconnected');
         setIsConnected(false);
         wsRef.current = null;
         // Reconnect if still in live mode
@@ -266,11 +275,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
       };
 
       wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        wsLogger.error('WebSocket error:', error);
         setIsConnected(false);
       };
     } catch (error) {
-      console.error('Failed to connect:', error);
+      wsLogger.error('Failed to connect:', error);
     }
   };
 
@@ -306,21 +315,19 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const handleWebSocketMessage = (message) => {
     try {
       const data = JSON.parse(message);
-      console.log('Parsed WebSocket message:', data);
-      console.log('Message type:', data.type, 'Selected machine:', selectedMachine);
+      // Only log important message types
+      if (data.type !== 'HISTORY_UPDATE' || (data.newEntries && data.newEntries.length > 0)) {
+        wsLogger.debug('WebSocket message type:', data.type);
+      }
       
       // Handle machine list
       if (data.type === 'MACHINES_LIST') {
         const machines = data.machines || [];
-        console.log('MACHINES_LIST received:', machines.map(m => m.id));
+        wsLogger.debug('MACHINES_LIST received:', machines.map(m => m.id));
         setLiveMachines(machines);
-        // Auto-select first machine if none selected
-        if (machines.length > 0 && !selectedMachine) {
-          console.log('Auto-selecting first machine:', machines[0].id);
-          setSelectedMachine(machines[0].id);
-          selectedMachineRef.current = machines[0].id;  // Update ref
-        } else if (selectedMachine) {
-          console.log('Machine already selected:', selectedMachine);
+        // Don't auto-select any machine - let user choose
+        if (selectedMachine) {
+          wsLogger.debug('Machine already selected:', selectedMachine);
         }
       } else if (data.type === 'MACHINE_REGISTERED') {
         // Add new machine to list
@@ -332,24 +339,27 @@ function MonitoringApp({ mode = 'snapshot' }) {
           setSelectedMachine(null);
         }
       } else if (data.type === 'CURRENT_STATE') {
-        console.log('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);
+        wsLogger.debug('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);
         setLiveState(data.currentState || 'IDLE');
         
         // If we haven't received initial state yet, add it
         if (!hasReceivedInitialState.current) {
-          console.log('Adding initial state');
+          wsLogger.debug('Adding initial state');
           hasReceivedInitialState.current = true;
           
           // Add initial state to history
           const initialTransition = {
             id: `initial-${Date.now()}-${Math.random()}`,
             stepNumber: 1,
-            fromState: 'Initial',
+            fromState: data.currentState || 'IDLE',
             toState: data.currentState || 'IDLE',
-            event: 'Initial State',
+            event: 'Entry',
+            isEntryStep: true,
+            stateChange: false,
             timestamp: data.timestamp || new Date().toISOString(),
             duration: 0,
             eventData: {},
+            entryActionStatus: 'none',
             contextBefore: {
               registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
               persistentContext: data.context || {},
@@ -366,7 +376,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
       } else if (data.type === 'MACHINE_STATE') {
         // Handle single machine state response
-        console.log('MACHINE_STATE received:', data);
+        wsLogger.debug('MACHINE_STATE received:', data);
         
         if (data.machineId === selectedMachine) {
           setLiveState(data.currentState || 'IDLE');
@@ -375,12 +385,15 @@ function MonitoringApp({ mode = 'snapshot' }) {
           const initialTransition = {
             id: `machine-state-${Date.now()}-${Math.random()}`,
             stepNumber: 1,
-            fromState: 'Initial',
+            fromState: data.currentState || 'IDLE',
             toState: data.currentState || 'IDLE',
-            event: 'Machine State',
+            event: 'Entry',
+            isEntryStep: true,
+            stateChange: false,
             timestamp: data.timestamp || new Date().toISOString(),
             duration: 0,
             eventData: {},
+            entryActionStatus: 'none',
             contextBefore: {
               registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
               persistentContext: {},
@@ -398,9 +411,9 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
       } else if (data.type === 'COMPLETE_STATUS') {
         // Handle complete status update from server
-        console.log('COMPLETE_STATUS received - machines count:', data.machines ? data.machines.length : 0);
-        console.log('Currently selected machine:', selectedMachine);
-        console.log('hasReceivedInitialState:', hasReceivedInitialState.current);
+        wsLogger.debug('COMPLETE_STATUS received - machines count:', data.machines ? data.machines.length : 0);
+        wsLogger.debug('Currently selected machine:', selectedMachine);
+        wsLogger.debug('hasReceivedInitialState:', hasReceivedInitialState.current);
         
         // Don't process COMPLETE_STATUS for history - it causes duplicates
         // We only use it for updating the machine list and current state
@@ -421,7 +434,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
       } else if (data.type === 'EVENT_SENT') {
         // Track the event that was sent to the state machine
-        console.log('EVENT_SENT received:', data);
+        wsLogger.debug('EVENT_SENT received:', data);
         
         // Add event to history as a separate entry
         setLiveHistory(prev => {
@@ -448,27 +461,27 @@ function MonitoringApp({ mode = 'snapshot' }) {
             }
           };
           
-          console.log('Adding event to history:', event.event);
+          wsLogger.debug('Adding event to history:', event.event);
           updated.push(event);
           return updated;
         });
       } else if (data.type === 'STATE_CHANGE') {
-        console.log('STATE_CHANGE received for machine:', data.machineId);
-        console.log('Currently selected machine (ref):', selectedMachineRef.current);
-        console.log('Currently selected machine (state):', selectedMachine);
-        console.log('Full STATE_CHANGE data:', JSON.stringify(data));
+        wsLogger.debug('STATE_CHANGE received for machine:', data.machineId);
+        wsLogger.debug('Currently selected machine (ref):', selectedMachineRef.current);
+        wsLogger.debug('Currently selected machine (state):', selectedMachine);
+        wsLogger.debug('Full STATE_CHANGE data:', JSON.stringify(data));
         
         // Only process state changes for the selected machine (use ref to avoid closure issues)
         if (data.machineId !== selectedMachineRef.current) {
-          console.log(`Ignoring state change: machineId=${data.machineId}, selected=${selectedMachineRef.current}`);
+          wsLogger.debug(`Ignoring state change: machineId=${data.machineId}, selected=${selectedMachineRef.current}`);
           return;
         }
         
-        console.log('Processing STATE_CHANGE for selected machine');
+        wsLogger.debug('Processing STATE_CHANGE for selected machine');
         
         // Update live state
         const newState = data.newState || data.stateAfter || data.state;
-        console.log('New state:', newState);
+        wsLogger.debug('New state:', newState);
         setLiveState(newState);
         
         // Handle countdown if present in message
@@ -485,13 +498,13 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
         
         // Add to live history with full context
-        console.log('Adding STATE_CHANGE to history');
-        console.log('Current liveHistory before update:', liveHistory.length, 'items');
+        wsLogger.debug('Adding STATE_CHANGE to history');
+        wsLogger.debug('Current liveHistory before update:', liveHistory.length, 'items');
         
         setLiveHistory(prev => {
           const updated = [...(Array.isArray(prev) ? prev : [])];
-          console.log('Inside setLiveHistory - current length:', updated.length);
-          console.log('Last item in history:', updated.length > 0 ? updated[updated.length - 1] : 'empty');
+          wsLogger.debug('Inside setLiveHistory - current length:', updated.length);
+          wsLogger.debug('Last item in history:', updated.length > 0 ? updated[updated.length - 1] : 'empty');
           
           // Don't add initial state here - let COMPLETE_STATUS handle it
           // Just add the actual state transition
@@ -514,7 +527,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
               lastTransition.toState === toState &&
               !lastTransition.eventSent &&
               Math.abs(new Date() - new Date(lastTransition.timestamp)) < 100) { // Within 100ms
-            console.log('WARNING: Duplicate state transition detected, skipping:', fromState, '->', toState);
+            wsLogger.debug('WARNING: Duplicate state transition detected, skipping:', fromState, '->', toState);
             return updated; // Skip duplicate
           }
           
@@ -527,6 +540,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
             }
           }
           
+          // Add the event/transition in the source state
           const transition = {
             id: `${Date.now()}-${Math.random()}`, // Add unique ID for debugging
             stepNumber: updated.length + 1,
@@ -537,7 +551,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
             timestamp: data.timestamp || new Date().toISOString(),
             duration: data.duration || 0,
             eventData: data.payload || {},
-            entryActionStatus: data.entryActionStatus || 'none', // Capture entry action status
+            entryActionStatus: 'none', // No entry action status for transitions
             contextBefore: {
               registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
               persistentContext: previousContext,
@@ -550,16 +564,135 @@ function MonitoringApp({ mode = 'snapshot' }) {
             }
           };
           
-          console.log('Adding transition:', transition.fromState, '->', transition.toState, 'ID:', transition.id);
-          console.log('History length before push:', updated.length);
-          console.log('All transitions in history:', updated.map(t => `${t.fromState}->${t.toState} (ID: ${t.id})`));
+          wsLogger.debug('Adding transition:', transition.fromState, '->', transition.toState, 'ID:', transition.id);
+          wsLogger.debug('History length before push:', updated.length);
+          wsLogger.debug('All transitions in history:', updated.map(t => `${t.fromState}->${t.toState} (ID: ${t.id})`));
           updated.push(transition);
-          console.log('History length after push:', updated.length);
+          
+          // Add entry step for the target state (only if it's a real state change)
+          if (fromState !== toState) {
+            const entryStep = {
+              id: `${Date.now()}-entry-${Math.random()}`,
+              stepNumber: updated.length + 1,
+              fromState: toState,
+              toState: toState,
+              event: 'Entry',
+              stateChange: false,
+              isEntryStep: true,
+              timestamp: new Date().toISOString(),
+              duration: 0,
+              eventData: {},
+              entryActionStatus: data.entryActionStatus || 'none',
+              contextBefore: {
+                registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                persistentContext: data.context || {},
+                volatileContext: {}
+              },
+              contextAfter: {
+                registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+                persistentContext: data.context || {},
+                volatileContext: {}
+              }
+            };
+            wsLogger.debug('Adding entry step for state:', toState);
+            updated.push(entryStep);
+          }
+          
+          wsLogger.debug('History length after push:', updated.length);
           return updated;
         });
+      } else if (data.type === 'HISTORY_DATA') {
+        // Full history data received
+        wsLogger.debug('=== HISTORY_DATA received ===');
+        wsLogger.debug('  Machine ID:', data.machineId);
+        wsLogger.debug('  History length:', data.history ? data.history.length : 0);
+        wsLogger.debug('  Selected machine ref:', selectedMachineRef.current);
+        wsLogger.debug('  Match:', data.machineId === selectedMachineRef.current);
+        
+        if (data.machineId === selectedMachineRef.current && data.history) {
+          wsLogger.debug('Processing history for', data.machineId);
+          
+          // Generate a new session ID for this history load
+          const sessionId = `${data.machineId}-${Date.now()}`;
+          historySessionId.current = sessionId;
+          wsLogger.debug('New history session:', sessionId);
+          
+          // Check if this is grouped format or raw format
+          let historyToSet;
+          if (data.history.length > 0 && data.history[0].state && data.history[0].transitions) {
+            // Grouped format - pass directly without transformation
+            wsLogger.debug('Received grouped history format - passing directly');
+            historyToSet = data.history;
+            
+            // Get last ID from the last transition in the last group
+            const lastGroup = data.history[data.history.length - 1];
+            const lastTransitions = lastGroup.transitions || [];
+            if (lastTransitions.length > 0) {
+              const lastTransition = lastTransitions[lastTransitions.length - 1];
+              lastHistoryId.current = lastTransition.id || 0;
+            } else {
+              lastHistoryId.current = 0;
+            }
+          } else {
+            // Raw format - transform it
+            wsLogger.debug('Received raw history format - transforming');
+            const transformedHistory = transformBackendHistory(data.history);
+            wsLogger.debug('Transformed', data.history.length, 'entries into', transformedHistory.length, 'frontend entries');
+            historyToSet = transformedHistory;
+            
+            // Update last ID for incremental updates
+            if (data.history.length > 0) {
+              const lastEntry = data.history[data.history.length - 1];
+              lastHistoryId.current = lastEntry.id || 0;
+            } else {
+              lastHistoryId.current = 0;
+            }
+          }
+          
+          wsLogger.debug('About to setLiveHistory with:', historyToSet.length, 'entries');
+          setLiveHistory(historyToSet);
+          wsLogger.debug('Set lastHistoryId to:', lastHistoryId.current);
+          
+          // Start polling for updates only if we have history
+          if (historyToSet.length > 0) {
+            wsLogger.debug('Starting history polling for', data.machineId);
+            startHistoryPolling(data.machineId);
+          }
+        } else {
+          wsLogger.debug('Not processing - machine mismatch or no history');
+        }
+      } else if (data.type === 'HISTORY_UPDATE') {
+        // Incremental history update - only log if there are new entries
+        if (data.newEntries && data.newEntries.length > 0) {
+          wsLogger.debug('HISTORY_UPDATE received:', data.newEntries.length, 'new entries');
+        }
+        
+        // Only process if it's for the current machine AND we have a matching session
+        const currentSessionId = historySessionId.current;
+        if (data.machineId === selectedMachineRef.current && 
+            currentSessionId && 
+            data.newEntries && 
+            data.newEntries.length > 0) {
+          
+          // Additional check: verify the lastId matches what we're expecting
+          if (data.lastId !== lastHistoryId.current) {
+            wsLogger.debug('Ignoring HISTORY_UPDATE - lastId mismatch', {
+              expected: lastHistoryId.current,
+              received: data.lastId
+            });
+            return;
+          }
+          
+          const newTransformed = transformBackendHistory(data.newEntries);
+          setLiveHistory(prev => [...prev, ...newTransformed]);
+          
+          // Update last ID
+          const lastEntry = data.newEntries[data.newEntries.length - 1];
+          lastHistoryId.current = lastEntry.id || lastHistoryId.current;
+        }
       } else if (data.type === 'CONNECTION_TEST') {
         // Ignore connection test messages
-        console.log('Connection test message received');
+        wsLogger.debug('Connection test message received');
       } else if (data.type === 'STATE') {
         // Simple state update without context
         setLiveState(data.state);
@@ -578,7 +711,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         setLiveState(data.state);
       }
     } catch (error) {
-      console.error('Error parsing message:', error, message);
+      wsLogger.error('Error parsing message:', error, message);
     }
   };
 
@@ -610,9 +743,149 @@ function MonitoringApp({ mode = 'snapshot' }) {
     }
   };
 
+  // Transform backend history format to frontend format
+  const transformBackendHistory = (backendHistory) => {
+    if (!backendHistory || !Array.isArray(backendHistory)) {
+      return [];
+    }
+    
+    wsLogger.debug('=== transformBackendHistory called with', backendHistory.length, 'entries ===');
+    wsLogger.debug('First entry:', backendHistory[0]);
+    
+    const transformed = [];
+    let stepNumber = 1;
+    
+    backendHistory.forEach((entry, index) => {
+      const isEntry = entry.event === 'ENTRY';
+      const isBeforeEntry = entry.event === 'BEFORE_ENTRY_ACTIONS';
+      const isAfterEntry = entry.event === 'AFTER_ENTRY_ACTIONS';
+      const isTransition = entry.transitionOrStay === true;
+      
+      wsLogger.debug(`Entry ${index}: state=${entry.state}, event=${entry.event}, isEntry=${isEntry}, isTransition=${isTransition}`);
+      
+      // Determine the display event name
+      let displayEvent = entry.event || 'Unknown';
+      if (isEntry) {
+        displayEvent = 'Entry';
+      } else if (isBeforeEntry) {
+        displayEvent = 'Before Entry Actions';
+      } else if (isAfterEntry) {
+        displayEvent = 'After Entry Actions';
+      }
+      
+      // Determine entry action status based on event type
+      let entryActionStatus = 'none';
+      if (isBeforeEntry || isAfterEntry) {
+        entryActionStatus = 'executed';
+      } else if (isEntry) {
+        entryActionStatus = 'none';  // No entry actions
+      }
+      
+      const historyEntry = {
+        stepNumber: stepNumber++,
+        fromState: entry.state,
+        toState: isTransition && entry.transitionToState ? entry.transitionToState : entry.state,
+        event: displayEvent,
+        timestamp: entry.datetime || new Date().toISOString(),
+        duration: 0,
+        eventData: entry.eventPayload || {},
+        eventIgnored: entry.eventIgnored || false,
+        stateChange: isTransition,
+        eventSent: !isTransition && !isEntry && !isBeforeEntry && !isAfterEntry,
+        entryActionStatus: entryActionStatus,
+        isEntryStep: isEntry || isBeforeEntry || isAfterEntry,
+        contextBefore: {
+          registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+          persistentContext: index > 0 && backendHistory[index - 1].persistentContext 
+            ? backendHistory[index - 1].persistentContext : {},
+          volatileContext: index > 0 && backendHistory[index - 1].volatileContext 
+            ? backendHistory[index - 1].volatileContext : {}
+        },
+        contextAfter: {
+          registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
+          persistentContext: entry.persistentContext || {},
+          volatileContext: entry.volatileContext || {}
+        }
+      };
+      
+      transformed.push(historyEntry);
+      wsLogger.debug(`Added transformed entry: Step #${historyEntry.stepNumber}, ${historyEntry.event}, isEntryStep=${historyEntry.isEntryStep}`);
+    });
+    
+    wsLogger.debug('=== Total transformed entries:', transformed.length, '===');
+    wsLogger.debug('Transformed history:', transformed);
+    return transformed;
+  };
+
+  // Request full history from backend
+  const requestMachineHistory = (machineId) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      wsLogger.error('WebSocket not connected');
+      return;
+    }
+    
+    const request = {
+      action: 'GET_HISTORY',
+      machineId: machineId
+    };
+    
+    wsLogger.debug('Requesting full history for:', machineId);
+    wsRef.current.send(JSON.stringify(request));
+  };
+  
+  // Request incremental history updates
+  const requestHistoryUpdate = (machineId) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    
+    const request = {
+      action: 'GET_HISTORY_SINCE',
+      machineId: machineId,
+      lastId: lastHistoryId.current
+    };
+    
+    // Only log if we're debugging polling issues
+    // wsLogger.debug('Requesting history update for:', machineId, 'since ID:', lastHistoryId.current);
+    wsRef.current.send(JSON.stringify(request));
+  };
+  
+  // Start polling for history updates
+  const startHistoryPolling = (machineId) => {
+    // Clear any existing polling
+    if (historyPollInterval.current) {
+      clearInterval(historyPollInterval.current);
+      historyPollInterval.current = null;
+    }
+    
+    // Store the session ID for this polling session
+    const sessionId = historySessionId.current;
+    
+    // Poll for updates every 2 seconds (reduced frequency)
+    historyPollInterval.current = setInterval(() => {
+      // Check both machine ID and session ID
+      if (selectedMachineRef.current === machineId && historySessionId.current === sessionId) {
+        requestHistoryUpdate(machineId);
+      } else {
+        // Stop polling if machine or session changed
+        wsLogger.debug('Stopping polling - machine or session changed');
+        clearInterval(historyPollInterval.current);
+        historyPollInterval.current = null;
+      }
+    }, 2000);
+  };
+  
+  // Stop history polling
+  const stopHistoryPolling = () => {
+    if (historyPollInterval.current) {
+      clearInterval(historyPollInterval.current);
+      historyPollInterval.current = null;
+    }
+  };
+
   const sendEvent = () => {
-    console.log('sendEvent called');
-    console.log('isConnected:', isConnected, 'wsRef.current:', wsRef.current, 'selectedMachine:', selectedMachine);
+    wsLogger.debug('sendEvent called');
+    wsLogger.debug('isConnected:', isConnected, 'wsRef.current:', wsRef.current, 'selectedMachine:', selectedMachine);
     
     if (!selectedMachine) {
       alert('Please select a machine first');
@@ -633,10 +906,10 @@ function MonitoringApp({ mode = 'snapshot' }) {
         payload: payload
       };
       
-      console.log('Sending WebSocket event:', message);
+      wsLogger.debug('Sending WebSocket event:', message);
       
       if (sendWebSocketMessage(message)) {
-        console.log('Event sent successfully');
+        wsLogger.debug('Event sent successfully');
         
         // Don't add the event to history here - let the backend STATE_CHANGE handle it
         // This was causing duplicate entries
@@ -645,7 +918,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
         alert('Failed to send event. WebSocket connection might be unstable.');
       }
     } catch (error) {
-      console.error('Error preparing event:', error);
+      wsLogger.error('Error preparing event:', error);
       alert('Invalid JSON payload: ' + error.message);
     }
   };
@@ -728,32 +1001,46 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       value={selectedMachine || ''}
                       onChange={(e) => {
                         const machineId = e.target.value;
-                        console.log('Machine selected:', machineId);
+                        wsLogger.debug('Machine selected:', machineId);
                         setSelectedMachine(machineId);
                         selectedMachineRef.current = machineId;  // Update ref to avoid closure issues
                         
-                        // When a machine is selected, reset history and request its state
+                        // When a machine is selected, request its history from backend
                         if (machineId) {
-                          console.log('Requesting state for machine:', machineId);
+                          wsLogger.debug('Requesting history for machine:', machineId);
+                          
+                          // Stop polling for the previous machine
+                          stopHistoryPolling();
+                          
+                          // Clear state for new machine
                           hasReceivedInitialState.current = false;
-                          // Don't clear history completely - keep initial state display
+                          lastHistoryId.current = 0;
+                          historySessionId.current = null; // Clear session ID
                           setLiveHistory([]);
+                          
+                          // Request the machine's history from backend
+                          requestMachineHistory(machineId);
                           
                           // Request the machine's current state using safe send
                           const request = {
                             action: 'GET_MACHINE_STATE',
                             machineId: machineId
                           };
-                          console.log('Sending WebSocket request:', request);
+                          wsLogger.debug('Sending WebSocket request:', request);
                           sendWebSocketMessage(request);
                         } else {
-                          console.log('Cannot request state - WebSocket not ready or no machine selected');
-                          console.log('machineId:', machineId, 'wsRef.current:', wsRef.current, 'readyState:', wsRef.current?.readyState);
+                          // User deselected machine (selected empty option)
+                          wsLogger.debug('Machine deselected');
+                          stopHistoryPolling();
+                          setLiveHistory([]);
+                          hasReceivedInitialState.current = false;
+                          lastHistoryId.current = 0;
+                          historySessionId.current = null; // Clear session ID
                         }
                       }}
                       style={{ marginBottom: '12px' }}
                     >
-                      <option value="">-- Select a Machine --</option>
+                      <option value="">Select Machine</option>
                       {liveMachines.map(machine => (
                         <option key={machine.id} value={machine.id}>
                           {machine.type} - {machine.id}
@@ -790,8 +1077,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
                     <button 
                       className="send-event-btn"
                       onClick={() => {
-                        console.log('Button clicked!');
-                        console.log('Current state - isConnected:', isConnected, 'selectedMachine:', selectedMachine);
+                        wsLogger.debug('Button clicked!');
+                        wsLogger.debug('Current state - isConnected:', isConnected, 'selectedMachine:', selectedMachine);
                         sendEvent();
                       }}
                       disabled={!isConnected || !selectedMachine}
@@ -875,6 +1162,9 @@ function MonitoringApp({ mode = 'snapshot' }) {
             ) : (
               // Live mode display
               selectedMachine ? (
+                (() => {
+                  wsLogger.debug('Rendering LiveHistoryDisplay with liveHistory.length:', liveHistory.length);
+                  return (
                 <LiveHistoryDisplay 
                   liveHistory={liveHistory.length > 0 ? liveHistory : [{
                     stepNumber: 1,
@@ -898,6 +1188,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
                   countdownState={countdownState}
                   countdownRemaining={countdownRemaining}
                 />
+                  );
+                })()
               ) : (
                 <div className="empty-state">
                   <h3>🔴 Live Monitoring Active</h3>

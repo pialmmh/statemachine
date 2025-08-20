@@ -10,7 +10,6 @@ import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.StateMachineContextEntity;
 import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
 import com.telcobright.statemachine.persistence.MysqlConnectionProvider;
-import com.telcobright.statemachine.eventstore.EventStore;
 import java.util.HashMap;
 
 /**
@@ -83,14 +82,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         // Notify listeners
         notifyRegistryCreate(id);
         
-        // Log to EventStore if debug is enabled
-        if (isDebugEnabled() && EventStore.getInstance() != null) {
-            Map<String, Object> details = new HashMap<>();
-            details.put("machineClass", machine.getClass().getSimpleName());
-            details.put("currentState", machine.getCurrentState());
-            details.put("debugEnabled", machine.isDebugEnabled());
-            EventStore.getInstance().logRegistryEvent("StateMachineRegistry", "CREATE", id, details);
-        }
+        // Registry events logged via MySQL history
         
         // Send event metadata update if WebSocket server is running
         if (isWebSocketServerRunning()) {
@@ -112,15 +104,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         
         notifyRegistryRemove(id);
         
-        // Log to EventStore if debug is enabled
-        if (isDebugEnabled() && EventStore.getInstance() != null) {
-            Map<String, Object> details = new HashMap<>();
-            if (machine != null) {
-                details.put("lastState", machine.getCurrentState());
-                details.put("wasComplete", machine.isComplete());
-            }
-            EventStore.getInstance().logRegistryEvent("StateMachineRegistry", "REMOVE", id, details);
-        }
+        // Registry events logged via MySQL history
     }
     
     /**
@@ -330,13 +314,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             }
         }
         
-        // Log to EventStore if debug is enabled
-        if (isDebugEnabled() && EventStore.getInstance() != null) {
-            Map<String, Object> details = new HashMap<>();
-            details.put("contextClass", contextClass.getSimpleName());
-            details.put("currentState", machine.getCurrentState());
-            EventStore.getInstance().logRegistryEvent("StateMachineRegistry", "REHYDRATE", machineId, details);
-        }
+        // Registry events logged via MySQL history
         
         return context;
     }
@@ -345,12 +323,11 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      * Initialize MySQL connection provider
      */
     private void initializeConnectionProvider() {
+        // Always try to initialize the connection provider
+        // It will be used when debug mode is enabled later
         try {
-            // Only initialize if debug mode is enabled (which includes snapshot mode)
-            if (isDebugEnabled()) {
-                connectionProvider = new MysqlConnectionProvider();
-                System.out.println("[Registry] Initialized MySQL connection provider for history tracking");
-            }
+            connectionProvider = new MysqlConnectionProvider();
+            System.out.println("[Registry] Initialized MySQL connection provider for history tracking");
         } catch (Exception e) {
             System.err.println("[Registry] Failed to initialize MySQL connection provider: " + e.getMessage());
             connectionProvider = null;

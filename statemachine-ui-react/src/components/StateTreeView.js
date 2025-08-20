@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 
 function StateTreeView({ stateInstances, onSelectTransition, selectedTransition }) {
+  console.log('StateTreeView received stateInstances:', stateInstances);
+  stateInstances.forEach(inst => {
+    console.log(`  State ${inst.state}-${inst.instanceNumber}: ${inst.transitions.length} transitions`);
+    inst.transitions.forEach((t, i) => {
+      console.log(`    Transition ${i}: event="${t.event}", direction="${t.direction}", keys=${Object.keys(t).join(',')}`);
+    });
+  });
+  
   // Simply keep all states expanded all the time
   const getAllStateKeys = () => {
     const keys = new Set();
     stateInstances.forEach(instance => {
       keys.add(`${instance.state}-${instance.instanceNumber}`);
     });
+    console.log('getAllStateKeys returning:', Array.from(keys));
     return keys;
   };
   
@@ -27,6 +36,14 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
     setExpandedStates(newExpanded);
   };
 
+  const expandAll = () => {
+    setExpandedStates(getAllStateKeys());
+  };
+
+  const collapseAll = () => {
+    setExpandedStates(new Set());
+  };
+
   // Get icon for state - Windows folder style
   const getStateIcon = (isExpanded) => {
     return isExpanded ? '📂' : '📁'; // Open/closed folder
@@ -36,25 +53,33 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
   const getEventIcon = (transition) => {
     const event = transition.event;
     
-    // For incoming transitions that are timeouts, treat them as regular state changes
-    if (transition.direction === 'incoming' && event === 'Timeout') {
-      return '⚙️'; // Regular state change icon
+    // Check for timeout events
+    if (event && (event.toUpperCase() === 'TIMEOUT' || event.toLowerCase().includes('timeout'))) {
+      return '⏰'; // Clock icon for timeout events
     }
     
-    // Check for timeout events specifically (outgoing or events)
-    if (event && (event.toLowerCase().includes('timeout') || event === 'Timeout')) {
-      return '⏰'; // Clock icon for timeout events
-    } else if (transition.eventSent || transition.direction === 'event') {
-      // This is an event that was sent
-      return '⚡'; // Lightning bolt for other events
-    } else if (transition.stateChange || transition.fromState !== transition.toState) {
-      // This is a state transition
-      return '⚙️'; // Gear icon for state transitions
-    } else if (event === 'Initial State' || event === 'Initial') {
-      return '◉'; // Circle/dot for initial state
-    } else {
-      return '•'; // Bullet point for other items
+    // Check for entry events (including BEFORE/AFTER entry actions)
+    if (event && (event.toUpperCase() === 'ENTRY' || event.toUpperCase().includes('ENTRY'))) {
+      return '📍'; // Pin icon for entry events
     }
+    
+    // For any other event (INCOMING_CALL, ANSWER, HANGUP, REJECT, etc.), use lightning bolt
+    // This includes events that cause transitions or stay in the same state
+    if (event && event.toUpperCase() !== 'ENTRY' && !event.toLowerCase().includes('timeout')) {
+      return '⚡'; // Lightning bolt for all other events
+    }
+    
+    // Check for direction-based icons (for compatibility with old format)
+    if (transition.eventSent || transition.direction === 'event') {
+      return '⚡'; // Lightning bolt for events
+    }
+    
+    if (transition.stateChange || (transition.fromState && transition.fromState !== transition.toState)) {
+      return '⚙️'; // Gear icon for state transitions
+    }
+    
+    // Default
+    return '•'; // Bullet point for other items
   };
 
   return (
@@ -69,6 +94,60 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       position: 'relative'
     }}>
+      {/* Expand/Collapse buttons */}
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        background: 'white',
+        borderBottom: '1px solid #e9ecef',
+        marginBottom: '10px',
+        paddingBottom: '8px',
+        marginTop: '-5px',
+        zIndex: 10,
+        display: 'flex',
+        gap: '8px'
+      }}>
+        <button
+          onClick={expandAll}
+          style={{
+            padding: '4px 8px',
+            fontSize: '11px',
+            background: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: '#495057'
+          }}
+          onMouseOver={(e) => e.target.style.background = '#e9ecef'}
+          onMouseOut={(e) => e.target.style.background = '#f8f9fa'}
+          title="Expand All"
+        >
+          <span style={{ fontSize: '12px' }}>▼</span> Expand All
+        </button>
+        <button
+          onClick={collapseAll}
+          style={{
+            padding: '4px 8px',
+            fontSize: '11px',
+            background: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: '#495057'
+          }}
+          onMouseOver={(e) => e.target.style.background = '#e9ecef'}
+          onMouseOut={(e) => e.target.style.background = '#f8f9fa'}
+          title="Collapse All"
+        >
+          <span style={{ fontSize: '12px' }}>▶</span> Collapse All
+        </button>
+      </div>
       {stateInstances.map((instance, idx) => {
         const stateKey = `${instance.state}-${instance.instanceNumber}`;
         const isExpanded = expandedStates.has(stateKey);
@@ -142,7 +221,7 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                 paddingLeft: '8px'
               }}>
                 {instance.transitions.map((transition, tIdx) => (
-                  <div key={transition.stepNumber}>
+                  <div key={transition.id || transition.stepNumber || tIdx}>
                     {/* Transition Node */}
                     <div
                       style={{
@@ -180,8 +259,18 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                       <span style={{ 
                         marginRight: '6px', 
                         fontSize: '14px',
-                        color: (transition.eventSent || transition.direction === 'event') ? '#dc3545' : 'inherit',
-                        filter: (transition.eventSent || transition.direction === 'event') && !transition.event?.toLowerCase().includes('timeout') ? 'hue-rotate(-55deg) saturate(5) brightness(0.9)' : 'none',
+                        color: (() => {
+                          const icon = getEventIcon(transition);
+                          // Make lightning bolt reddish
+                          if (icon === '⚡') return '#dc3545';
+                          // Keep timeout yellow/orange
+                          if (icon === '⏰') return '#fd7e14';
+                          // Keep entry pin blue
+                          if (icon === '📍') return '#0066cc';
+                          // Keep arrow green
+                          if (icon === '➜') return '#28a745';
+                          return 'inherit';
+                        })(),
                         display: 'inline-block'
                       }}>
                         {getEventIcon(transition)}
@@ -194,12 +283,13 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                           marginBottom: '2px'
                         }}>
                           <span style={{ 
-                            color: transition.eventSent ? '#9b59b6' : '#495057', // Purple for events, gray for state changes
+                            color: transition.isEntryStep ? '#28a745' : 
+                                   transition.eventSent ? '#9b59b6' : '#495057', // Green for entry, Purple for events, gray for state changes
                             fontSize: '11px',
                             fontWeight: '600'
                           }}>
-                            {/* Show different label based on direction */}
-                            {transition.direction === 'incoming' && transition.event === 'Timeout' ? 'State Change' : transition.event}
+                            {/* Show event name */}
+                            {transition.event || 'Unknown'}
                           </span>
                           <span style={{ 
                             color: '#6c757d',
@@ -207,8 +297,8 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                             marginLeft: '6px'
                           }}>
                             {transition.direction === 'event' ? '(event)' : 
-                             transition.fromState !== transition.toState ? `(→ ${transition.toState})` : 
-                             transition.direction === 'incoming' ? `(← ${transition.fromState})` : ''}
+                             transition.direction === 'entry' ? '' :
+                             transition.fromState !== transition.toState ? `(→ ${transition.toState})` : ''}
                           </span>
                         </div>
 
@@ -219,23 +309,27 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                           display: 'flex',
                           gap: '8px'
                         }}>
-                          <span>Step #{transition.stepNumber}</span>
-                          {transition.eventData && Object.keys(transition.eventData).length > 0 && (
+                          <span>Step #{transition.id || transition.stepNumber || tIdx + 1}</span>
+                          {((transition.eventData && Object.keys(transition.eventData).length > 0) || 
+                            (transition.eventPayload && transition.eventPayload !== null)) && (
                             <span>• 📦 Has payload</span>
                           )}
-                          {/* Entry Action Status */}
-                          {transition.entryActionStatus && (
+                          {/* Entry Action Status - show only for entry steps */}
+                          {(transition.event === 'ENTRY' || (transition.isEntryStep && transition.event === 'Entry')) && (
                             <span style={{
                               fontWeight: '600',
-                              color: transition.entryActionStatus === 'executed' ? '#28a745' :
-                                     transition.entryActionStatus === 'skipped' ? '#ffc107' :
-                                     transition.entryActionStatus === 'failed' ? '#dc3545' :
-                                     transition.entryActionStatus === 'none' ? '#6c757d' : '#6c757d'
+                              color: '#6c757d'
                             }}>
-                              {transition.entryActionStatus === 'executed' ? '• ✓ Entry Actions' :
-                               transition.entryActionStatus === 'skipped' ? '• ⟳ Entry Skipped' :
-                               transition.entryActionStatus === 'failed' ? '• ✗ Entry Failed' :
-                               transition.entryActionStatus === 'none' ? '• ○ No Entry Actions' : ''}
+                              • ○ No Entry Actions
+                            </span>
+                          )}
+                          {/* Show context info for Before/After Entry Actions */}
+                          {(transition.event === 'Before Entry Actions' || transition.event === 'After Entry Actions') && (
+                            <span style={{
+                              fontWeight: '600',
+                              color: '#28a745'
+                            }}>
+                              • ✓ Context {transition.event === 'Before Entry Actions' ? 'before' : 'after'} actions
                             </span>
                           )}
                         </div>

@@ -1,7 +1,5 @@
 package com.telcobright.statemachine.persistence;
 
-import com.telcobright.statemachine.persistence.config.DatabaseConfig;
-import com.telcobright.statemachine.persistence.config.DatabaseConfigLoader;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -10,70 +8,75 @@ import java.sql.SQLException;
 
 /**
  * Provides MySQL connections using HikariCP connection pool
+ * Uses hardcoded credentials for simplicity (no config files)
  */
 public class MysqlConnectionProvider {
     private final HikariDataSource dataSource;
-    private final DatabaseConfig databaseConfig;
+    
+    // Hardcoded database credentials
+    private static final String DEFAULT_JDBC_URL = "jdbc:mysql://127.0.0.1:3306/statedb";
+    private static final String DEFAULT_USERNAME = "root";
+    private static final String DEFAULT_PASSWORD = "123456";
+    private static final String DEFAULT_DRIVER = "com.mysql.cj.jdbc.Driver";
+    
+    private final String jdbcUrl;
+    private final String username;
+    private final String password;
     
     /**
-     * Create provider with default configuration
+     * Create provider with default hardcoded configuration
      */
     public MysqlConnectionProvider() {
-        this(DatabaseConfigLoader.loadConfig());
+        this(DEFAULT_JDBC_URL, DEFAULT_USERNAME, DEFAULT_PASSWORD);
     }
     
     /**
-     * Create provider with specific configuration
+     * Create provider with custom credentials
      */
-    public MysqlConnectionProvider(DatabaseConfig config) {
-        this.databaseConfig = config;
-        this.dataSource = createDataSource(config);
+    public MysqlConnectionProvider(String jdbcUrl, String username, String password) {
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.password = password;
+        this.dataSource = createDataSource();
     }
     
     /**
-     * Create HikariCP data source from config
+     * Create HikariCP data source with hardcoded settings
      */
-    private HikariDataSource createDataSource(DatabaseConfig config) {
+    private HikariDataSource createDataSource() {
         HikariConfig hikariConfig = new HikariConfig();
         
         // Basic connection properties
-        hikariConfig.setJdbcUrl(config.getJdbcUrl());
-        hikariConfig.setUsername(config.getUsername());
-        hikariConfig.setPassword(config.getPassword());
-        hikariConfig.setDriverClassName(config.getDriverClassName());
+        hikariConfig.setJdbcUrl(jdbcUrl);
+        hikariConfig.setUsername(username);
+        hikariConfig.setPassword(password);
+        hikariConfig.setDriverClassName(DEFAULT_DRIVER);
         
-        // Pool configuration
-        hikariConfig.setMinimumIdle(config.getMinimumIdle());
-        hikariConfig.setMaximumPoolSize(config.getMaximumPoolSize());
-        hikariConfig.setConnectionTimeout(config.getConnectionTimeout());
-        hikariConfig.setIdleTimeout(config.getIdleTimeout());
-        hikariConfig.setMaxLifetime(config.getMaxLifetime());
-        hikariConfig.setAutoCommit(config.isAutoCommit());
-        hikariConfig.setValidationTimeout(config.getValidationTimeout());
+        // Pool configuration (hardcoded optimal values)
+        hikariConfig.setMinimumIdle(2);
+        hikariConfig.setMaximumPoolSize(10);
+        hikariConfig.setConnectionTimeout(30000); // 30 seconds
+        hikariConfig.setIdleTimeout(600000); // 10 minutes
+        hikariConfig.setMaxLifetime(1800000); // 30 minutes
+        hikariConfig.setAutoCommit(true);
+        hikariConfig.setValidationTimeout(5000); // 5 seconds
         
-        if (config.getLeakDetectionThreshold() > 0) {
-            hikariConfig.setLeakDetectionThreshold(config.getLeakDetectionThreshold());
-        }
-        
-        // MySQL specific optimizations
-        hikariConfig.addDataSourceProperty("cachePrepStmts", config.isCachePrepStmts());
-        hikariConfig.addDataSourceProperty("prepStmtCacheSize", config.getPrepStmtCacheSize());
-        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", config.getPrepStmtCacheSqlLimit());
-        hikariConfig.addDataSourceProperty("useServerPrepStmts", config.isUseServerPrepStmts());
-        hikariConfig.addDataSourceProperty("useLocalSessionState", config.isUseLocalSessionState());
-        hikariConfig.addDataSourceProperty("rewriteBatchedStatements", config.isRewriteBatchedStatements());
-        hikariConfig.addDataSourceProperty("cacheResultSetMetadata", config.isCacheResultSetMetadata());
-        hikariConfig.addDataSourceProperty("cacheServerConfiguration", config.isCacheServerConfiguration());
-        hikariConfig.addDataSourceProperty("elideSetAutoCommits", config.isElideSetAutoCommits());
-        hikariConfig.addDataSourceProperty("maintainTimeStats", config.isMaintainTimeStats());
-        
-        // Additional custom properties
-        config.getAdditionalProperties().forEach((key, value) -> {
-            hikariConfig.addDataSourceProperty(key.toString(), value);
-        });
+        // MySQL specific optimizations (hardcoded)
+        hikariConfig.addDataSourceProperty("cachePrepStmts", true);
+        hikariConfig.addDataSourceProperty("prepStmtCacheSize", 250);
+        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", 2048);
+        hikariConfig.addDataSourceProperty("useServerPrepStmts", true);
+        hikariConfig.addDataSourceProperty("useLocalSessionState", true);
+        hikariConfig.addDataSourceProperty("rewriteBatchedStatements", true);
+        hikariConfig.addDataSourceProperty("cacheResultSetMetadata", true);
+        hikariConfig.addDataSourceProperty("cacheServerConfiguration", true);
+        hikariConfig.addDataSourceProperty("elideSetAutoCommits", true);
+        hikariConfig.addDataSourceProperty("maintainTimeStats", false);
         
         // Set pool name for monitoring
         hikariConfig.setPoolName("StateMachine-MySQL-Pool");
+        
+        System.out.println("[MySQL] Creating connection pool to: " + jdbcUrl);
         
         return new HikariDataSource(hikariConfig);
     }
@@ -91,6 +94,7 @@ public class MysqlConnectionProvider {
     public void close() {
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
+            System.out.println("[MySQL] Connection pool closed");
         }
     }
     
@@ -99,13 +103,6 @@ public class MysqlConnectionProvider {
      */
     public boolean isRunning() {
         return dataSource != null && !dataSource.isClosed();
-    }
-    
-    /**
-     * Get the database configuration
-     */
-    public DatabaseConfig getDatabaseConfig() {
-        return databaseConfig;
     }
     
     /**
@@ -120,5 +117,12 @@ public class MysqlConnectionProvider {
                 dataSource.getHikariPoolMXBean().getThreadsAwaitingConnection());
         }
         return "Pool not initialized";
+    }
+    
+    /**
+     * Get JDBC URL
+     */
+    public String getJdbcUrl() {
+        return jdbcUrl;
     }
 }

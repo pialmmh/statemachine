@@ -15,8 +15,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
-import com.telcobright.statemachine.eventstore.EventStore;
-import com.telcobright.statemachine.eventstore.EventLogEntry;
 import java.time.LocalDate;
 
 /**
@@ -31,7 +29,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
     private final Gson gson;
     private final AbstractStateMachineRegistry registry;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private final EventStore eventStore = EventStore.getInstance();
+    private final WebSocketLogger wsLogger = new WebSocketLogger();
     
     public StateMachineWebSocketServer(int port, AbstractStateMachineRegistry registry) {
         super(new InetSocketAddress(port));
@@ -73,12 +71,16 @@ public class StateMachineWebSocketServer extends WebSocketServer
                 return;
             }
             
+            // Log incoming message
+            wsLogger.logIncoming(extractMachineId(message), message);
+            
             JsonObject request;
             try {
                 request = gson.fromJson(message, JsonObject.class);
             } catch (Exception e) {
                 // Log and skip malformed JSON
                 System.err.println("[WS] Failed to parse message as JSON: " + message.substring(0, Math.min(message.length(), 100)));
+                wsLogger.logSystem("Failed to parse message: " + e.getMessage());
                 return;
             }
             
@@ -95,6 +97,24 @@ public class StateMachineWebSocketServer extends WebSocketServer
                     routeEventToMachine(machineId, eventType, payload);
                 }
                 return;
+            }
+            
+            // Handle history requests
+            if (request.has("action")) {
+                String action = request.get("action").getAsString();
+                
+                if ("GET_HISTORY".equals(action) && request.has("machineId")) {
+                    String machineId = request.get("machineId").getAsString();
+                    sendMachineHistory(conn, machineId);
+                    return;
+                }
+                
+                if ("GET_HISTORY_SINCE".equals(action) && request.has("machineId")) {
+                    String machineId = request.get("machineId").getAsString();
+                    int lastId = request.has("lastId") ? request.get("lastId").getAsInt() : 0;
+                    sendMachineHistorySince(conn, machineId, lastId);
+                    return;
+                }
             }
             
             // Handle registry queries
@@ -126,7 +146,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
                         break;
                     case "LOG":
                         // Handle log messages from React app
-                        handleLogMessage(request);
+                        handleLogMessage(conn, request);
                         break;
                     default:
                         System.out.println("[WS] Unknown action: " + action);
@@ -148,42 +168,27 @@ public class StateMachineWebSocketServer extends WebSocketServer
         // Periodic updates disabled - updates only on connect and events
     }
     
-    private void handleLogMessage(JsonObject logData) {
+    private void handleLogMessage(WebSocket conn, JsonObject logData) {
         try {
             // Extract log information
-            String source = logData.has("source") ? logData.get("source").getAsString() : "unknown";
-            String direction = logData.has("direction") ? logData.get("direction").getAsString() : null;
-            String timestamp = logData.has("timestamp") ? logData.get("timestamp").getAsString() : null;
-            String selectedMachine = logData.has("selectedMachine") ? logData.get("selectedMachine").getAsString() : null;
+            String category = logData.has("category") ? logData.get("category").getAsString() : "INFO";
+            String message = logData.has("message") ? logData.get("message").getAsString() : "";
+            String timestamp = logData.has("timestamp") ? logData.get("timestamp").getAsString() : "";
             
-            // Convert JsonObject to Map for event data
-            Map<String, Object> eventData = new HashMap<>();
-            if (logData.has("eventData") && logData.get("eventData").isJsonObject()) {
-                JsonObject eventJson = logData.getAsJsonObject("eventData");
-                for (String key : eventJson.keySet()) {
-                    eventData.put(key, gson.toJson(eventJson.get(key)));
-                }
+            // Get client identifier
+            String clientId = conn.getRemoteSocketAddress().toString();
+            
+            // Format and log the message
+            String logMessage = String.format("[CLIENT %s] [%s] %s", clientId, category, message);
+            
+            // If there's additional data, include it
+            if (logData.has("data") && !logData.get("data").isJsonNull()) {
+                logMessage += " | Data: " + gson.toJson(logData.get("data"));
             }
             
-            // Create EventStore entry for React app logs
-            if (eventStore != null && eventStore.isEnabled()) {
-                String eventType = direction != null ? "WEBSOCKET_" + direction.toUpperCase() : "WEBSOCKET_LOG";
-                String destination = direction != null && direction.equals("sent") ? 
-                    "WebSocketServer" : "react_app";
-                String sourceStr = direction != null && direction.equals("sent") ? 
-                    "react_app" : "WebSocketServer";
-                
-                eventStore.logWebSocketEvent(
-                    sourceStr,
-                    destination,
-                    eventType,
-                    "CLIENT_LOG",
-                    eventData,
-                    selectedMachine,
-                    true,
-                    0
-                );
-            }
+            // Log to our WebSocket logger
+            wsLogger.logIncoming("CLIENT_LOG", logMessage);
+            
         } catch (Exception e) {
             System.err.println("[WS] Error handling log message: " + e.getMessage());
         }
@@ -257,23 +262,28 @@ public class StateMachineWebSocketServer extends WebSocketServer
         String message = gson.toJson(event);
         broadcastMessage(message);
         
-        // Log to EventStore if enabled
-        if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-            Map<String, Object> details = new HashMap<>();
-            details.put("eventType", eventType);
-            details.put("entryActionStatus", machine != null ? machine.getEntryActionStatus() : "unknown");
-            details.put("clientCount", connectedClients.size());
-            
-            EventStore.getInstance().logWebSocketOut("StateMachineWebSocketServer", machineId, eventType, oldState, newState, details);
-        }
+        // WebSocket events logged via MySQL history
     }
     
     private void broadcastMessage(String message) {
+        wsLogger.logOutgoing("BROADCAST", message);
         for (WebSocket client : connectedClients) {
             if (client.isOpen()) {
                 client.send(message);
             }
         }
+    }
+    
+    private String extractMachineId(String message) {
+        try {
+            JsonObject obj = gson.fromJson(message, JsonObject.class);
+            if (obj.has("machineId")) {
+                return obj.get("machineId").getAsString();
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        return null;
     }
     
     private void sendRegistryState(WebSocket conn) {
@@ -386,30 +396,18 @@ public class StateMachineWebSocketServer extends WebSocketServer
                     response.addProperty("newState", newState);
                     broadcastMessage(gson.toJson(response));
                     
-                    // Log successful event to EventStore
-                    if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-                        EventStore.getInstance().logWebSocketIn("StateMachineWebSocketServer", clientAddress, machineId, eventType, 
-                            eventPayload, true, null);
-                    }
+                    // Event success logged via MySQL history
                 } else {
                     System.err.println("[Event] Could not create event instance for type: " + eventType);
                     
-                    // Log error to EventStore
-                    if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-                        EventStore.getInstance().logWebSocketIn("StateMachineWebSocketServer", clientAddress, machineId, eventType, 
-                            eventPayload, false, "Could not create event instance");
-                    }
+                    // Event error logged via MySQL history
                 }
                 
             } catch (Exception e) {
                 System.err.println("[Event] Error firing event: " + e.getMessage());
                 e.printStackTrace();
                 
-                // Log error to EventStore
-                if (registry.isDebugEnabled() && EventStore.getInstance() != null) {
-                    EventStore.getInstance().logWebSocketIn("StateMachineWebSocketServer", clientAddress, machineId, eventType, 
-                        eventPayload, false, e.getMessage());
-                }
+                // Event exception logged via MySQL history
                 
                 // Send error response
                 JsonObject response = new JsonObject();
@@ -446,6 +444,86 @@ public class StateMachineWebSocketServer extends WebSocketServer
     private void broadcastCompleteStatus() {
         JsonObject status = buildCompleteStatus();
         broadcastMessage(gson.toJson(status));
+    }
+    
+    /**
+     * Send machine history to a client
+     */
+    private void sendMachineHistory(WebSocket conn, String machineId) {
+        System.out.println("[WS] GET_HISTORY request for: " + machineId);
+        
+        GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
+        if (machine != null && machine.getHistoryTracker() != null) {
+            try {
+                // Use grouped history instead of raw history
+                List<Map<String, Object>> history = machine.getHistoryTracker().readGroupedHistory();
+                
+                // Debug: Print grouped history structure
+                if (!history.isEmpty()) {
+                    System.out.println("[WS] Sending grouped history with " + history.size() + " state instances");
+                    Map<String, Object> firstInstance = history.get(0);
+                    System.out.println("[WS] First state instance: state=" + firstInstance.get("state") + 
+                        ", instanceNumber=" + firstInstance.get("instanceNumber") + 
+                        ", transitions=" + ((List)firstInstance.get("transitions")).size());
+                }
+                
+                JsonObject response = new JsonObject();
+                response.addProperty("type", "HISTORY_DATA");
+                response.addProperty("machineId", machineId);
+                response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+                response.add("history", gson.toJsonTree(history));
+                
+                conn.send(gson.toJson(response));
+                System.out.println("[WS] Sent grouped history with " + history.size() + " state instances for " + machineId);
+            } catch (Exception e) {
+                System.err.println("[WS] Error reading history for " + machineId + ": " + e.getMessage());
+                sendErrorResponse(conn, "Failed to read history: " + e.getMessage());
+            }
+        } else {
+            System.err.println("[WS] No history tracker for machine: " + machineId);
+            sendErrorResponse(conn, "No history available for machine: " + machineId);
+        }
+    }
+    
+    /**
+     * Send incremental history updates to a client
+     */
+    private void sendMachineHistorySince(WebSocket conn, String machineId, int lastId) {
+        System.out.println("[WS] GET_HISTORY_SINCE request for: " + machineId + " since ID: " + lastId);
+        
+        GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
+        if (machine != null && machine.getHistoryTracker() != null) {
+            try {
+                List<Map<String, Object>> history = machine.getHistoryTracker().readHistorySince(lastId);
+                
+                JsonObject response = new JsonObject();
+                response.addProperty("type", "HISTORY_UPDATE");
+                response.addProperty("machineId", machineId);
+                response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+                response.addProperty("lastId", lastId);
+                response.add("newEntries", gson.toJsonTree(history));
+                
+                conn.send(gson.toJson(response));
+                System.out.println("[WS] Sent " + history.size() + " new history entries for " + machineId);
+            } catch (Exception e) {
+                System.err.println("[WS] Error reading history updates for " + machineId + ": " + e.getMessage());
+                sendErrorResponse(conn, "Failed to read history updates: " + e.getMessage());
+            }
+        } else {
+            System.err.println("[WS] No history tracker for machine: " + machineId);
+            sendErrorResponse(conn, "No history available for machine: " + machineId);
+        }
+    }
+    
+    /**
+     * Send error response to client
+     */
+    private void sendErrorResponse(WebSocket conn, String errorMessage) {
+        JsonObject error = new JsonObject();
+        error.addProperty("type", "ERROR");
+        error.addProperty("message", errorMessage);
+        error.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+        conn.send(gson.toJson(error));
     }
     
     /**
@@ -554,6 +632,8 @@ public class StateMachineWebSocketServer extends WebSocketServer
     
     public void shutdown() {
         try {
+            wsLogger.logSystem("Shutting down WebSocket server");
+            wsLogger.shutdown();
             scheduler.shutdown();
             scheduler.awaitTermination(1, TimeUnit.SECONDS);
             this.stop();
@@ -563,117 +643,17 @@ public class StateMachineWebSocketServer extends WebSocketServer
     }
     
     /**
-     * Handle GET_EVENTS request from client
+     * Handle GET_EVENTS request from client - deprecated, use GET_HISTORY instead
      */
     private void handleGetEvents(WebSocket conn, JsonObject request) {
-        try {
-            // Parse request parameters
-            int page = request.has("page") ? request.get("page").getAsInt() : 1;
-            int pageSize = request.has("pageSize") ? request.get("pageSize").getAsInt() : 50;
-            String dateStr = request.has("date") ? request.get("date").getAsString() : null;
-            String machineId = request.has("machineId") ? request.get("machineId").getAsString() : null;
-            String category = request.has("category") ? request.get("category").getAsString() : null;
-            
-            // Default to today if no date specified
-            LocalDate date = dateStr != null ? LocalDate.parse(dateStr) : LocalDate.now();
-            
-            // Check if EventStore is initialized
-            if (!EventStore.isInitialized()) {
-                JsonObject error = new JsonObject();
-                error.addProperty("type", "EVENTS_ERROR");
-                error.addProperty("error", "EventStore not initialized");
-                conn.send(gson.toJson(error));
-                return;
-            }
-            
-            // Get events from EventStore
-            List<EventLogEntry> allEvents = EventStore.getInstance().readEvents(date);
-            
-            // Filter events if needed
-            if (machineId != null && !machineId.isEmpty()) {
-                allEvents = allEvents.stream()
-                    .filter(e -> machineId.equals(e.getMachineId()))
-                    .collect(java.util.stream.Collectors.toList());
-            }
-            
-            if (category != null && !category.isEmpty()) {
-                allEvents = allEvents.stream()
-                    .filter(e -> category.equals(e.getEventCategory()))
-                    .collect(java.util.stream.Collectors.toList());
-            }
-            
-            // Calculate pagination
-            int totalEvents = allEvents.size();
-            int totalPages = (int) Math.ceil((double) totalEvents / pageSize);
-            int startIndex = (page - 1) * pageSize;
-            int endIndex = Math.min(startIndex + pageSize, totalEvents);
-            
-            // Get page of events
-            List<EventLogEntry> pageEvents = startIndex < totalEvents ? 
-                allEvents.subList(startIndex, endIndex) : new ArrayList<>();
-            
-            // Convert events to JSON
-            JsonArray eventsArray = new JsonArray();
-            for (EventLogEntry event : pageEvents) {
-                JsonObject eventJson = new JsonObject();
-                eventJson.addProperty("id", event.getId());
-                eventJson.addProperty("timestamp", event.getFormattedTimestamp());
-                eventJson.addProperty("source", event.getSource());
-                eventJson.addProperty("destination", event.getDestination());
-                eventJson.addProperty("eventType", event.getEventType());
-                eventJson.addProperty("eventCategory", event.getEventCategory());
-                eventJson.addProperty("machineId", event.getMachineId());
-                eventJson.addProperty("stateBefore", event.getStateBefore());
-                eventJson.addProperty("stateAfter", event.getStateAfter());
-                eventJson.addProperty("success", event.isSuccess());
-                eventJson.addProperty("errorMessage", event.getErrorMessage());
-                eventJson.addProperty("processingTimeMs", event.getProcessingTimeMs());
-                
-                // Add event details as JSON
-                if (event.getEventDetails() != null) {
-                    eventJson.add("details", gson.toJsonTree(event.getEventDetails()));
-                }
-                
-                eventsArray.add(eventJson);
-            }
-            
-            // Create response
-            JsonObject response = new JsonObject();
-            response.addProperty("type", "EVENTS_DATA");
-            response.add("events", eventsArray);
-            response.addProperty("page", page);
-            response.addProperty("pageSize", pageSize);
-            response.addProperty("totalEvents", totalEvents);
-            response.addProperty("totalPages", totalPages);
-            response.addProperty("date", date.toString());
-            
-            // Add available categories and machines for filtering
-            Set<String> categories = new HashSet<>();
-            Set<String> machines = new HashSet<>();
-            for (EventLogEntry event : allEvents) {
-                if (event.getEventCategory() != null) categories.add(event.getEventCategory());
-                if (event.getMachineId() != null) machines.add(event.getMachineId());
-            }
-            
-            JsonArray categoriesArray = new JsonArray();
-            categories.stream().sorted().forEach(categoriesArray::add);
-            response.add("availableCategories", categoriesArray);
-            
-            JsonArray machinesArray = new JsonArray();
-            machines.stream().sorted().forEach(machinesArray::add);
-            response.add("availableMachines", machinesArray);
-            
-            // Send response
-            conn.send(gson.toJson(response));
-            
-        } catch (Exception e) {
-            System.err.println("[WS] Error handling GET_EVENTS: " + e.getMessage());
-            e.printStackTrace();
-            
-            JsonObject error = new JsonObject();
-            error.addProperty("type", "EVENTS_ERROR");
-            error.addProperty("error", e.getMessage());
-            conn.send(gson.toJson(error));
-        }
+        // Events are now tracked in MySQL history only
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "EVENTS_ERROR");
+        response.addProperty("error", "Events are now tracked in MySQL history. Use GET_HISTORY instead.");
+        conn.send(gson.toJson(response));
     }
+    
+    /**
+     * Old handleGetEvents method - deprecated - removed completely
+     */
 }

@@ -40,6 +40,9 @@ public class CallMachineRunnerProper {
         // This ensures the FluentStateMachineBuilder uses the correct instances
         StateMachineFactory.setDefaultInstances(timeoutManager, registry);
         
+        // Enable snapshot debug mode for history tracking
+        registry.enableSnapshotDebug();
+        
         // Enable live debug mode (hardcoded)
         registry.enableLiveDebug(WS_PORT);
         System.out.println("🔴 Live debugging ENABLED - WebSocket server started on port " + WS_PORT);
@@ -144,12 +147,7 @@ public class CallMachineRunnerProper {
                     connectionDetails.put("codec", "G.722"); // Simulated codec
                     connectionDetails.put("billingRate", 0.05); // Simulated rate per minute
                     
-                    // Log to event store if available
-                    if (registry.isDebugEnabled() && com.telcobright.statemachine.eventstore.EventStore.getInstance() != null) {
-                        com.telcobright.statemachine.eventstore.EventStore.getInstance()
-                                .logEntryAction("CallMachineRunnerProper", machineId,
-                                        CallState.CONNECTED.name(), "CALL_CONNECTED", connectionDetails);
-                    }
+                    // Connection details logged via MySQL history
                     
                     System.out.println("   ✓ Ring duration: " + ringDuration + "ms");
                     System.out.println("   ✓ Ring count: " + context.getRingCount());

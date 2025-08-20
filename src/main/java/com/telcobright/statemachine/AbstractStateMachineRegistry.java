@@ -9,7 +9,6 @@ import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
 import com.telcobright.statemachine.websocket.StateMachineWebSocketServer;
-import com.telcobright.statemachine.eventstore.EventStore;
 import java.nio.file.Paths;
 import com.telcobright.statemachine.events.EventTypeRegistry;
 import com.telcobright.statemachine.events.StateMachineEvent;
@@ -72,8 +71,7 @@ public abstract class AbstractStateMachineRegistry {
         this.snapshotDebug = true;
         this.snapshotRecorder = customRecorder;
         
-        // Initialize EventStore when snapshot debug is enabled
-        initializeEventStore();
+        // Event logging handled by MySQL history
         
         System.out.println("📸 Snapshot debugging ENABLED");
         System.out.println("   All state transitions will be recorded to database");
@@ -95,8 +93,7 @@ public abstract class AbstractStateMachineRegistry {
         this.webSocketPort = port;
         startWebSocketServer();
         
-        // Initialize EventStore when live debug is enabled
-        initializeEventStore();
+        // Event logging handled by MySQL history
         
         System.out.println("🔴 Live debugging ENABLED");
         System.out.println("   WebSocket server: ws://localhost:" + port);
@@ -506,25 +503,6 @@ public abstract class AbstractStateMachineRegistry {
         webSocketServer.broadcastMetadata(update);
     }
     
-    /**
-     * Initialize EventStore for event logging
-     */
-    private void initializeEventStore() {
-        try {
-            // Only initialize if not already initialized
-            if (!EventStore.isInitialized()) {
-                // Initialize EventStore with 7-day retention
-                EventStore eventStore = EventStore.getInstance(Paths.get("."), 7);
-                eventStore.setEnabled(true);
-                System.out.println("📁 EventStore initialized for event logging (7-day retention)");
-            } else {
-                // Just enable if already initialized
-                EventStore.getInstance().setEnabled(true);
-            }
-        } catch (Exception e) {
-            System.err.println("Failed to initialize EventStore: " + e.getMessage());
-        }
-    }
     
     /**
      * Shutdown the registry and clean up resources
@@ -533,14 +511,7 @@ public abstract class AbstractStateMachineRegistry {
         clearAll();
         stopWebSocketServer();
         
-        // Shutdown EventStore if initialized
-        try {
-            if (EventStore.getInstance() != null) {
-                EventStore.getInstance().shutdown();
-            }
-        } catch (Exception e) {
-            // Ignore if not initialized
-        }
+        // Event logging cleanup handled by MySQL connection pool
         
         if (timeoutManager != null) {
             // Shutdown timeout manager if needed

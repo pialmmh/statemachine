@@ -1,159 +1,81 @@
 import React, { useState } from 'react';
 import StateTreeView from './StateTreeView';
 import TransitionDetailPanel from './TransitionDetailPanel';
+import wsLogger from '../wsLogger';
 
 function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining }) {
   const [selectedTransition, setSelectedTransition] = useState(null);
 
-  console.log('LiveHistoryDisplay rendering with history:', liveHistory.map(t => 
-    `Step #${t.stepNumber}: ${t.fromState} -> ${t.toState} (${t.event})`
-  ));
+  wsLogger.render('LiveHistoryDisplay', '=== LiveHistoryDisplay RENDER ===');
+  wsLogger.render('LiveHistoryDisplay', '  Received', liveHistory.length, 'items');
 
   if (liveHistory.length === 0) {
+    wsLogger.render('LiveHistoryDisplay', 'LiveHistoryDisplay: No history entries, returning null');
     return null;
   }
-
-  // Group transitions by states - each re-entry creates a new instance
-  const stateInstances = [];
-  const stateInstanceMap = new Map(); // Maps state-instanceNumber to instance object
-  const stateCounters = new Map(); // Track instance numbers for each state
-  const currentStateInstance = new Map(); // Track the current active instance for each state
   
-  // Process transitions and events in order
-  liveHistory.forEach((transition, index) => {
-    let fromInstanceKey = null;
-    let toInstanceKey = null;
+  // Backend now sends pre-grouped history with state instances
+  // Each item in liveHistory is a state instance with:
+  // - state: the state name
+  // - instanceNumber: which instance of this state (for re-entries)  
+  // - transitions: array of events/transitions in this state instance
+  
+  let stateInstances;
+  
+  // Check if this is the new grouped format or old raw format
+  if (liveHistory.length > 0 && liveHistory[0].state && liveHistory[0].transitions) {
+    // New grouped format from backend - use as-is
+    stateInstances = liveHistory;
+    wsLogger.render('LiveHistoryDisplay', 'Using grouped history from backend:', stateInstances.length, 'state instances');
+    console.log('GROUPED FORMAT DETECTED:', JSON.stringify(liveHistory, null, 2));
+  } else {
+    // Old raw format - convert to grouped format for compatibility
+    wsLogger.render('LiveHistoryDisplay', 'Converting raw history to grouped format');
     
-    // For events that don't change state (eventSent flag)
-    if (transition.eventSent && transition.fromState === transition.toState) {
-      // This is just an event, not a state change
-      const state = transition.fromState;
-      if (!currentStateInstance.has(state)) {
-        // Create first instance if needed
-        const instanceNumber = 1;
-        stateCounters.set(state, instanceNumber);
-        currentStateInstance.set(state, instanceNumber);
-        const instanceKey = `${state}-${instanceNumber}`;
-        
-        const instance = {
+    // Simple conversion: each transition becomes its own state instance
+    const instanceMap = new Map();
+    const instanceCounters = new Map();
+    
+    liveHistory.forEach(transition => {
+      const state = transition.state || transition.fromState || 'UNKNOWN';
+      
+      // Get or create counter for this state
+      if (!instanceCounters.has(state)) {
+        instanceCounters.set(state, 1);
+      }
+      
+      // Check if we need a new instance (re-entry)
+      const isReEntry = transition.event === 'ENTRY' && instanceMap.has(state);
+      if (isReEntry) {
+        instanceCounters.set(state, instanceCounters.get(state) + 1);
+      }
+      
+      const instanceNum = instanceCounters.get(state);
+      const instanceKey = `${state}-${instanceNum}`;
+      
+      // Get or create instance
+      if (!instanceMap.has(instanceKey)) {
+        instanceMap.set(instanceKey, {
           state: state,
-          instanceNumber: instanceNumber,
+          instanceNumber: instanceNum,
           transitions: []
-        };
-        stateInstances.push(instance);
-        stateInstanceMap.set(instanceKey, instance);
-      }
-      
-      // Add event to current state instance
-      const instanceNumber = currentStateInstance.get(state);
-      const instanceKey = `${state}-${instanceNumber}`;
-      if (stateInstanceMap.has(instanceKey)) {
-        stateInstanceMap.get(instanceKey).transitions.push({
-          ...transition,
-          direction: 'event' // Mark as an event
-        });
-      }
-      return; // Skip the rest for events
-    }
-    
-    // Handle fromState first to ensure it exists
-    if (transition.fromState !== 'Initial') {
-      // Get or create instance for fromState
-      if (!currentStateInstance.has(transition.fromState)) {
-        // First time seeing this state as source
-        const instanceNumber = 1;
-        stateCounters.set(transition.fromState, instanceNumber);
-        currentStateInstance.set(transition.fromState, instanceNumber);
-        fromInstanceKey = `${transition.fromState}-${instanceNumber}`;
-        
-        // Create the instance
-        const instance = {
-          state: transition.fromState,
-          instanceNumber: instanceNumber,
-          transitions: []
-        };
-        stateInstances.push(instance);
-        stateInstanceMap.set(fromInstanceKey, instance);
-      } else {
-        // Use current instance for this state
-        const instanceNumber = currentStateInstance.get(transition.fromState);
-        fromInstanceKey = `${transition.fromState}-${instanceNumber}`;
-      }
-    }
-    
-    // Handle toState
-    let toInstanceNumber;
-    
-    // Check if we're re-entering a state that we've left
-    if (currentStateInstance.has(transition.toState)) {
-      const currentInstance = currentStateInstance.get(transition.toState);
-      const currentKey = `${transition.toState}-${currentInstance}`;
-      const currentStateInst = stateInstanceMap.get(currentKey);
-      
-      // Check if this state has any outgoing transitions
-      // If it does, we're re-entering and need a new instance
-      const hasOutgoing = currentStateInst && currentStateInst.transitions.some(t => t.direction === 'outgoing');
-      
-      if (hasOutgoing) {
-        // Re-entry: create new instance
-        toInstanceNumber = (stateCounters.get(transition.toState) || 0) + 1;
-        stateCounters.set(transition.toState, toInstanceNumber);
-      } else {
-        // Same instance - still in this state
-        toInstanceNumber = currentInstance;
-      }
-    } else {
-      // First time entering this state
-      toInstanceNumber = 1;
-      stateCounters.set(transition.toState, 1);
-    }
-    
-    currentStateInstance.set(transition.toState, toInstanceNumber);
-    toInstanceKey = `${transition.toState}-${toInstanceNumber}`;
-    
-    // Create toState instance if it doesn't exist
-    if (!stateInstanceMap.has(toInstanceKey)) {
-      const instance = {
-        state: transition.toState,
-        instanceNumber: toInstanceNumber,
-        transitions: []
-      };
-      stateInstances.push(instance);
-      stateInstanceMap.set(toInstanceKey, instance);
-    }
-    
-    // Add transitions
-    // For state changes, add both outgoing and incoming
-    if (transition.stateChange || transition.fromState !== transition.toState) {
-      console.log(`Processing state change: ${transition.fromState} -> ${transition.toState}, Step #${transition.stepNumber}`);
-      
-      // Add outgoing transition to fromState
-      if (fromInstanceKey && stateInstanceMap.has(fromInstanceKey)) {
-        console.log(`  Adding as outgoing to ${fromInstanceKey}`);
-        stateInstanceMap.get(fromInstanceKey).transitions.push({
-          ...transition,
-          direction: 'outgoing'
         });
       }
       
-      // Add incoming transition to toState
-      if (stateInstanceMap.has(toInstanceKey)) {
-        console.log(`  Adding as incoming to ${toInstanceKey}`);
-        stateInstanceMap.get(toInstanceKey).transitions.push({
-          ...transition,
-          direction: 'incoming'
-        });
-      }
-    } else {
-      // This is an event within the same state
-      if (toInstanceKey && stateInstanceMap.has(toInstanceKey)) {
-        stateInstanceMap.get(toInstanceKey).transitions.push({
-          ...transition,
-          direction: 'event'
-        });
-      }
-    }
-  });
+      // Add transition to instance
+      instanceMap.get(instanceKey).transitions.push({
+        ...transition,
+        direction: transition.transitionOrStay ? 'outgoing' : 
+                   transition.event === 'ENTRY' ? 'entry' : 'event'
+      });
+    });
+    
+    stateInstances = Array.from(instanceMap.values());
+  }
+  
+  wsLogger.render('LiveHistoryDisplay', '=== Final state instances:', stateInstances.map(inst => 
+    `${inst.state}-${inst.instanceNumber}: ${inst.transitions.length} transitions`
+  ));
 
   return (
     <div style={{ 

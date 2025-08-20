@@ -1,6 +1,12 @@
 import React from 'react';
 
 function TransitionDetailPanel({ transition, countdownState, countdownRemaining }) {
+  console.log('TransitionDetailPanel received transition:', transition);
+  if (transition) {
+    console.log('  Context before:', transition.contextBefore);
+    console.log('  Context after:', transition.contextAfter);
+  }
+  
   if (!transition) {
     return (
       <div style={{

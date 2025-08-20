@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test for call-002</h1>
+    <button onclick="connect()">Connect</button>
+    <button onclick="getHistory()">Get History</button>
+    <button onclick="sendEvent()">Send INCOMING_CALL</button>
+    <pre id="output"></pre>
+
+    <script>
+        let ws;
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:9999');
+            
+            ws.onopen = () => {
+                log('Connected to WebSocket');
+                // Auto-request history
+                getHistory();
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'HISTORY_DATA') {
+                    log('\n=== HISTORY_DATA received ===');
+                    log('Machine: ' + data.machineId);
+                    log('History length: ' + data.history.length);
+                    
+                    data.history.forEach((entry, i) => {
+                        log(`Entry ${i}: ${entry.state} - ${entry.event}`);
+                        log(`  transitionOrStay: ${entry.transitionOrStay}`);
+                        log(`  transitionToState: ${entry.transitionToState}`);
+                        log(`  has persistentContext: ${!!entry.persistentContext}`);
+                    });
+                    
+                    // Transform and check
+                    log('\n=== Transformation Test ===');
+                    data.history.forEach((entry, i) => {
+                        const isEntry = entry.event === 'ENTRY';
+                        const isTransition = entry.transitionOrStay === true;
+                        
+                        log(`Entry ${i}:`);
+                        log(`  event: ${entry.event}`);
+                        log(`  isEntry: ${isEntry}`);
+                        log(`  isTransition: ${isTransition}`);
+                        log(`  Would set isEntryStep: ${isEntry}`);
+                        log(`  fromState would be: ${entry.state}`);
+                        log(`  toState would be: ${isTransition && entry.transitionToState ? entry.transitionToState : entry.state}`);
+                    });
+                } else if (data.type === 'STATE_CHANGE') {
+                    log(`STATE_CHANGE: ${data.stateBefore} -> ${data.stateAfter}`);
+                }
+            };
+            
+            ws.onerror = (err) => {
+                log('WebSocket error: ' + err);
+            };
+        }
+
+        function getHistory() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const request = {
+                    action: 'GET_HISTORY',
+                    machineId: 'call-002'
+                };
+                ws.send(JSON.stringify(request));
+                log('Sent GET_HISTORY request');
+            }
+        }
+
+        function sendEvent() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const event = {
+                    type: 'EVENT',
+                    machineId: 'call-002',
+                    eventType: 'INCOMING_CALL',
+                    payload: {phoneNumber: '+1-555-TEST'}
+                };
+                ws.send(JSON.stringify(event));
+                log('Sent INCOMING_CALL event');
+            }
+        }
+
+        // Auto-connect on load
+        window.onload = () => {
+            connect();
+        };
+    </script>
+</body>
+</html>
