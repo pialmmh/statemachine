@@ -16,6 +16,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const [eventPayload, setEventPayload] = useState('{\n  "phoneNumber": "+1-555-9999"\n}');
   const [countdownState, setCountdownState] = useState(null);
   const [countdownRemaining, setCountdownRemaining] = useState(0);
+  const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'events'
   const [liveMachines, setLiveMachines] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState(null);
   
@@ -451,12 +452,12 @@ function MonitoringApp({ mode = 'snapshot' }) {
             entryActionStatus: 'none',
             contextBefore: {
               registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
+              persistentContext: updated.length > 0 ? (updated[updated.length - 1].contextAfter?.persistentContext || updated[updated.length - 1].persistentContext || {}) : {},
               volatileContext: {}
             },
             contextAfter: {
               registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-              persistentContext: updated.length > 0 ? updated[updated.length - 1].contextAfter.persistentContext : {},
+              persistentContext: updated.length > 0 ? (updated[updated.length - 1].contextAfter?.persistentContext || updated[updated.length - 1].persistentContext || {}) : {},
               volatileContext: {}
             }
           };
@@ -511,7 +512,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
           
           // Get the previous context (from last transition's contextAfter)
           const previousContext = updated.length > 0 
-            ? updated[updated.length - 1].contextAfter.persistentContext 
+            ? (updated[updated.length - 1].contextAfter?.persistentContext || updated[updated.length - 1].persistentContext || {})
             : {};
           
           // Detect timeout transitions by pattern
@@ -1094,15 +1095,98 @@ function MonitoringApp({ mode = 'snapshot' }) {
 
         <div className="right-panel">
           <div className="panel-header">
-            📈 {currentMode === 'live' ? 'Live State Transitions' : 'State Machine History'}
-            {currentMode === 'live' && liveHistory.length > 0 && (
-              <button 
-                className="refresh-btn" 
-                onClick={() => setLiveHistory([])}
-                style={{ marginLeft: 'auto' }}
-              >
-                Clear History
-              </button>
+            {currentMode === 'live' ? (
+              <>
+                {selectedMachine ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      padding: '6px 12px',
+                      background: '#495057',
+                      border: '1px solid #6c757d',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#f8f9fa',
+                      fontFamily: '"Inter", sans-serif'
+                    }}>
+                      Machine: {selectedMachine}, Current State: <span style={{ color: '#ffc107', fontWeight: '600' }}>{liveState || 'IDLE'}</span>
+                    </div>
+                    <button
+                      onClick={() => setViewMode('tree')}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        border: '1px solid',
+                        borderColor: viewMode === 'tree' ? '#17a2b8' : '#6c757d',
+                        background: viewMode === 'tree' ? '#17a2b8' : '#6c757d',
+                        color: 'white',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap',
+                        fontFamily: '"Inter", sans-serif',
+                        opacity: viewMode === 'tree' ? 1 : 0.8
+                      }}
+                      onMouseEnter={(e) => {
+                        if (viewMode !== 'tree') {
+                          e.target.style.opacity = '1';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (viewMode !== 'tree') {
+                          e.target.style.opacity = '0.8';
+                        }
+                      }}
+                    >
+                      🌳 Transition Tree
+                    </button>
+                    <button
+                      onClick={() => setViewMode('events')}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        border: '1px solid',
+                        borderColor: viewMode === 'events' ? '#17a2b8' : '#6c757d',
+                        background: viewMode === 'events' ? '#17a2b8' : '#6c757d',
+                        color: 'white',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap',
+                        fontFamily: '"Inter", sans-serif',
+                        opacity: viewMode === 'events' ? 1 : 0.8
+                      }}
+                      onMouseEnter={(e) => {
+                        if (viewMode !== 'events') {
+                          e.target.style.opacity = '1';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (viewMode !== 'events') {
+                          e.target.style.opacity = '0.8';
+                        }
+                      }}
+                    >
+                      📋 Event Viewer
+                    </button>
+                  </div>
+                ) : (
+                  <span style={{ color: '#999' }}>No Machine Selected</span>
+                )}
+                {liveHistory.length > 0 && (
+                  <button 
+                    className="refresh-btn" 
+                    onClick={() => setLiveHistory([])}
+                    style={{ marginLeft: 'auto' }}
+                  >
+                    Clear History
+                  </button>
+                )}
+              </>
+            ) : (
+              'State Machine History'
             )}
           </div>
           <div className="history-content">
@@ -1187,6 +1271,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
                   }]}
                   countdownState={countdownState}
                   countdownRemaining={countdownRemaining}
+                  viewMode={viewMode}
                 />
                   );
                 })()

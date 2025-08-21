@@ -3,7 +3,7 @@ import StateTreeView from './StateTreeView';
 import TransitionDetailPanel from './TransitionDetailPanel';
 import wsLogger from '../wsLogger';
 
-function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining }) {
+function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining, viewMode = 'tree' }) {
   const [selectedTransition, setSelectedTransition] = useState(null);
 
   wsLogger.render('LiveHistoryDisplay', '=== LiveHistoryDisplay RENDER ===');
@@ -74,69 +74,194 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining })
   }
   
   wsLogger.render('LiveHistoryDisplay', '=== Final state instances:', stateInstances.map(inst => 
-    `${inst.state}-${inst.instanceNumber}: ${inst.transitions.length} transitions`
+    `${inst.state}-${inst.instanceNumber}: ${inst.transitions ? inst.transitions.length : 0} transitions`
   ));
 
-  return (
-    <div style={{ 
-      display: 'grid', 
-      gridTemplateColumns: '280px 1fr', 
-      gap: '20px',
-      height: '100%',
-      minHeight: '600px'
-    }}>
-      {/* Left: Tree View */}
-      <div style={{ 
-        background: '#f8f9fa',
-        borderRadius: '8px',
-        padding: '10px',
-        overflowY: 'auto',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-      }}>
-        <div style={{ 
-          padding: '10px', 
-          background: 'white',
-          color: '#495057',
-          borderRadius: '6px',
-          marginBottom: '10px',
-          fontSize: '14px',
-          fontWeight: '600',
-          borderBottom: '1px solid #dee2e6'
-        }}>
-          State Transition Tree
-          {countdownState && countdownRemaining > 0 && (
-            <span style={{ 
-              float: 'right',
-              background: '#f8f9fa', 
-              padding: '2px 8px', 
-              borderRadius: '12px', 
-              fontSize: '12px',
-              color: '#dc3545'
-            }}>
-              ⏱️ {countdownRemaining}s
-            </span>
-          )}
-        </div>
-        <StateTreeView 
-          stateInstances={stateInstances}
-          onSelectTransition={setSelectedTransition}
-          selectedTransition={selectedTransition}
-        />
-      </div>
+  // Flatten all transitions for event viewer
+  const getAllEvents = () => {
+    const events = [];
+    stateInstances.forEach(instance => {
+      if (instance.transitions && Array.isArray(instance.transitions)) {
+        instance.transitions.forEach(transition => {
+          events.push({
+            ...transition,
+            stateName: instance.state,
+            instanceNumber: instance.instanceNumber
+          });
+        });
+      }
+    });
+    // Sort by datetime first, then by special event ordering
+    return events.sort((a, b) => {
+      // First try to sort by datetime if available
+      if (a.datetime && b.datetime) {
+        const dateA = new Date(a.datetime).getTime();
+        const dateB = new Date(b.datetime).getTime();
+        if (dateA !== dateB) {
+          return dateA - dateB;
+        }
+      }
+      
+      // If timestamps are equal, we need special ordering:
+      // 1. Event that causes transition (e.g., INCOMING_CALL, TIMEOUT)
+      // 2. TRANSITION event (synthetic)
+      // 3. ENTRY event to the new state
+      
+      const eventA = a.event || '';
+      const eventB = b.event || '';
+      
+      // Helper to get event priority (lower number = earlier in sequence)
+      const getEventPriority = (event) => {
+        if (event === 'TRANSITION') return 2; // Middle
+        if (event === 'ENTRY') return 3; // Last
+        return 1; // Everything else (INCOMING_CALL, TIMEOUT, etc.) comes first
+      };
+      
+      const priorityA = getEventPriority(eventA);
+      const priorityB = getEventPriority(eventB);
+      
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // If same priority, fall back to ID
+      return (a.id || 0) - (b.id || 0);
+    });
+  };
 
-      {/* Right: Detail Panel */}
-      <div style={{ 
-        background: '#ffffff',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        overflow: 'hidden'
-      }}>
-        <TransitionDetailPanel 
-          transition={selectedTransition}
-          countdownState={countdownState}
-          countdownRemaining={countdownRemaining}
-        />
-      </div>
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Conditional View Rendering */}
+      {viewMode === 'tree' ? (
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: '280px 1fr', 
+          gap: '20px',
+          height: '100%',
+          minHeight: '600px'
+        }}>
+          {/* Left: Tree View */}
+          <div style={{ 
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            padding: '10px',
+            overflowY: 'auto',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+          }}>
+            <StateTreeView 
+              stateInstances={stateInstances}
+              onSelectTransition={setSelectedTransition}
+              selectedTransition={selectedTransition}
+            />
+          </div>
+
+          {/* Right: Detail Panel */}
+          <div style={{ 
+            background: '#ffffff',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            overflow: 'hidden'
+          }}>
+            <TransitionDetailPanel 
+              transition={selectedTransition}
+              countdownState={countdownState}
+              countdownRemaining={countdownRemaining}
+            />
+          </div>
+        </div>
+      ) : (
+        /* Event Viewer Table */
+        <div style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '20px',
+          height: '100%',
+          overflowY: 'auto',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+        }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '13px',
+            fontFamily: '"Inter", sans-serif'
+          }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #dee2e6' }}>
+                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>ID</th>
+                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>State</th>
+                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Event</th>
+                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Transition</th>
+                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Timestamp</th>
+                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Payload</th>
+              </tr>
+            </thead>
+            <tbody>
+              {getAllEvents().map((event, idx) => (
+                <tr key={event.id || idx} style={{ 
+                  borderBottom: '1px solid #e9ecef',
+                  background: idx % 2 === 0 ? 'white' : '#f8f9fa'
+                }}>
+                  <td style={{ padding: '10px 8px', color: '#6c757d' }}>{event.id || idx + 1}</td>
+                  <td style={{ padding: '10px 8px', fontWeight: '500' }}>
+                    {event.stateName}
+                    {event.instanceNumber > 1 && (
+                      <span style={{ 
+                        marginLeft: '5px',
+                        background: '#e9ecef',
+                        padding: '1px 5px',
+                        borderRadius: '10px',
+                        fontSize: '10px'
+                      }}>
+                        #{event.instanceNumber}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 8px' }}>
+                    <span style={{ 
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}>
+                      {event.event === 'ENTRY' && '🎯'}
+                      {event.event === 'TRANSITION' && '🔀'}
+                      {event.event === 'TIMEOUT' && '⏰'}
+                      {event.event && !['ENTRY', 'TRANSITION', 'TIMEOUT'].includes(event.event) && '⚡'}
+                      <span style={{ color: event.eventIgnored ? '#dc3545' : '#212529' }}>
+                        {event.event}
+                      </span>
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 8px' }}>
+                    {event.transitionOrStay && event.transitionToState && (
+                      <span style={{ color: '#28a745' }}>
+                        → {event.transitionToState}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 8px', color: '#6c757d', fontSize: '12px' }}>
+                    {event.datetime ? new Date(event.datetime).toLocaleTimeString() : ''}
+                  </td>
+                  <td style={{ padding: '10px 8px' }}>
+                    {event.eventPayload && (
+                      <span style={{ 
+                        background: '#e9ecef',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        color: '#495057'
+                      }}>
+                        {typeof event.eventPayload === 'object' 
+                          ? Object.keys(event.eventPayload).join(', ')
+                          : '✓'}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

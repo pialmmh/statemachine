@@ -32,6 +32,61 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
   const eventBgColor = '#d1ecf1';
   const eventColor = '#17a2b8';
 
+  // Special handling for TRANSITION events
+  if (transition.event === 'TRANSITION') {
+    const fromState = transition.state;
+    const toState = transition.transitionToState;
+    
+    return (
+      <div style={{
+        background: 'white',
+        borderRadius: '8px',
+        height: '100%',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      }}>
+        {/* Header for TRANSITION */}
+        <div style={{
+          background: '#d4edda',
+          padding: '15px 20px',
+          borderBottom: '2px solid #dee2e6',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px'
+        }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#155724',
+            fontFamily: '"Inter", "SF Pro Display", sans-serif',
+            letterSpacing: '-0.01em'
+          }}>
+            Step: TRANSITION, {fromState} → {toState}
+          </h2>
+        </div>
+        
+        {/* Content area - empty for transitions */}
+        <div style={{
+          flex: 1,
+          padding: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#6c757d',
+          fontSize: '14px'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '15px', opacity: 0.3 }}>🔀</div>
+            <p>State transition from <strong>{fromState}</strong> to <strong>{toState}</strong></p>
+            <p style={{ fontSize: '12px', opacity: 0.7 }}>No additional context for transition events</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       background: 'white',
@@ -63,11 +118,11 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           }}>
             Step {transition.stepNumber}: {transition.event}
           </span>
-          <span style={{ fontSize: '14px', color: '#000000', fontFamily: '"Inter", sans-serif', fontWeight: '700' }}>
-            {transition.fromState === 'Initial'
-              ? `Initial State: ${transition.toState}`
-              : `${transition.fromState} → ${transition.toState}`}
-          </span>
+          {transition.event !== 'TRANSITION' && (
+            <span style={{ fontSize: '14px', color: '#000000', fontFamily: '"Inter", sans-serif', fontWeight: '700' }}>
+              State: {transition.state}
+            </span>
+          )}
           <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d', fontFamily: '"Inter", sans-serif' }}>
             {transition.timestamp}
           </span>
@@ -121,7 +176,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             overflowX: 'auto',
             margin: 0
           }}>
-            {JSON.stringify(transition.eventData || {}, null, 2)}
+            {JSON.stringify(transition.eventPayload || transition.eventData || {}, null, 2)}
           </pre>
         </div>
 
@@ -188,9 +243,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               lineHeight: '1.6',
               letterSpacing: '-0.01em'
             }}>
-              Status: {(transition.contextAfter?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.contextAfter?.registryStatus?.status}`} | 
-              Hydrated: {transition.contextAfter?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
-              Online: {transition.contextAfter?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
+              Status: {(transition.persistentContext?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.persistentContext?.registryStatus?.status}`} | 
+              Hydrated: {transition.persistentContext?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
+              Online: {transition.persistentContext?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
             </div>
           </div>
         </div>
@@ -237,7 +292,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
-                  {JSON.stringify(transition.contextBefore?.persistentContext || {}, null, 2)}
+                  {JSON.stringify(transition.persistentContext || {}, null, 2)}
                 </pre>
               </div>
 
@@ -258,7 +313,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
-                  {JSON.stringify(transition.contextBefore?.volatileContext || {}, null, 2)}
+                  {JSON.stringify(transition.volatileContext || {}, null, 2)}
                 </pre>
               </div>
             </div>
@@ -300,7 +355,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
-                  {JSON.stringify(transition.contextAfter?.persistentContext || {}, null, 2)}
+                  {JSON.stringify(transition.persistentContext || {}, null, 2)}
                 </pre>
               </div>
 
@@ -321,7 +376,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
-                  {JSON.stringify(transition.contextAfter?.volatileContext || {}, null, 2)}
+                  {JSON.stringify(transition.volatileContext || {}, null, 2)}
                 </pre>
               </div>
             </div>

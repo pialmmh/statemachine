@@ -644,6 +644,8 @@ public class MachineHistoryMySQLTracker {
         // Map to track state instances: key = "state-counter", value = list of events
         Map<String, List<Map<String, Object>>> stateInstances = new LinkedHashMap<>();
         
+        int nextId = 1000000; // Start synthetic IDs at a high number to avoid conflicts
+        
         for (Map<String, Object> entry : rawHistory) {
             String state = (String) entry.get("state");
             Integer counter = (Integer) entry.get("transitionCounter");
@@ -656,6 +658,27 @@ public class MachineHistoryMySQLTracker {
             
             // Add this entry to the instance
             instanceEvents.add(entry);
+            
+            // If this event causes a transition, add a synthetic TRANSITION event
+            Boolean transitionOrStay = (Boolean) entry.get("transitionOrStay");
+            String transitionToState = (String) entry.get("transitionToState");
+            if (transitionOrStay != null && transitionOrStay && transitionToState != null) {
+                // Create a synthetic transition event
+                Map<String, Object> transitionEvent = new HashMap<>();
+                transitionEvent.put("id", nextId++);
+                transitionEvent.put("state", state);
+                transitionEvent.put("event", "TRANSITION");
+                transitionEvent.put("eventIgnored", false);
+                transitionEvent.put("transitionOrStay", true);
+                transitionEvent.put("transitionToState", transitionToState);
+                transitionEvent.put("transitionCounter", counter);
+                transitionEvent.put("datetime", entry.get("datetime"));
+                transitionEvent.put("persistentContext", entry.get("persistentContext"));
+                transitionEvent.put("volatileContext", entry.get("volatileContext"));
+                
+                // Add the transition event to the same state instance
+                instanceEvents.add(transitionEvent);
+            }
         }
         
         // Convert to the format expected by frontend

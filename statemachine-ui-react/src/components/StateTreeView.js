@@ -53,6 +53,11 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
   const getEventIcon = (transition) => {
     const event = transition.event;
     
+    // Check for transition events
+    if (event && event.toUpperCase() === 'TRANSITION') {
+      return '🔀'; // Twisted arrows for explicit state transitions
+    }
+    
     // Check for timeout events
     if (event && (event.toUpperCase() === 'TIMEOUT' || event.toLowerCase().includes('timeout'))) {
       return '⏰'; // Clock icon for timeout events
@@ -60,7 +65,7 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
     
     // Check for entry events (including BEFORE/AFTER entry actions)
     if (event && (event.toUpperCase() === 'ENTRY' || event.toUpperCase().includes('ENTRY'))) {
-      return '📍'; // Pin icon for entry events
+      return '🎯'; // Target icon for entry events
     }
     
     // For any other event (INCOMING_CALL, ANSWER, HANGUP, REJECT, etc.), use lightning bolt
@@ -258,17 +263,17 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                       }}></span>
                       <span style={{ 
                         marginRight: '6px', 
-                        fontSize: '14px',
+                        fontSize: getEventIcon(transition) === '🔀' ? '12px' : '14px',
                         color: (() => {
                           const icon = getEventIcon(transition);
                           // Make lightning bolt reddish
                           if (icon === '⚡') return '#dc3545';
                           // Keep timeout yellow/orange
                           if (icon === '⏰') return '#fd7e14';
-                          // Keep entry pin blue
-                          if (icon === '📍') return '#0066cc';
-                          // Keep arrow green
-                          if (icon === '➜') return '#28a745';
+                          // Keep entry target blue
+                          if (icon === '🎯') return '#0066cc';
+                          // Keep transition twisted arrows purple
+                          if (icon === '🔀') return '#8b5cf6';
                           return 'inherit';
                         })(),
                         display: 'inline-block'
@@ -289,14 +294,17 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                             fontWeight: '600'
                           }}>
                             {/* Show event name */}
-                            {transition.event || 'Unknown'}
+                            {transition.event === 'TRANSITION' ? 
+                              `Transition → ${transition.transitionToState}` : 
+                              (transition.event || 'Unknown')}
                           </span>
                           <span style={{ 
                             color: '#6c757d',
                             fontSize: '10px',
                             marginLeft: '6px'
                           }}>
-                            {transition.direction === 'event' ? '(event)' : 
+                            {transition.event === 'TRANSITION' ? '' :
+                             transition.direction === 'event' ? '(event)' : 
                              transition.direction === 'entry' ? '' :
                              transition.fromState !== transition.toState ? `(→ ${transition.toState})` : ''}
                           </span>
@@ -311,7 +319,7 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
                         }}>
                           <span>Step #{transition.id || transition.stepNumber || tIdx + 1}</span>
                           {((transition.eventData && Object.keys(transition.eventData).length > 0) || 
-                            (transition.eventPayload && transition.eventPayload !== null)) && (
+                            (transition.eventPayload && typeof transition.eventPayload === 'object' && Object.keys(transition.eventPayload).length > 0)) && (
                             <span>• 📦 Has payload</span>
                           )}
                           {/* Entry Action Status - show only for entry steps */}
