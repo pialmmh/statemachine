@@ -3,10 +3,14 @@ import React, { useState, useEffect } from 'react';
 function StateTreeView({ stateInstances, onSelectTransition, selectedTransition }) {
   console.log('StateTreeView received stateInstances:', stateInstances);
   stateInstances.forEach(inst => {
-    console.log(`  State ${inst.state}-${inst.instanceNumber}: ${inst.transitions.length} transitions`);
-    inst.transitions.forEach((t, i) => {
-      console.log(`    Transition ${i}: event="${t.event}", direction="${t.direction}", keys=${Object.keys(t).join(',')}`);
-    });
+    if (inst.transitions && Array.isArray(inst.transitions)) {
+      console.log(`  State ${inst.state}-${inst.instanceNumber}: ${inst.transitions.length} transitions`);
+      inst.transitions.forEach((t, i) => {
+        console.log(`    Transition ${i}: event="${t.event}", direction="${t.direction}", keys=${Object.keys(t).join(',')}`);
+      });
+    } else {
+      console.log(`  State ${inst.state}-${inst.instanceNumber}: no transitions`);
+    }
   });
   
   // Simply keep all states expanded all the time
@@ -218,7 +222,7 @@ function StateTreeView({ stateInstances, onSelectTransition, selectedTransition 
             </div>
 
             {/* Transitions */}
-            {isExpanded && (
+            {isExpanded && instance.transitions && Array.isArray(instance.transitions) && (
               <div style={{ 
                 marginLeft: '19px', 
                 marginTop: '2px',

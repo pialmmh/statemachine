@@ -174,7 +174,7 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining, v
         <div style={{
           background: 'white',
           borderRadius: '8px',
-          padding: '20px',
+          padding: '10px 20px 20px 20px',
           height: '100%',
           overflowY: 'auto',
           boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
@@ -182,17 +182,17 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining, v
           <table style={{
             width: '100%',
             borderCollapse: 'collapse',
-            fontSize: '13px',
-            fontFamily: '"Inter", sans-serif'
+            fontSize: '12px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #dee2e6' }}>
-                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>ID</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>State</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Event</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Transition</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Timestamp</th>
-                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Payload</th>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>ID</th>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>State</th>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Event</th>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Transition</th>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Timestamp</th>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: '600', color: '#495057' }}>Payload</th>
               </tr>
             </thead>
             <tbody>
@@ -201,8 +201,8 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining, v
                   borderBottom: '1px solid #e9ecef',
                   background: idx % 2 === 0 ? 'white' : '#f8f9fa'
                 }}>
-                  <td style={{ padding: '10px 8px', color: '#6c757d' }}>{event.id || idx + 1}</td>
-                  <td style={{ padding: '10px 8px', fontWeight: '500' }}>
+                  <td style={{ padding: '10px 8px', color: '#6c757d', textAlign: 'left' }}>{event.id || idx + 1}</td>
+                  <td style={{ padding: '10px 8px', fontWeight: '500', textAlign: 'left' }}>
                     {event.stateName}
                     {event.instanceNumber > 1 && (
                       <span style={{ 
@@ -216,7 +216,7 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining, v
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '10px 8px' }}>
+                  <td style={{ padding: '10px 8px', textAlign: 'left' }}>
                     <span style={{ 
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -231,17 +231,18 @@ function LiveHistoryDisplay({ liveHistory, countdownState, countdownRemaining, v
                       </span>
                     </span>
                   </td>
-                  <td style={{ padding: '10px 8px' }}>
+                  <td style={{ padding: '10px 8px', textAlign: 'left' }}>
                     {event.transitionOrStay && event.transitionToState && (
-                      <span style={{ color: '#28a745' }}>
-                        → {event.transitionToState}
+                      <span style={{ color: '#28a745', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '12px' }}>🔀</span>
+                        {event.transitionToState}
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '10px 8px', color: '#6c757d', fontSize: '12px' }}>
+                  <td style={{ padding: '10px 8px', color: '#6c757d', fontSize: '11px', textAlign: 'left' }}>
                     {event.datetime ? new Date(event.datetime).toLocaleTimeString() : ''}
                   </td>
-                  <td style={{ padding: '10px 8px' }}>
+                  <td style={{ padding: '10px 8px', textAlign: 'left' }}>
                     {event.eventPayload && (
                       <span style={{ 
                         background: '#e9ecef',

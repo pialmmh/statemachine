@@ -12,7 +12,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
       <div style={{
         background: 'white',
         borderRadius: '8px',
-        padding: '20px',
+        padding: '12px',
         height: '100%',
         display: 'flex',
         alignItems: 'center',
@@ -50,14 +50,14 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
         {/* Header for TRANSITION */}
         <div style={{
           background: '#d4edda',
-          padding: '15px 20px',
-          borderBottom: '2px solid #dee2e6',
+          padding: '10px 15px',
+          borderBottom: '1px solid #dee2e6',
           borderTopLeftRadius: '8px',
           borderTopRightRadius: '8px'
         }}>
           <h2 style={{
             margin: 0,
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: '600',
             color: '#155724',
             fontFamily: '"Inter", "SF Pro Display", sans-serif',
@@ -70,7 +70,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
         {/* Content area - empty for transitions */}
         <div style={{
           flex: 1,
-          padding: '20px',
+          padding: '15px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -100,8 +100,8 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
       {/* Header */}
       <div style={{
         background: eventBgColor,
-        padding: '15px 20px',
-        borderBottom: '2px solid #dee2e6',
+        padding: '10px 15px',
+        borderBottom: '1px solid #dee2e6',
         borderTopLeftRadius: '8px',
         borderTopRightRadius: '8px'
       }}>
@@ -150,14 +150,14 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, padding: '20px' }}>
+      <div style={{ flex: 1, padding: '12px' }}>
         {/* Event Payload */}
-        <div style={{ marginBottom: '25px' }}>
+        <div style={{ marginBottom: '15px' }}>
           <h3 style={{ 
-            fontSize: '14px', 
+            fontSize: '13px', 
             fontWeight: '600', 
             color: '#28a745',
-            marginBottom: '10px',
+            marginBottom: '6px',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -169,9 +169,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           <pre style={{
             background: '#f8f9fa',
             border: '1px solid #dee2e6',
-            borderRadius: '6px',
-            padding: '12px',
-            fontSize: '12px',
+            borderRadius: '4px',
+            padding: '8px',
+            fontSize: '11px',
             fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
             overflowX: 'auto',
             margin: 0
@@ -184,16 +184,16 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: '1fr 1fr', 
-          gap: '20px',
-          marginBottom: '25px'
+          gap: '12px',
+          marginBottom: '15px'
         }}>
           {/* Registry Status Before */}
           <div>
             <h3 style={{ 
-              fontSize: '14px', 
+              fontSize: '13px', 
               fontWeight: '600', 
               color: '#dc3545',
-              marginBottom: '10px',
+              marginBottom: '6px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -205,9 +205,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             <div style={{
               background: '#fff5f5',
               border: '1px solid #f5c6cb',
-              borderRadius: '6px',
-              padding: '12px',
-              fontSize: '12px',
+              borderRadius: '4px',
+              padding: '8px',
+              fontSize: '11px',
               fontFamily: '"Inter", sans-serif',
               lineHeight: '1.6',
               letterSpacing: '-0.01em'
@@ -221,10 +221,10 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           {/* Registry Status After */}
           <div>
             <h3 style={{ 
-              fontSize: '14px', 
+              fontSize: '13px', 
               fontWeight: '600', 
               color: '#17a2b8',
-              marginBottom: '10px',
+              marginBottom: '6px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -236,9 +236,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             <div style={{
               background: '#f0f8ff',
               border: '1px solid #bee5eb',
-              borderRadius: '6px',
-              padding: '12px',
-              fontSize: '12px',
+              borderRadius: '4px',
+              padding: '8px',
+              fontSize: '11px',
               fontFamily: '"Inter", sans-serif',
               lineHeight: '1.6',
               letterSpacing: '-0.01em'
@@ -254,15 +254,15 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: '1fr 1fr', 
-          gap: '20px' 
+          gap: '12px' 
         }}>
           {/* Context Before */}
           <div>
             <h3 style={{ 
-              fontSize: '14px', 
+              fontSize: '13px', 
               fontWeight: '600', 
               color: '#dc3545',
-              marginBottom: '10px',
+              marginBottom: '6px',
               fontFamily: '"Inter", "SF Pro Display", sans-serif',
               letterSpacing: '-0.01em'
             }}>
@@ -272,24 +272,24 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             <div style={{
               background: '#fff5f5',
               border: '1px solid #f5c6cb',
-              borderRadius: '6px',
-              padding: '15px'
+              borderRadius: '4px',
+              padding: '10px'
             }}>
               {/* Persistent Context */}
-              <div style={{ marginBottom: '15px' }}>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24', fontFamily: '"Inter", sans-serif' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <h4 style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', color: '#721c24', fontFamily: '"Inter", sans-serif' }}>
                   Persistent Context
                 </h4>
                 <pre style={{
                   background: 'white',
                   border: '1px solid #f5c6cb',
-                  borderRadius: '4px',
-                  padding: '8px',
+                  borderRadius: '3px',
+                  padding: '6px',
                   fontSize: '10px',
                   fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '300px',
+                  maxHeight: '200px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.persistentContext || {}, null, 2)}
@@ -298,19 +298,19 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
 
               {/* Volatile Context */}
               <div>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#721c24', fontFamily: '"Inter", sans-serif' }}>
+                <h4 style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', color: '#721c24', fontFamily: '"Inter", sans-serif' }}>
                   Volatile Context
                 </h4>
                 <pre style={{
                   background: 'white',
                   border: '1px solid #f5c6cb',
-                  borderRadius: '4px',
-                  padding: '8px',
+                  borderRadius: '3px',
+                  padding: '6px',
                   fontSize: '10px',
                   fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '300px',
+                  maxHeight: '200px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.volatileContext || {}, null, 2)}
@@ -322,10 +322,10 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           {/* Context After */}
           <div>
             <h3 style={{ 
-              fontSize: '14px', 
+              fontSize: '13px', 
               fontWeight: '600', 
               color: '#17a2b8',
-              marginBottom: '10px',
+              marginBottom: '6px',
               fontFamily: '"Inter", "SF Pro Display", sans-serif',
               letterSpacing: '-0.01em'
             }}>
@@ -335,12 +335,12 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
             <div style={{
               background: '#f0f8ff',
               border: '1px solid #bee5eb',
-              borderRadius: '6px',
-              padding: '15px'
+              borderRadius: '4px',
+              padding: '10px'
             }}>
               {/* Persistent Context */}
-              <div style={{ marginBottom: '15px' }}>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085', fontFamily: '"Inter", sans-serif' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <h4 style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', color: '#004085', fontFamily: '"Inter", sans-serif' }}>
                   Persistent Context
                 </h4>
                 <pre style={{
@@ -352,7 +352,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '300px',
+                  maxHeight: '200px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.persistentContext || {}, null, 2)}
@@ -361,7 +361,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
 
               {/* Volatile Context */}
               <div>
-                <h4 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#004085', fontFamily: '"Inter", sans-serif' }}>
+                <h4 style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', color: '#004085', fontFamily: '"Inter", sans-serif' }}>
                   Volatile Context
                 </h4>
                 <pre style={{
@@ -373,7 +373,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   fontFamily: '"Inter", "SF Pro Text", "Segoe UI", -apple-system, sans-serif',
                   overflowX: 'auto',
                   margin: 0,
-                  maxHeight: '300px',
+                  maxHeight: '200px',
                   overflowY: 'auto'
                 }}>
                   {JSON.stringify(transition.volatileContext || {}, null, 2)}

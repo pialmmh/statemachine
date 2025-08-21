@@ -19,6 +19,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'events'
   const [liveMachines, setLiveMachines] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [lastAddedMachine, setLastAddedMachine] = useState(null);
+  const [lastRemovedMachine, setLastRemovedMachine] = useState(null);
   
   const wsRef = useRef(null);
   const wsUrl = 'ws://localhost:9999';
@@ -244,6 +246,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
           sendWebSocketMessage({
             action: 'GET_STATE'
           });
+          
+          // Request registry status to get last added/removed machines
+          sendWebSocketMessage({
+            action: 'GET_REGISTRY_STATE'
+          });
         }, 50);
       };
 
@@ -333,11 +340,25 @@ function MonitoringApp({ mode = 'snapshot' }) {
       } else if (data.type === 'MACHINE_REGISTERED') {
         // Add new machine to list
         setLiveMachines(prev => [...prev, { id: data.machineId, type: data.machineType || 'StateMachine' }]);
+        setLastAddedMachine(data.machineId);
+        // Request registry status to get latest info
+        requestRegistryStatus();
       } else if (data.type === 'MACHINE_UNREGISTERED') {
         // Remove machine from list
         setLiveMachines(prev => prev.filter(m => m.id !== data.machineId));
+        setLastRemovedMachine(data.machineId);
         if (selectedMachine === data.machineId) {
           setSelectedMachine(null);
+        }
+        // Request registry status to get latest info
+        requestRegistryStatus();
+      } else if (data.type === 'REGISTRY_STATE') {
+        // Update registry state including last added/removed
+        if (data.lastAddedMachine) {
+          setLastAddedMachine(data.lastAddedMachine);
+        }
+        if (data.lastRemovedMachine) {
+          setLastRemovedMachine(data.lastRemovedMachine);
         }
       } else if (data.type === 'CURRENT_STATE') {
         wsLogger.debug('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);
@@ -834,6 +855,19 @@ function MonitoringApp({ mode = 'snapshot' }) {
     wsRef.current.send(JSON.stringify(request));
   };
   
+  // Request registry status to get last added/removed machines
+  const requestRegistryStatus = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    
+    const request = {
+      action: 'GET_REGISTRY_STATE'
+    };
+    
+    wsRef.current.send(JSON.stringify(request));
+  };
+  
   // Request incremental history updates
   const requestHistoryUpdate = (machineId) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -952,10 +986,12 @@ function MonitoringApp({ mode = 'snapshot' }) {
     <div className="monitoring-app">
       <div className="container">
         <div className="left-panel">
-          <div className="panel-header">
-            <span>📋 {currentMode === 'live' ? `Live Machines: ${liveMachines.length}` : 'Recent Runs'}</span>
-            <button className="refresh-btn" onClick={refreshData}>Refresh</button>
-          </div>
+          {currentMode === 'snapshot' && (
+            <div className="panel-header">
+              <span>Recent Runs</span>
+              <button className="refresh-btn" onClick={refreshData}>Refresh</button>
+            </div>
+          )}
           <div className="run-list">
             {loading ? (
               <div className="loading">Loading state machine runs...</div>
@@ -980,18 +1016,29 @@ function MonitoringApp({ mode = 'snapshot' }) {
               ))
             ) : (
               <div className="live-controls">
-                <div className="run-item" style={{ background: isConnected ? '#d4edda' : '#f8d7da' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
+                <div className="run-item" style={{ background: isConnected ? '#d4edda' : '#f8d7da', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', fontWeight: '700', marginBottom: '10px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '8px' }}>
+                    <span>Registry Status</span>
+                    <button 
+                      className="refresh-btn" 
+                      onClick={refreshData}
+                      style={{ padding: '3px 8px', fontSize: '11px' }}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '13px', marginBottom: '6px' }}>
                     {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
                   </div>
-                  <div style={{ fontSize: '12px' }}>
-                    Current State: <strong>{liveState}</strong>
+                  <div style={{ fontSize: '13px', marginBottom: '6px' }}>
+                    📋 Live Machines: {liveMachines.length}
                   </div>
-                  {isConnected && (
-                    <div style={{ fontSize: '11px', marginTop: '8px', color: '#495057' }}>
-                      WebSocket: {wsUrl}
-                    </div>
-                  )}
+                  <div style={{ fontSize: '12px', marginBottom: '4px', color: lastAddedMachine ? '#28a745' : '#6c757d' }}>
+                    Last added/rehydrated: <strong>{lastAddedMachine || 'none'}</strong>
+                  </div>
+                  <div style={{ fontSize: '12px', color: lastRemovedMachine ? '#dc3545' : '#6c757d' }}>
+                    Last removed/offline: <strong>{lastRemovedMachine || 'none'}</strong>
+                  </div>
                 </div>
                 
                 {isConnected && (

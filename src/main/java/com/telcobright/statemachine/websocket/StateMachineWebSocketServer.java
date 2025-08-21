@@ -297,6 +297,13 @@ public class StateMachineWebSocketServer extends WebSocketServer
         Set<String> machineIds = registry.getActiveMachineIds();
         state.add("machineIds", gson.toJsonTree(machineIds));
         
+        // Add last added and removed machines
+        String lastAdded = registry.getLastAddedMachine();
+        String lastRemoved = registry.getLastRemovedMachine();
+        System.out.println("[WS] Sending registry state - lastAdded: " + lastAdded + ", lastRemoved: " + lastRemoved);
+        state.addProperty("lastAddedMachine", lastAdded);
+        state.addProperty("lastRemovedMachine", lastRemoved);
+        
         conn.send(gson.toJson(state));
     }
     

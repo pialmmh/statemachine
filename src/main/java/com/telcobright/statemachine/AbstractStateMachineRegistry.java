@@ -34,6 +34,10 @@ public abstract class AbstractStateMachineRegistry {
     protected StateMachineWebSocketServer webSocketServer;
     protected int webSocketPort = 9999; // Default WebSocket port
     
+    // Track last added and removed machines
+    protected volatile String lastAddedMachine = null;
+    protected volatile String lastRemovedMachine = null;
+    
     /**
      * Default constructor
      */
@@ -516,5 +520,21 @@ public abstract class AbstractStateMachineRegistry {
         if (timeoutManager != null) {
             // Shutdown timeout manager if needed
         }
+    }
+    
+    /**
+     * Get the ID of the last added/rehydrated machine
+     * @return Machine ID or null if none
+     */
+    public String getLastAddedMachine() {
+        return lastAddedMachine;
+    }
+    
+    /**
+     * Get the ID of the last removed/offline machine
+     * @return Machine ID or null if none
+     */
+    public String getLastRemovedMachine() {
+        return lastRemovedMachine;
     }
 }

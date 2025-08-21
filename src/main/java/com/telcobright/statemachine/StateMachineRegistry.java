@@ -52,6 +52,8 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     @Override
     public void register(String id, GenericStateMachine<?, ?> machine) {
         activeMachines.put(id, machine);
+        lastAddedMachine = id; // Track last added machine
+        System.out.println("[Registry] Machine registered: " + id + " - setting lastAddedMachine to: " + id);
         
         // Set up state transition callback to notify listeners (including WebSocket)
         // This ensures timeout transitions are also broadcast
@@ -96,6 +98,9 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     @Override
     public void removeMachine(String id) {
         GenericStateMachine<?, ?> machine = activeMachines.remove(id);
+        if (machine != null) {
+            lastRemovedMachine = id; // Track last removed machine
+        }
         
         // Close history tracker if machine has one
         if (machine != null) {
@@ -276,7 +281,10 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      * Remove a machine from active registry (evict from memory)
      */
     public void evict(String id) {
-        activeMachines.remove(id);
+        GenericStateMachine<?, ?> machine = activeMachines.remove(id);
+        if (machine != null) {
+            lastRemovedMachine = id; // Track as removed/offline
+        }
     }
     
     /**
@@ -304,6 +312,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         T context = contextSupplier.get();
         GenericStateMachine<T, ?> machine = machineBuilder.apply(context);
         register(machineId, machine);
+        lastAddedMachine = machineId; // Track as rehydrated
         
         // Notify listeners
         for (StateMachineListener listener : listeners) {
