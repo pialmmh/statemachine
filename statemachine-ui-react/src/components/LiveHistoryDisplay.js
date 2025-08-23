@@ -58,13 +58,16 @@ function LiveHistoryDisplay({ transitions, mysqlHistory, selectedMachineId, coun
           height: '100%',
           minHeight: '600px'
         }}>
-          {/* Left: Tree View */}
+          {/* Left: Tree View with independent scroll */}
           <div style={{ 
             background: '#f8f9fa',
             borderRadius: '8px',
             padding: '0',
             overflowY: 'auto',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            overflowX: 'hidden',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+            height: '100%',
+            position: 'relative'
           }}>
             <StateTreeView 
               transitions={transitions}
@@ -76,12 +79,15 @@ function LiveHistoryDisplay({ transitions, mysqlHistory, selectedMachineId, coun
             />
           </div>
 
-          {/* Right: Detail Panel */}
+          {/* Right: Detail Panel with independent scroll */}
           <div style={{ 
             background: '#ffffff',
             borderRadius: '8px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            overflow: 'hidden'
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            height: '100%',
+            position: 'relative'
           }}>
             <TransitionDetailPanel 
               transition={selectedTransition}

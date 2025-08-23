@@ -26,6 +26,7 @@ import java.util.HashSet;
 public abstract class AbstractStateMachineRegistry {
     
     protected final Map<String, GenericStateMachine<?, ?>> activeMachines = new ConcurrentHashMap<>();
+    protected final Map<String, GenericStateMachine<?, ?>> offlineMachinesForDebug = new ConcurrentHashMap<>();
     protected final TimeoutManager timeoutManager;
     protected boolean debugMode = false;       // Debug mode flag
     protected History history;
@@ -258,6 +259,31 @@ public abstract class AbstractStateMachineRegistry {
         Supplier<T> contextSupplier, 
         Function<T, GenericStateMachine<T, ?>> machineBuilder
     );
+    
+    /**
+     * Clear offline machines for debug when no WebSocket clients are connected
+     */
+    public void clearOfflineMachinesForDebug() {
+        int count = offlineMachinesForDebug.size();
+        if (count > 0) {
+            offlineMachinesForDebug.clear();
+            System.out.println("[Registry] Cleared " + count + " offline machines from debug cache");
+        }
+    }
+    
+    /**
+     * Check if WebSocket has connected clients
+     */
+    public boolean hasWebSocketClients() {
+        return webSocketServer != null && webSocketServer.hasConnectedClients();
+    }
+    
+    /**
+     * Get offline machines for debug (read-only)
+     */
+    public Map<String, GenericStateMachine<?, ?>> getOfflineMachinesForDebug() {
+        return new ConcurrentHashMap<>(offlineMachinesForDebug);
+    }
     
     /**
      * Extract supported events from a state machine using reflection

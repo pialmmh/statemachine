@@ -87,10 +87,28 @@ public class History {
     }
     
     /**
+     * Record machine going offline (but keep in history)
+     */
+    public synchronized void recordMachineOffline(String machineId) {
+        List<TransitionInfo> transitions = machineTransitions.get(machineId);
+        if (transitions != null && !transitions.isEmpty()) {
+            // Mark the last transition as leading to offline
+            TransitionInfo lastTransition = transitions.get(transitions.size() - 1);
+            lastTransition.isOffline = true;
+            System.out.println("[History] Machine " + machineId + " marked as offline at state: " + lastTransition.toState);
+            broadcastStore();
+        }
+    }
+    
+    /**
      * Record machine removal
      */
     public synchronized void recordMachineRemoval(String machineId) {
-        machineTransitions.remove(machineId);
+        // First mark as offline if it exists
+        recordMachineOffline(machineId);
+        
+        // Then remove from transitions (optional - we might want to keep history)
+        // machineTransitions.remove(machineId);
         
         // Clear selection if this was the selected machine
         if (machineId.equals(selectedMachineId)) {
@@ -158,6 +176,7 @@ public class History {
                 transitionObj.addProperty("timestamp", transition.timestamp);
                 transitionObj.addProperty("duration", transition.duration);
                 transitionObj.addProperty("machineId", transition.machineId);
+                transitionObj.addProperty("isOffline", transition.isOffline);
                 
                 transitionsArray.add(transitionObj);
             }
@@ -203,5 +222,6 @@ public class History {
         String timestamp;
         long duration;
         int stepNumber;
+        boolean isOffline = false;  // Track if this transition led to offline state
     }
 }

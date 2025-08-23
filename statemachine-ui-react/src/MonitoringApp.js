@@ -25,6 +25,9 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const [lastAddedMachine, setLastAddedMachine] = useState(null);
   const [lastRemovedMachine, setLastRemovedMachine] = useState(null);
   const [arbitraryMachineId, setArbitraryMachineId] = useState('');
+  const [offlineMachines, setOfflineMachines] = useState([]);
+  const [offlineSelectedEvent, setOfflineSelectedEvent] = useState('INCOMING_CALL');
+  const [offlineEventPayload, setOfflineEventPayload] = useState('{\n  "phoneNumber": "+1-555-9999"\n}');
   
   const wsRef = useRef(null);
   const wsUrl = 'ws://localhost:9999';
@@ -290,6 +293,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
             action: 'GET_MACHINES'
           });
           
+          // Request list of offline machines
+          sendWebSocketMessage({
+            action: 'GET_OFFLINE_MACHINES'
+          });
+          
           // Request initial state
           sendWebSocketMessage({
             action: 'GET_STATE'
@@ -407,6 +415,12 @@ function MonitoringApp({ mode = 'snapshot' }) {
         }
         if (data.lastRemovedMachine) {
           setLastRemovedMachine(data.lastRemovedMachine);
+        }
+      } else if (data.type === 'OFFLINE_MACHINES_LIST') {
+        // Update offline machines list
+        if (data.machines) {
+          setOfflineMachines(data.machines);
+          wsLogger.debug('Received offline machines:', data.machines.length);
         }
       } else if (data.type === 'CURRENT_STATE') {
         wsLogger.debug('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);
@@ -567,9 +581,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
           handleCountdown(data.countdown.state, data.countdown.remaining);
         } else {
           // If no countdown in message, check if this is a state with timeout
-          // RINGING state has a 30-second timeout
+          // RINGING and CONNECTED states have 30-second timeouts
           if (newState === 'RINGING') {
             handleCountdown('RINGING', 30);
+          } else if (newState === 'CONNECTED') {
+            handleCountdown('CONNECTED', 30);
           } else {
             handleCountdown(null, 0);
           }
@@ -1054,7 +1070,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
     wsLogger.debug('isConnected:', isConnected, 'arbitraryMachineId:', arbitraryMachineId);
     
     if (!arbitraryMachineId || !arbitraryMachineId.trim()) {
-      alert('Please enter a machine ID');
+      alert('Please select an offline machine');
       return;
     }
 
@@ -1064,11 +1080,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
     }
 
     try {
-      const payload = eventPayload ? JSON.parse(eventPayload) : {};
+      const payload = offlineEventPayload ? JSON.parse(offlineEventPayload) : {};
       const message = {
         type: 'EVENT_TO_ARBITRARY',
         machineId: arbitraryMachineId.trim(),
-        eventType: selectedEvent,
+        eventType: offlineSelectedEvent,
         payload: payload
       };
       
@@ -1154,34 +1170,34 @@ function MonitoringApp({ mode = 'snapshot' }) {
               ))
             ) : (
               <div className="live-controls">
-                <div className="run-item" style={{ background: isConnected ? '#d4edda' : '#f8d7da', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', fontWeight: '700', marginBottom: '10px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '8px' }}>
+                <div className="run-item" style={{ background: isConnected ? '#d4edda' : '#f8d7da', marginBottom: '8px', padding: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', fontWeight: '700', marginBottom: '6px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '6px' }}>
                     <span>Registry Status</span>
                     <button 
                       className="refresh-btn" 
                       onClick={refreshData}
-                      style={{ padding: '3px 8px', fontSize: '11px' }}
+                      style={{ padding: '2px 6px', fontSize: '10px' }}
                     >
                       Refresh
                     </button>
                   </div>
-                  <div style={{ fontSize: '13px', marginBottom: '6px' }}>
-                    {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                  <div style={{ fontSize: '12px', marginBottom: '4px' }}>
+                    {isConnected ? '🟢 Connected' : '🔴 Disconnected'} • 📋 Machines: {liveMachines.length}
                   </div>
-                  <div style={{ fontSize: '13px', marginBottom: '6px' }}>
-                    📋 Live Machines: {liveMachines.length}
-                  </div>
-                  <div style={{ fontSize: '12px', marginBottom: '4px', color: lastAddedMachine ? '#28a745' : '#6c757d' }}>
-                    Last added/rehydrated: <strong>{lastAddedMachine || 'none'}</strong>
-                  </div>
-                  <div style={{ fontSize: '12px', color: lastRemovedMachine ? '#dc3545' : '#6c757d' }}>
-                    Last removed/offline: <strong>{lastRemovedMachine || 'none'}</strong>
+                  <div style={{ fontSize: '11px', color: '#495057' }}>
+                    <span style={{ color: lastAddedMachine ? '#28a745' : '#6c757d' }}>
+                      Last Added: <strong>{lastAddedMachine || 'none'}</strong>
+                    </span>
+                    <span style={{ margin: '0 4px', color: '#6c757d' }}>|</span>
+                    <span style={{ color: lastRemovedMachine ? '#dc3545' : '#6c757d' }}>
+                      Last Offline: <strong>{lastRemovedMachine || 'none'}</strong>
+                    </span>
                   </div>
                 </div>
                 
                 {isConnected && (
-                  <div className="event-trigger-panel">
-                    <div className="panel-subtitle">🖥️ Select Machine</div>
+                  <div className="event-trigger-panel" style={{ paddingTop: '8px' }}>
+                    <div className="panel-subtitle" style={{ marginBottom: '6px', fontSize: '13px' }}>🖥️ Select Online Machine</div>
                     <select 
                       className="event-select"
                       value={selectedMachine || ''}
@@ -1242,7 +1258,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       ))}
                     </select>
                     
-                    <div className="panel-subtitle">📮 Send Event</div>
+                    <div className="panel-subtitle" style={{ marginBottom: '6px', marginTop: '10px', fontSize: '13px' }}>📮 Send Event</div>
                     <select 
                       className="event-select"
                       value={selectedEvent}
@@ -1280,36 +1296,62 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       Send Event → {!isConnected ? '(Not Connected)' : !selectedMachine ? '(No Machine Selected)' : ''}
                     </button>
                     
-                    {/* Send to Arbitrary Machine */}
-                    <div style={{ 
-                      marginTop: '20px', 
-                      paddingTop: '20px', 
-                      borderTop: '2px solid #e9ecef' 
-                    }}>
-                      <div className="panel-subtitle">🚀 Send to Arbitrary Machine</div>
-                      <p style={{ 
-                        fontSize: '12px', 
-                        color: '#6c757d', 
-                        marginBottom: '10px' 
-                      }}>
-                        Send events to offline or unregistered machines
-                      </p>
-                      <input 
-                        type="text" 
-                        className="machine-id-input"
-                        placeholder="Enter Machine ID (e.g., call-001)"
+                    {/* Horizontal Separator Line */}
+                    <hr style={{ 
+                      margin: '15px 0 12px 0',
+                      border: 'none',
+                      borderTop: '2px solid #e9ecef'
+                    }} />
+                    
+                    {/* Send to Offline Debug Machines */}
+                    <div>
+                      <div className="panel-subtitle" style={{ marginBottom: '6px', fontSize: '13px' }}>🖥️ Select Offline Machine</div>
+                      
+                      {/* Offline Machine Selector */}
+                      <select 
+                        className="event-select"
                         value={arbitraryMachineId}
                         onChange={(e) => setArbitraryMachineId(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          fontSize: '13px',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          marginBottom: '10px',
-                          fontFamily: 'monospace'
-                        }}
-                      />
+                        style={{ marginBottom: '12px' }}
+                      >
+                        <option value="">Select Machine</option>
+                        {offlineMachines.map(machine => (
+                          <option key={machine.id} value={machine.id}>
+                            {machine.type || 'StateMachine'} - {machine.id}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      <div className="panel-subtitle" style={{ marginBottom: '6px', marginTop: '10px', fontSize: '13px' }}>📮 Send Event</div>
+                      
+                      {/* Event Type Selector for Offline Machines */}
+                      <select 
+                        className="event-select"
+                        value={offlineSelectedEvent}
+                        onChange={(e) => setOfflineSelectedEvent(e.target.value)}
+                      >
+                        <option value="INCOMING_CALL">INCOMING_CALL</option>
+                        <option value="ANSWER">ANSWER</option>
+                        <option value="HANGUP">HANGUP</option>
+                        <option value="SESSION_PROGRESS">SESSION_PROGRESS</option>
+                        <option value="REJECT">REJECT</option>
+                        <option value="BUSY">BUSY</option>
+                        <option value="TIMEOUT">TIMEOUT</option>
+                      </select>
+                      
+                      {/* Event Payload for Offline Machines */}
+                      <div className="payload-section">
+                        <label>Event Payload (JSON):</label>
+                        <textarea 
+                          className="payload-input"
+                          value={offlineEventPayload}
+                          onChange={(e) => setOfflineEventPayload(e.target.value)}
+                          placeholder='{"phoneNumber": "+1-555-9999"}'
+                          rows="4"
+                        />
+                      </div>
+                      
+                      {/* Send Button for Offline Machines */}
                       <button 
                         className="send-event-btn"
                         onClick={() => {
@@ -1317,12 +1359,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
                           sendEventToArbitraryMachine();
                         }}
                         disabled={!isConnected || !arbitraryMachineId || !arbitraryMachineId.trim()}
-                        style={{
-                          background: '#17a2b8',
-                          borderColor: '#17a2b8'
-                        }}
                       >
-                        Send to {arbitraryMachineId || 'Machine'} → 
+                        Send Event → {!isConnected ? '(Not Connected)' : !arbitraryMachineId ? '(No Machine Selected)' : ''}
                       </button>
                     </div>
                   </div>
@@ -1337,9 +1375,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
             {currentMode === 'live' ? (
               <>
                 {selectedMachine ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start' }}>
                     <div style={{
-                      padding: '6px 12px',
+                      width: '400px',
+                      marginLeft: '-10px',
+                      padding: '8px 12px',
                       background: '#495057',
                       border: '1px solid #6c757d',
                       borderRadius: '6px',

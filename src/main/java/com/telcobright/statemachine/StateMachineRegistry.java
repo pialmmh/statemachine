@@ -16,6 +16,9 @@ import com.telcobright.statemachine.persistence.IdLookUpMode;
 import com.telcobright.db.PartitionedRepository;
 import com.telcobright.db.entity.ShardingEntity;
 import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Registry for managing state machine instances
@@ -31,6 +34,13 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
     // Optional ShardingEntity repository for advanced persistence
     private ShardingEntityStateMachineRepository<? extends ShardingEntity<?>, ?> shardingRepository;
+    
+    // Executor for async operations to avoid blocking real-time performance
+    private ExecutorService asyncExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "StateMachine-Async");
+        t.setDaemon(true);
+        return t;
+    });
     
     /**
      * Default constructor for testing
@@ -152,7 +162,18 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     @Override
     public GenericStateMachine<?, ?> getMachine(String id) {
-        return activeMachines.get(id);
+        // First check active machines
+        GenericStateMachine<?, ?> machine = activeMachines.get(id);
+        
+        // If not found and WebSocket clients are connected, check offline debug cache
+        if (machine == null && hasWebSocketClients()) {
+            machine = offlineMachinesForDebug.get(id);
+            if (machine != null) {
+                System.out.println("[Registry] Retrieved machine " + id + " from offline debug cache");
+            }
+        }
+        
+        return machine;
     }
     
     /**
@@ -291,11 +312,17 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     @SuppressWarnings("unchecked")
     private void notifyRegistryCreate(String machineId) {
-        // Update history if debug mode is enabled
+        // Update history asynchronously if debug mode is enabled
         if (debugMode && history != null) {
             GenericStateMachine<?, ?> machine = activeMachines.get(machineId);
             if (machine != null) {
-                history.recordMachineStart(machineId, machine.getCurrentState());
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        history.recordMachineStart(machineId, machine.getCurrentState());
+                    } catch (Exception e) {
+                        System.err.println("[Registry] Error recording machine start: " + e.getMessage());
+                    }
+                }, asyncExecutor);
             }
         }
         
@@ -313,9 +340,15 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     @SuppressWarnings("unchecked")
     private void notifyRegistryRemove(String machineId) {
-        // Update history if debug mode is enabled
+        // Update history asynchronously if debug mode is enabled
         if (debugMode && history != null) {
-            history.recordMachineRemoval(machineId);
+            CompletableFuture.runAsync(() -> {
+                try {
+                    history.recordMachineRemoval(machineId);
+                } catch (Exception e) {
+                    System.err.println("[Registry] Error recording machine removal: " + e.getMessage());
+                }
+            }, asyncExecutor);
         }
         
         for (StateMachineListener listener : listeners) {
@@ -333,23 +366,28 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     @SuppressWarnings("unchecked")
     public void notifyStateMachineEvent(String machineId, String oldState, String newState, 
                                        StateMachineContextEntity contextEntity, Object volatileContext) {
-        // Update history if debug mode is enabled
-        System.out.println("[Registry] notifyStateMachineEvent: " + machineId + " " + oldState + " -> " + newState + 
-                          " (debugMode=" + debugMode + ", history=" + (history != null ? "exists" : "null") + ")");
-        
+        // Update history asynchronously if debug mode is enabled
         if (debugMode && history != null) {
             // Get the machine to check for event info
             GenericStateMachine<?, ?> machine = activeMachines.get(machineId);
             if (machine != null) {
-                System.out.println("[Registry] Recording transition in History for machine " + machineId);
-                // TODO: Get the actual event from machine if available
-                history.recordTransition(machineId, oldState, newState, null, 
-                    contextEntity, contextEntity, 0);
+                // Record history asynchronously to avoid blocking real-time performance
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        System.out.println("[Registry] Recording transition in History for machine " + machineId);
+                        // TODO: Get the actual event from machine if available
+                        history.recordTransition(machineId, oldState, newState, null, 
+                            contextEntity, contextEntity, 0);
+                    } catch (Exception e) {
+                        System.err.println("[Registry] Error recording history: " + e.getMessage());
+                    }
+                }, asyncExecutor);
             } else {
                 System.out.println("[Registry] Machine not found in activeMachines: " + machineId);
             }
         }
         
+        // Notify listeners synchronously for real-time updates
         for (StateMachineListener listener : listeners) {
             try {
                 listener.onStateMachineEvent(machineId, oldState, newState, contextEntity, volatileContext);
@@ -380,6 +418,32 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         GenericStateMachine<?, ?> machine = activeMachines.remove(id);
         if (machine != null) {
             lastRemovedMachine = id; // Track as removed/offline
+            
+            // Mark as offline in history asynchronously if debug mode is enabled
+            if (debugMode && history != null) {
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        history.recordMachineOffline(id);
+                    } catch (Exception e) {
+                        System.err.println("[Registry] Error marking machine offline: " + e.getMessage());
+                    }
+                }, asyncExecutor);
+            }
+            
+            // If WebSocket has connected clients, keep machine in debug cache
+            if (hasWebSocketClients()) {
+                offlineMachinesForDebug.put(id, machine);
+                System.out.println("[Registry] Machine " + id + " moved to offline debug cache (WebSocket clients connected)");
+                
+                // Broadcast the updated offline machines list AND updated active machines list to all connected clients
+                if (webSocketServer != null) {
+                    webSocketServer.broadcastOfflineMachines();
+                    // Also broadcast updated active machines list since count has changed
+                    webSocketServer.broadcastMachinesList();
+                }
+            } else {
+                System.out.println("[Registry] Machine " + id + " evicted completely (no WebSocket clients)");
+            }
         }
     }
     
@@ -625,6 +689,18 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         if (connectionProvider != null) {
             connectionProvider.close();
             System.out.println("[Registry] Closed MySQL connection provider");
+        }
+        
+        // Shutdown async executor
+        if (asyncExecutor != null) {
+            asyncExecutor.shutdown();
+            try {
+                if (!asyncExecutor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    asyncExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                asyncExecutor.shutdownNow();
+            }
         }
         
         // Call parent shutdown which handles WebSocket and other cleanup

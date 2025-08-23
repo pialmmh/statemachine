@@ -79,8 +79,8 @@ public class CallMachineRunnerProper {
                 .done()
                 
             .state(CallState.CONNECTED)
-                .timeout(120, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name()) // 2 minute call timeout
-                .offline() // Mark as offline state - machine is removed from online registry
+                .offline() // Mark CONNECTED as offline for testing
+                .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name()) // 30 second call timeout
                 .on(Hangup.class).to(CallState.IDLE)
                 .done()
             .build();

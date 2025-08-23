@@ -103,6 +103,12 @@ public class StateMachineWebSocketServer extends WebSocketServer
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         connectedClients.remove(conn);
         System.out.println("[WS] Client disconnected: " + conn.getRemoteSocketAddress());
+        
+        // If no more clients connected, notify registry to clear offline machines for debug
+        if (connectedClients.isEmpty() && registry != null) {
+            System.out.println("[WS] Last client disconnected - clearing offline machines for debug");
+            registry.clearOfflineMachinesForDebug();
+        }
     }
     
     @Override
@@ -246,6 +252,10 @@ public class StateMachineWebSocketServer extends WebSocketServer
                         // Send list of machines to the client
                         sendMachinesList(conn);
                         break;
+                    case "GET_OFFLINE_MACHINES":
+                        // Send list of offline debug machines to the client
+                        sendOfflineMachinesList(conn);
+                        break;
                     case "GET_STATE":
                         // Send current state of all machines
                         sendCompleteStatus(conn);
@@ -386,6 +396,13 @@ public class StateMachineWebSocketServer extends WebSocketServer
                 client.send(message);
             }
         }
+    }
+    
+    /**
+     * Check if there are any connected WebSocket clients
+     */
+    public boolean hasConnectedClients() {
+        return !connectedClients.isEmpty();
     }
     
     private String extractMachineId(String message) {
@@ -739,6 +756,99 @@ public class StateMachineWebSocketServer extends WebSocketServer
         response.add("machines", machineArray);
         conn.send(gson.toJson(response));
         System.out.println("[WS] Sent machines list with " + machineArray.size() + " machines");
+    }
+    
+    /**
+     * Broadcast offline machines list to all connected clients
+     */
+    public void broadcastOfflineMachines() {
+        JsonObject response = buildOfflineMachinesResponse();
+        String message = gson.toJson(response);
+        
+        // Broadcast to all connected clients
+        for (WebSocket conn : getConnections()) {
+            if (conn != null && conn.isOpen()) {
+                conn.send(message);
+            }
+        }
+        
+        System.out.println("[WS] Broadcasted offline machines update to all clients");
+    }
+    
+    /**
+     * Broadcast updated active machines list to all connected clients
+     */
+    public void broadcastMachinesList() {
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "MACHINES_LIST");
+        response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+        
+        JsonArray machineArray = new JsonArray();
+        Set<String> machineIds = registry.getActiveMachineIds();
+        
+        for (String machineId : machineIds) {
+            GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
+            if (machine != null) {
+                JsonObject machineInfo = new JsonObject();
+                machineInfo.addProperty("id", machineId);
+                // Try to determine machine type from class name
+                String className = machine.getClass().getSimpleName();
+                String machineType = className.contains("Call") ? "CallMachine" : 
+                                    className.contains("Sms") ? "SmsMachine" : "StateMachine";
+                machineInfo.addProperty("type", machineType);
+                machineInfo.addProperty("currentState", machine.getCurrentState());
+                machineArray.add(machineInfo);
+            }
+        }
+        
+        response.add("machines", machineArray);
+        String message = gson.toJson(response);
+        
+        // Broadcast to all connected clients
+        for (WebSocket conn : getConnections()) {
+            if (conn != null && conn.isOpen()) {
+                conn.send(message);
+            }
+        }
+        
+        System.out.println("[WS] Broadcasted active machines list update (" + machineIds.size() + " machines) to all clients");
+    }
+    
+    private void sendOfflineMachinesList(WebSocket conn) {
+        JsonObject response = buildOfflineMachinesResponse();
+        conn.send(gson.toJson(response));
+        System.out.println("[WS] Sent offline machines list with " + 
+            response.get("machines").getAsJsonArray().size() + " machines");
+    }
+    
+    private JsonObject buildOfflineMachinesResponse() {
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "OFFLINE_MACHINES_LIST");
+        response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
+        
+        JsonArray machineArray = new JsonArray();
+        
+        // Get offline machines from the registry
+        if (registry instanceof AbstractStateMachineRegistry) {
+            AbstractStateMachineRegistry abstractRegistry = (AbstractStateMachineRegistry) registry;
+            Map<String, GenericStateMachine<?, ?>> offlineMachines = abstractRegistry.getOfflineMachinesForDebug();
+            
+            for (Map.Entry<String, GenericStateMachine<?, ?>> entry : offlineMachines.entrySet()) {
+                JsonObject machineInfo = new JsonObject();
+                machineInfo.addProperty("id", entry.getKey());
+                machineInfo.addProperty("state", entry.getValue().getCurrentState());
+                
+                // Try to determine machine type from class name
+                String className = entry.getValue().getClass().getSimpleName();
+                String machineType = className.contains("Call") ? "CallMachine" : 
+                                    className.contains("Sms") ? "SmsMachine" : "StateMachine";
+                machineInfo.addProperty("type", machineType);
+                machineArray.add(machineInfo);
+            }
+        }
+        
+        response.add("machines", machineArray);
+        return response;
     }
     
     /**

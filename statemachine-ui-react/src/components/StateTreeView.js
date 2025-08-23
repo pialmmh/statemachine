@@ -15,6 +15,9 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
       const isEntry = transition.event === 'Start' || transition.event === 'Entry';
       const isTransition = transition.fromState !== transition.toState;
       
+      // Check if this transition leads to offline state
+      const leadsToOffline = transition.isOffline || false;
+      
       if (isEntry) {
         // This is an entry event - create or find the state group for the target state
         const targetState = transition.toState;
@@ -31,7 +34,8 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
           const newGroup = {
             state: targetState,
             instanceNumber: stateInstanceMap[targetState],
-            transitions: []
+            transitions: [],
+            isOffline: leadsToOffline
           };
           stateGroups.push(newGroup);
           currentState = targetState;
@@ -43,6 +47,11 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
             eventData: transition.payload || {},
             entryActionStatus: transition.entryActionStatus || 'none'
           });
+          
+          // Mark this group as offline if this transition leads to offline
+          if (leadsToOffline) {
+            newGroup.isOffline = true;
+          }
         }
       } else if (isTransition) {
         // This is a transition event - add it to the FROM state
@@ -59,6 +68,14 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
         
         // Update current state to the target state
         currentState = transition.toState;
+        
+        // If this transition leads to offline, mark the last state group
+        if (leadsToOffline && stateGroups.length > 0) {
+          const lastGroup = stateGroups[stateGroups.length - 1];
+          if (lastGroup.state === transition.toState) {
+            lastGroup.isOffline = true;
+          }
+        }
       } else {
         // This is a stay event (same fromState and toState, not an entry)
         const currentGroups = stateGroups.filter(g => g.state === currentState);
@@ -138,7 +155,7 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
   const getStateTimeout = (stateName) => {
     const timeouts = {
       'RINGING': '30s',
-      'CONNECTED': '120s'
+      'CONNECTED': '30s'
     };
     return timeouts[stateName] || null;
   };
@@ -275,6 +292,21 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
               </span>
               <span style={{ flex: 1 }}>
                 {instance.state}
+                {/* Show offline indicator */}
+                {instance.isOffline && (
+                  <span style={{ 
+                    marginLeft: '6px',
+                    padding: '2px 6px',
+                    background: '#e74c3c',
+                    color: 'white',
+                    borderRadius: '3px',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    letterSpacing: '0.5px'
+                  }}>
+                    OFFLINE
+                  </span>
+                )}
                 {/* Show countdown only on the latest instance of this state */}
                 {isLatestInstance && countdownState === instance.state && countdownRemaining > 0 && (
                   <span style={{ 
