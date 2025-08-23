@@ -389,6 +389,15 @@ function MonitoringApp({ mode = 'snapshot' }) {
         const machines = data.machines || [];
         wsLogger.debug('MACHINES_LIST received:', machines.map(m => m.id));
         setLiveMachines(machines);
+        
+        // Update lastAdded and lastRemoved if provided
+        if (data.lastAddedMachine !== undefined) {
+          setLastAddedMachine(data.lastAddedMachine);
+        }
+        if (data.lastRemovedMachine !== undefined) {
+          setLastRemovedMachine(data.lastRemovedMachine);
+        }
+        
         // Don't auto-select any machine - let user choose
         if (selectedMachine) {
           wsLogger.debug('Machine already selected:', selectedMachine);
@@ -421,6 +430,14 @@ function MonitoringApp({ mode = 'snapshot' }) {
         if (data.machines) {
           setOfflineMachines(data.machines);
           wsLogger.debug('Received offline machines:', data.machines.length);
+          
+          // If there's a newly offline machine, auto-select it in the dropdown
+          if (data.machines.length > 0) {
+            // Get the most recently added offline machine (last in the list)
+            const latestOfflineMachine = data.machines[data.machines.length - 1];
+            setArbitraryMachineId(latestOfflineMachine.id);
+            wsLogger.debug('Auto-selected offline machine:', latestOfflineMachine.id);
+          }
         }
       } else if (data.type === 'CURRENT_STATE') {
         wsLogger.debug('CURRENT_STATE message received. Has context?', !!data.context, 'Has received initial?', hasReceivedInitialState.current);

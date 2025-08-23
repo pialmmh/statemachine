@@ -779,6 +779,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
      * Broadcast updated active machines list to all connected clients
      */
     public void broadcastMachinesList() {
+        // Send both the machines list AND the registry state (which includes lastRemoved)
         JsonObject response = new JsonObject();
         response.addProperty("type", "MACHINES_LIST");
         response.addProperty("timestamp", LocalDateTime.now().format(TIME_FORMAT));
@@ -802,6 +803,13 @@ public class StateMachineWebSocketServer extends WebSocketServer
         }
         
         response.add("machines", machineArray);
+        
+        // Also include lastAdded and lastRemoved in the same message
+        String lastAdded = registry.getLastAddedMachine();
+        String lastRemoved = registry.getLastRemovedMachine();
+        response.addProperty("lastAddedMachine", lastAdded);
+        response.addProperty("lastRemovedMachine", lastRemoved);
+        
         String message = gson.toJson(response);
         
         // Broadcast to all connected clients
@@ -811,7 +819,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
             }
         }
         
-        System.out.println("[WS] Broadcasted active machines list update (" + machineIds.size() + " machines) to all clients");
+        System.out.println("[WS] Broadcasted active machines list update (" + machineIds.size() + " machines) with lastRemoved: " + lastRemoved);
     }
     
     private void sendOfflineMachinesList(WebSocket conn) {
