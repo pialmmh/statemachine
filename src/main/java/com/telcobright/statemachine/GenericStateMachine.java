@@ -40,6 +40,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private ScheduledFuture<?> currentTimeout;
     private TPersistingEntity persistingEntity;  // The entity that gets persisted
     private TContext context;  // Volatile context
+    private StateMachineEvent currentEvent;  // Track current event for History
     
     // Monitoring and debugging
     private boolean debugEnabled = false;
@@ -240,6 +241,15 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             onStateTransition.accept(newState);
         }
         
+        // Record transition in History for tree view
+        if (registry != null && registry instanceof AbstractStateMachineRegistry) {
+            AbstractStateMachineRegistry abstractRegistry = (AbstractStateMachineRegistry) registry;
+            if (abstractRegistry.getHistory() != null) {
+                abstractRegistry.getHistory().recordTransition(id, oldState, newState, currentEvent, 
+                    persistingEntity, persistingEntity, System.currentTimeMillis() - startTime);
+            }
+        }
+        
         // Create snapshot asynchronously
         // TODO: Implement ShardingEntity persistence
         persistState();
@@ -283,6 +293,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     private void handleEvent(StateMachineEvent event) {
         System.out.println("📨 handleEvent called for machine " + id + " with event: " + event.getClass().getSimpleName() + " (type: " + event.getEventType() + ")");
+        
+        // Set current event for History recording in transitionTo
+        currentEvent = event;
         
         // Capture before state for snapshot
         String stateBefore = currentState;
@@ -343,6 +356,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             if (isDebugEnabled()) {
                 recordSnapshot(stateBefore, currentState, event, contextBefore, context, transitionDuration);
             }
+            
+            // Clear current event
+            currentEvent = null;
         }
     }
     

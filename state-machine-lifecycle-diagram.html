@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Machine Lifecycle Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .subtitle {
+            margin-top: 10px;
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px;
+        }
+        .diagram-section {
+            margin-bottom: 60px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        }
+        h2 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            font-size: 1.8em;
+        }
+        .mermaid {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .description {
+            background: #e8f4f8;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #2c3e50;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .active { background: #4caf50; }
+        .offline { background: #ff9800; }
+        .database { background: #2196f3; }
+        .error { background: #f44336; }
+        .nav {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+        .nav h3 {
+            margin: 0 0 15px 0;
+            color: #667eea;
+            font-size: 14px;
+        }
+        .nav a {
+            display: block;
+            padding: 8px 12px;
+            color: #555;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 5px 0;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        .nav a:hover {
+            background: #667eea;
+            color: white;
+            transform: translateX(-5px);
+        }
+        @media (max-width: 1200px) {
+            .nav { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h3>Quick Navigation</h3>
+        <a href="#overview">Overview</a>
+        <a href="#creation">Creation Flow</a>
+        <a href="#offline">Offline Flow</a>
+        <a href="#rehydration">Rehydration Flow</a>
+        <a href="#states">State Diagram</a>
+        <a href="#sequence">Sequence</a>
+        <a href="#memory">Memory States</a>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🔄 State Machine Lifecycle</h1>
+            <div class="subtitle">Complete Flow Diagrams with Offline/Rehydration Mechanism</div>
+        </div>
+        
+        <div class="content">
+            <!-- Complete Lifecycle Overview -->
+            <div id="overview" class="diagram-section">
+                <h2>Complete Lifecycle Overview</h2>
+                <div class="description">
+                    This diagram shows the complete journey of a state machine from creation through active processing, 
+                    offline storage, and rehydration back to active state.
+                </div>
+                <div class="mermaid">
+                    graph TB
+                        Start([🚀 Start]) --> Create[Create State Machine]
+                        
+                        Create --> Register[Register with Registry]
+                        Register --> SetCallbacks[Set Callbacks:<br/>- onStateTransition<br/>- onOfflineTransition]
+                        SetCallbacks --> Active[Active in Memory<br/>🟢 In HashMap]
+                        
+                        Active --> Event{Event Received}
+                        Event -->|Normal State| ProcessEvent[Process Event]
+                        ProcessEvent --> StateChange[State Transition]
+                        StateChange --> CheckOffline{Is New State<br/>Marked .offline?}
+                        
+                        CheckOffline -->|No| Active
+                        CheckOffline -->|Yes| ExecuteEntry[Execute Entry Actions]
+                        ExecuteEntry --> TriggerOffline[Trigger onOfflineTransition]
+                        TriggerOffline --> Persist[💾 Persist to MySQL]
+                        Persist --> Evict[Evict from Registry<br/>🔴 Remove from HashMap]
+                        Evict --> Offline[Offline State<br/>💤 In Database Only]
+                        
+                        Offline --> EventForOffline{Event Arrives<br/>for Offline Machine}
+                        EventForOffline --> CheckMemory[Check Registry HashMap]
+                        CheckMemory -->|Not Found| LoadFromDB[📥 Load Context from MySQL]
+                        LoadFromDB --> CheckComplete{Is Complete?}
+                        CheckComplete -->|Yes| Reject[❌ Reject Event<br/>Don't Rehydrate]
+                        CheckComplete -->|No| Rehydrate[💧 Rehydrate Machine]
+                        
+                        Rehydrate --> CreateNew[Create New Instance<br/>with Same Config]
+                        CreateNew --> SetContext[Set Persistent Context<br/>from Database]
+                        SetContext --> RestoreState[Restore Current State<br/>without Entry Actions]
+                        RestoreState --> CheckTimeout{Timeout Expired?}
+                        CheckTimeout -->|Yes| TriggerTimeout[⏰ Trigger Timeout<br/>Transition]
+                        CheckTimeout -->|No| ScheduleTimeout[⏰ Schedule Remaining<br/>Timeout]
+                        TriggerTimeout --> RegisterRehydrated
+                        ScheduleTimeout --> RegisterRehydrated[Register in Registry]
+                        RegisterRehydrated --> Active
+                        
+                        Active --> Shutdown{System Shutdown?}
+                        Shutdown -->|Yes| PersistAll[💾 Persist All Active<br/>Machines to MySQL]
+                        PersistAll --> End([🏁 End])
+                        
+                        Reject --> End
+                        
+                        style Active fill:#4caf50,stroke:#2e7d32,color:#fff
+                        style Offline fill:#ff9800,stroke:#e65100,color:#fff
+                        style Persist fill:#2196f3,stroke:#0d47a1,color:#fff
+                        style LoadFromDB fill:#2196f3,stroke:#0d47a1,color:#fff
+                        style Reject fill:#f44336,stroke:#b71c1c,color:#fff
+                        style Rehydrate fill:#03a9f4,stroke:#01579b,color:#fff
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-box active"></div>
+                        <span>Active in Memory</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box offline"></div>
+                        <span>Offline State</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box database"></div>
+                        <span>Database Operation</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box error"></div>
+                        <span>Error/Rejection</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Machine Creation Flow -->
+            <div id="creation" class="diagram-section">
+                <h2>Machine Creation Flow</h2>
+                <div class="description">
+                    Shows how the system determines whether to create a new machine, return an existing one from memory, 
+                    or rehydrate from the database.
+                </div>
+                <div class="mermaid">
+                    graph LR
+                        A[New Event/Request] --> B{Machine Exists?}
+                        B -->|🟢 In Memory| C[Return Existing<br/>from HashMap]
+                        B -->|💾 In Database| D[Rehydrate from<br/>MySQL]
+                        B -->|❌ Not Found| E[Create New<br/>Machine]
+                        E --> F[Initialize Context]
+                        F --> G[Set Initial State]
+                        G --> H[Register in<br/>Registry]
+                        D --> I[Load Context]
+                        I --> J[Check Complete]
+                        J -->|Not Complete| K[Restore State]
+                        K --> H
+                        J -->|Complete| L[Don't Create]
+                        
+                        style C fill:#4caf50,stroke:#2e7d32,color:#fff
+                        style D fill:#2196f3,stroke:#0d47a1,color:#fff
+                        style E fill:#9c27b0,stroke:#4a148c,color:#fff
+                        style L fill:#f44336,stroke:#b71c1c,color:#fff
+                </div>
+            </div>
+
+            <!-- Offline Transition Flow -->
+            <div id="offline" class="diagram-section">
+                <h2>Offline Transition Flow</h2>
+                <div class="description">
+                    Details the exact sequence when a state machine transitions to a state marked with .offline() flag.
+                </div>
+                <div class="mermaid">
+                    graph TD
+                        A[State Transition] --> B[Enter New State]
+                        B --> C{State has<br/>.offline() flag?}
+                        C -->|No| D[Continue Normal<br/>Operation]
+                        C -->|Yes| E[✅ Complete Entry Actions]
+                        E --> F[🔔 Fire onOfflineTransition<br/>Callback]
+                        F --> G[💾 Save Context to MySQL]
+                        G --> H[🗑️ Remove from HashMap]
+                        H --> I[💤 Machine Now Offline]
+                        I --> J[Free Memory<br/>Resources]
+                        
+                        style D fill:#4caf50,stroke:#2e7d32,color:#fff
+                        style G fill:#2196f3,stroke:#0d47a1,color:#fff
+                        style I fill:#ff9800,stroke:#e65100,color:#fff
+                        style J fill:#9e9e9e,stroke:#424242,color:#fff
+                </div>
+            </div>
+
+            <!-- Rehydration Flow -->
+            <div id="rehydration" class="diagram-section">
+                <h2>Rehydration Flow</h2>
+                <div class="description">
+                    Shows the detailed process of rehydrating a machine from database when an event arrives for an offline machine.
+                </div>
+                <div class="mermaid">
+                    graph TD
+                        A[📨 Event for Machine ID] --> B[Registry.getMachine]
+                        B -->|null| C[Check Persistence<br/>Provider]
+                        C --> D[📥 Load from MySQL]
+                        D -->|Found| E{Is Complete?}
+                        E -->|No| F[🏗️ Create Machine<br/>Instance]
+                        F --> G[Set Loaded Context]
+                        G --> H[Restore State<br/>NO Entry Actions]
+                        H --> I[⏰ Check/Schedule<br/>Timeouts]
+                        I --> J[Register in HashMap]
+                        J --> K[🎯 Process Event]
+                        K --> L[Machine Active]
+                        E -->|Yes| M[❌ Don't Rehydrate<br/>Reject Event]
+                        D -->|Not Found| N[Create New<br/>Machine]
+                        N --> K
+                        
+                        style D fill:#2196f3,stroke:#0d47a1,color:#fff
+                        style F fill:#03a9f4,stroke:#01579b,color:#fff
+                        style L fill:#4caf50,stroke:#2e7d32,color:#fff
+                        style M fill:#f44336,stroke:#b71c1c,color:#fff
+                </div>
+            </div>
+
+            <!-- State Diagram -->
+            <div id="states" class="diagram-section">
+                <h2>State Machine States</h2>
+                <div class="description">
+                    The fundamental states a state machine can be in throughout its lifecycle.
+                </div>
+                <div class="mermaid">
+                    stateDiagram-v2
+                        [*] --> Created: new()
+                        Created --> InMemory: register()
+                        InMemory --> InMemory: process events
+                        InMemory --> Offline: enter .offline() state
+                        Offline --> InMemory: rehydrate on event
+                        InMemory --> Completed: setComplete(true)
+                        Offline --> Completed: setComplete(true)
+                        Completed --> [*]: terminal state
+                        
+                        InMemory: In Memory (Active)
+                        InMemory: ● Processing Events
+                        InMemory: ● In Registry HashMap
+                        InMemory: ● Consuming RAM
+                        
+                        Offline: Offline (Persisted)
+                        Offline: ● Stored in MySQL
+                        Offline: ● Not in HashMap
+                        Offline: ● No RAM Usage
+                        
+                        Completed: Completed (Terminal)
+                        Completed: ● Cannot be rehydrated
+                        Completed: ● Stored in MySQL
+                        Completed: ● Marked as complete
+                </div>
+            </div>
+
+            <!-- Sequence Diagram -->
+            <div id="sequence" class="diagram-section">
+                <h2>Component Interaction Sequence</h2>
+                <div class="description">
+                    Shows the detailed interaction between components during event processing and rehydration.
+                </div>
+                <div class="mermaid">
+                    sequenceDiagram
+                        participant Client
+                        participant WebSocket
+                        participant Registry
+                        participant Machine
+                        participant MySQL
+                        participant TimeoutMgr
+                        
+                        rect rgb(230, 245, 230)
+                            Note over Client,TimeoutMgr: Normal Event Processing (Machine in Memory)
+                            Client->>WebSocket: Send Event
+                            WebSocket->>Registry: routeEvent(machineId, event)
+                            Registry->>Registry: Check HashMap
+                            Registry->>Machine: fire(event)
+                            Machine->>Machine: Process Event
+                            Machine->>Registry: onStateTransition
+                            Registry->>WebSocket: Broadcast State Change
+                        end
+                        
+                        rect rgb(255, 243, 224)
+                            Note over Client,TimeoutMgr: Rehydration Flow (Machine Offline)
+                            Client->>WebSocket: Send Event
+                            WebSocket->>Registry: routeEvent(machineId, event)
+                            Registry->>Registry: Check HashMap (not found)
+                            Registry->>MySQL: Load Context
+                            MySQL-->>Registry: Context Data
+                            Registry->>Registry: Check isComplete()
+                            Registry->>Machine: Create New Instance
+                            Registry->>Machine: Set Context
+                            Registry->>Machine: Restore State
+                            Machine->>TimeoutMgr: Check/Schedule Timeouts
+                            Registry->>Machine: fire(event)
+                            Machine->>Registry: onStateTransition
+                            Registry->>WebSocket: Broadcast State Change
+                        end
+                        
+                        rect rgb(255, 235, 238)
+                            Note over Client,TimeoutMgr: Offline Transition
+                            Machine->>Machine: Enter .offline() State
+                            Machine->>Machine: Execute Entry Actions
+                            Machine->>Registry: onOfflineTransition
+                            Registry->>MySQL: Save Context
+                            MySQL-->>Registry: Saved
+                            Registry->>Registry: Evict from HashMap
+                            Registry->>WebSocket: Notify Machine Offline
+                        end
+                </div>
+            </div>
+
+            <!-- Memory Management Table -->
+            <div id="memory" class="diagram-section">
+                <h2>Memory Management States</h2>
+                <div class="description">
+                    Comparison of different states and their memory/database characteristics.
+                </div>
+                <style>
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 20px 0;
+                        background: white;
+                        overflow: hidden;
+                        box-shadow: none !important;
+                        border: none !important;
+                        outline: none !important;
+                    }
+                    thead {
+                        border: none !important;
+                    }
+                    tbody {
+                        border: none !important;
+                    }
+                    th {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 15px;
+                        text-align: left;
+                        font-weight: 600;
+                        border: none !important;
+                        border-bottom: 2px solid #667eea !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-top: none !important;
+                        outline: none !important;
+                    }
+                    th:first-child {
+                        padding-left: 20px;
+                    }
+                    th:last-child {
+                        padding-right: 20px;
+                    }
+                    td {
+                        padding: 12px 15px;
+                        border: none !important;
+                        border-bottom: 1px solid #eee !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-top: none !important;
+                        outline: none !important;
+                    }
+                    td:first-child {
+                        padding-left: 20px;
+                    }
+                    td:last-child {
+                        padding-right: 20px;
+                    }
+                    tr {
+                        border: none !important;
+                        outline: none !important;
+                    }
+                    tr:last-child td {
+                        border-bottom: none !important;
+                    }
+                    tr:hover {
+                        background: #f8f9fa;
+                    }
+                    .check { color: #4caf50; font-weight: bold; }
+                    .cross { color: #f44336; font-weight: bold; }
+                    .partial { color: #ff9800; font-weight: bold; }
+                </style>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>State</th>
+                            <th>In Memory</th>
+                            <th>In Database</th>
+                            <th>Can Process Events</th>
+                            <th>Memory Usage</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Active</strong></td>
+                            <td class="check">✅ Yes</td>
+                            <td class="cross">❌ No*</td>
+                            <td class="check">✅ Yes</td>
+                            <td>Full</td>
+                            <td>Normal operation, fast event processing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Offline</strong></td>
+                            <td class="cross">❌ No</td>
+                            <td class="check">✅ Yes</td>
+                            <td class="partial">🔄 Via Rehydration</td>
+                            <td>None</td>
+                            <td>Memory efficient, slower first event</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Rehydrating</strong></td>
+                            <td class="partial">🔄 Loading</td>
+                            <td class="check">✅ Yes</td>
+                            <td class="partial">⏳ After Load</td>
+                            <td>Increasing</td>
+                            <td>Transient state during restoration</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Completed</strong></td>
+                            <td class="cross">❌ No</td>
+                            <td class="check">✅ Yes</td>
+                            <td class="cross">❌ No</td>
+                            <td>None</td>
+                            <td>Terminal state, won't be rehydrated</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    * Active machines can be persisted on shutdown or for debugging purposes
+                </p>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="diagram-section">
+                <h2>Performance Characteristics</h2>
+                <div class="mermaid">
+                    graph LR
+                        subgraph "Operation Costs"
+                            A[Create New<br/>Time: O₁<br/>DB: 0 calls]
+                            B[Fire Event Active<br/>Time: O₁<br/>DB: 0 calls]
+                            C[Go Offline<br/>Time: O₁<br/>DB: 1 save]
+                            D[Rehydrate<br/>Time: O₁<br/>DB: 1 load]
+                            E[Check Complete<br/>Time: O₁<br/>DB: 1 query]
+                        end
+                        
+                        style A fill:#9c27b0,stroke:#4a148c,color:#fff
+                        style B fill:#4caf50,stroke:#2e7d32,color:#fff
+                        style C fill:#ff9800,stroke:#e65100,color:#fff
+                        style D fill:#03a9f4,stroke:#01579b,color:#fff
+                        style E fill:#607d8b,stroke:#263238,color:#fff
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#667eea',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#4c51bf',
+                lineColor: '#5a67d8',
+                secondaryColor: '#f7fafc',
+                tertiaryColor: '#e2e8f0',
+                background: '#ffffff',
+                mainBkg: '#667eea',
+                secondBkg: '#f7fafc',
+                tertiaryBkg: '#e2e8f0'
+            }
+        });
+    </script>
+</body>
+</html>

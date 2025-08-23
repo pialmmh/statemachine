@@ -84,7 +84,7 @@ public abstract class GenericWebSocketStateMachineRunner<TPersistingEntity exten
     protected StateMachineRegistry createRegistry() {
         StateMachineRegistry reg = new StateMachineRegistry();
         // Enable live debugging by default
-        reg.enableLiveDebug(getPort());
+        reg.enableDebugMode(getPort());
         return reg;
     }
     

@@ -7,7 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
-import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
+import com.telcobright.statemachine.history.History;
 import com.telcobright.statemachine.websocket.StateMachineWebSocketServer;
 import java.nio.file.Paths;
 import com.telcobright.statemachine.events.EventTypeRegistry;
@@ -27,9 +27,8 @@ public abstract class AbstractStateMachineRegistry {
     
     protected final Map<String, GenericStateMachine<?, ?>> activeMachines = new ConcurrentHashMap<>();
     protected final TimeoutManager timeoutManager;
-    protected boolean snapshotDebug = false;  // Snapshot debugging flag
-    protected boolean liveDebug = false;       // Live debugging flag
-    protected SimpleDatabaseSnapshotRecorder snapshotRecorder;
+    protected boolean debugMode = false;       // Debug mode flag
+    protected History history;
     protected final List<StateMachineListener<?, ?>> listeners = new CopyOnWriteArrayList<>();
     protected StateMachineWebSocketServer webSocketServer;
     protected int webSocketPort = 9999; // Default WebSocket port
@@ -61,46 +60,35 @@ public abstract class AbstractStateMachineRegistry {
     }
     
     /**
-     * Enable snapshot debugging - records state transitions to database
+     * Enable debug mode - starts WebSocket server for real-time monitoring
+     * and enables history tracking for treeview
      */
-    public void enableSnapshotDebug() {
-        enableSnapshotDebug(new SimpleDatabaseSnapshotRecorder());
+    public void enableDebugMode() {
+        enableDebugMode(webSocketPort);
     }
     
     /**
-     * Enable snapshot debugging with custom recorder
-     * @param customRecorder Custom snapshot recorder implementation
-     */
-    public void enableSnapshotDebug(SimpleDatabaseSnapshotRecorder customRecorder) {
-        this.snapshotDebug = true;
-        this.snapshotRecorder = customRecorder;
-        
-        // Event logging handled by MySQL history
-        
-        System.out.println("📸 Snapshot debugging ENABLED");
-        System.out.println("   All state transitions will be recorded to database");
-    }
-    
-    /**
-     * Enable live debugging - starts WebSocket server for real-time monitoring
-     */
-    public void enableLiveDebug() {
-        enableLiveDebug(webSocketPort);
-    }
-    
-    /**
-     * Enable live debugging with custom port
+     * Enable debug mode with custom port
      * @param port WebSocket server port
      */
-    public void enableLiveDebug(int port) {
-        this.liveDebug = true;
+    public void enableDebugMode(int port) {
+        this.debugMode = true;
         this.webSocketPort = port;
+        
+        // Start WebSocket server first
         startWebSocketServer();
         
-        // Event logging handled by MySQL history
+        // Initialize history with broadcaster after server is started
+        this.history = new History(message -> {
+            if (webSocketServer != null) {
+                // The message is already a complete JSON object with type field
+                webSocketServer.broadcastMessage(message.toString());
+            }
+        });
         
-        System.out.println("🔴 Live debugging ENABLED");
+        System.out.println("🔍 Debug mode ENABLED");
         System.out.println("   WebSocket server: ws://localhost:" + port);
+        System.out.println("   History tracking: ACTIVE");
     }
     
     /**
@@ -166,57 +154,30 @@ public abstract class AbstractStateMachineRegistry {
     }
     
     /**
-     * Disable snapshot debugging
+     * Disable debug mode
      */
-    public void disableSnapshotDebug() {
-        this.snapshotDebug = false;
-        this.snapshotRecorder = null;
-        System.out.println("📸 Snapshot debugging DISABLED");
-    }
-    
-    /**
-     * Disable live debugging
-     */
-    public void disableLiveDebug() {
-        this.liveDebug = false;
+    public void disableDebugMode() {
+        this.debugMode = false;
         stopWebSocketServer();
-        System.out.println("🔴 Live debugging DISABLED");
+        if (history != null) {
+            history.clear();
+            history = null;
+        }
+        System.out.println("🔴 Debug mode DISABLED");
     }
     
     /**
-     * Disable all debugging
-     */
-    public void disableAllDebug() {
-        disableSnapshotDebug();
-        disableLiveDebug();
-    }
-    
-    /**
-     * Check if snapshot debugging is enabled
-     */
-    public boolean isSnapshotDebugEnabled() {
-        return snapshotDebug;
-    }
-    
-    /**
-     * Check if live debugging is enabled
-     */
-    public boolean isLiveDebugEnabled() {
-        return liveDebug;
-    }
-    
-    /**
-     * Check if any debugging is enabled
+     * Check if debug mode is enabled
      */
     public boolean isDebugEnabled() {
-        return snapshotDebug || liveDebug;
+        return debugMode;
     }
     
     /**
-     * Get the snapshot recorder (if debug mode is enabled)
+     * Get the history tracker (if debug mode is enabled)
      */
-    public SimpleDatabaseSnapshotRecorder getSnapshotRecorder() {
-        return snapshotRecorder;
+    public History getHistory() {
+        return history;
     }
     
     /**

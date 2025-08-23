@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './MonitoringApp.css';
 import LiveHistoryDisplay from './components/LiveHistoryDisplay';
 import wsLogger from './wsLogger';
+import treeViewStore from './store/treeViewStore';
 
 function MonitoringApp({ mode = 'snapshot' }) {
   const [currentMode, setCurrentMode] = useState(mode);
@@ -12,6 +13,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const [isConnected, setIsConnected] = useState(false);
   const [liveState, setLiveState] = useState('IDLE');
   const [liveHistory, setLiveHistory] = useState([]);
+  const [mysqlHistory, setMysqlHistory] = useState([]); // MySQL history for Event Viewer
   const [selectedEvent, setSelectedEvent] = useState('INCOMING_CALL');
   const [eventPayload, setEventPayload] = useState('{\n  "phoneNumber": "+1-555-9999"\n}');
   const [countdownState, setCountdownState] = useState(null);
@@ -19,8 +21,10 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'events'
   const [liveMachines, setLiveMachines] = useState([]);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [treeViewData, setTreeViewData] = useState({ stateInstances: [] }); // Subscribe to treeViewStore
   const [lastAddedMachine, setLastAddedMachine] = useState(null);
   const [lastRemovedMachine, setLastRemovedMachine] = useState(null);
+  const [arbitraryMachineId, setArbitraryMachineId] = useState('');
   
   const wsRef = useRef(null);
   const wsUrl = 'ws://localhost:9999';
@@ -41,6 +45,45 @@ function MonitoringApp({ mode = 'snapshot' }) {
     selectedMachineRef.current = selectedMachine;
     wsLogger.debug('Updated selectedMachineRef to: ' + selectedMachine);
   }, [selectedMachine]);
+
+  // Auto-refresh Event Viewer history every 5 seconds
+  useEffect(() => {
+    if (viewMode === 'events' && selectedMachine && isConnected) {
+      // Request initial Event Viewer history
+      requestEventViewerHistory(selectedMachine);
+      
+      // Set up interval to refresh every 5 seconds
+      const intervalId = setInterval(() => {
+        if (selectedMachineRef.current) {
+          wsLogger.debug('Auto-refreshing Event Viewer history for:', selectedMachineRef.current);
+          requestEventViewerHistory(selectedMachineRef.current);
+        }
+      }, 5000);
+      
+      // Cleanup interval on unmount or when conditions change
+      return () => {
+        wsLogger.debug('Stopping Event Viewer auto-refresh');
+        clearInterval(intervalId);
+      };
+    }
+  }, [viewMode, selectedMachine, isConnected]);
+
+  // Subscribe to treeViewStore updates
+  useEffect(() => {
+    const unsubscribe = treeViewStore.subscribe((state) => {
+      console.log('[MonitoringApp] TreeView store updated, version:', state.version);
+      wsLogger.log('MonitoringApp', 'TreeView store subscription callback, stateInstances count:', state.stateInstances?.length || 0);
+      wsLogger.log('MonitoringApp', 'TreeView store subscription callback, stateInstances:', JSON.stringify(state.stateInstances));
+      setTreeViewData(state);
+    });
+    
+    // Get initial state
+    const initialState = treeViewStore.getSnapshot();
+    wsLogger.log('MonitoringApp', 'Initial treeViewStore state, stateInstances count:', initialState.stateInstances?.length || 0);
+    setTreeViewData(initialState);
+    
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     loadRuns();
@@ -231,6 +274,9 @@ function MonitoringApp({ mode = 'snapshot' }) {
       wsRef.current.onopen = () => {
         wsLogger.debug('WebSocket connected for live mode');
         setIsConnected(true);
+        
+        // Set WebSocket connection for treeViewStore
+        treeViewStore.setWebSocket(wsRef.current);
         
         // Set WebSocket reference in logger
         wsLogger.setWebSocket(wsRef.current);
@@ -487,6 +533,14 @@ function MonitoringApp({ mode = 'snapshot' }) {
           updated.push(event);
           return updated;
         });
+      } else if (data.type === 'TREEVIEW_STORE_UPDATE') {
+        // Handle treeview store update from backend
+        wsLogger.debug('TREEVIEW_STORE_UPDATE received, version:', data.store?.version);
+        wsLogger.log('MonitoringApp', 'TREEVIEW_STORE_UPDATE stateInstances count:', data.store?.stateInstances?.length || 0);
+        wsLogger.log('MonitoringApp', 'TREEVIEW_STORE_UPDATE data.store.stateInstances:', JSON.stringify(data.store?.stateInstances));
+        if (data.store) {
+          treeViewStore.replaceStore(data.store);
+        }
       } else if (data.type === 'STATE_CHANGE') {
         wsLogger.debug('STATE_CHANGE received for machine:', data.machineId);
         wsLogger.debug('Currently selected machine (ref):', selectedMachineRef.current);
@@ -623,16 +677,30 @@ function MonitoringApp({ mode = 'snapshot' }) {
           wsLogger.debug('History length after push:', updated.length);
           return updated;
         });
+      } else if (data.type === 'EVENT_VIEWER_HISTORY') {
+        // Event Viewer history received (MySQL raw data)
+        wsLogger.debug('=== EVENT_VIEWER_HISTORY received ===');
+        wsLogger.debug('  Machine ID:', data.machineId);
+        wsLogger.debug('  Events length:', data.events ? data.events.length : 0);
+        
+        if (data.machineId === selectedMachineRef.current && data.events) {
+          wsLogger.debug('Processing Event Viewer history for', data.machineId);
+          setMysqlHistory(data.events);
+        }
       } else if (data.type === 'HISTORY_DATA') {
         // Full history data received
         wsLogger.debug('=== HISTORY_DATA received ===');
         wsLogger.debug('  Machine ID:', data.machineId);
         wsLogger.debug('  History length:', data.history ? data.history.length : 0);
+        wsLogger.debug('  Raw history length:', data.rawHistory ? data.rawHistory.length : 0);
         wsLogger.debug('  Selected machine ref:', selectedMachineRef.current);
         wsLogger.debug('  Match:', data.machineId === selectedMachineRef.current);
         
         if (data.machineId === selectedMachineRef.current && data.history) {
           wsLogger.debug('Processing history for', data.machineId);
+          
+          // Store raw MySQL history for Event Viewer (if available, otherwise fall back to grouped)
+          setMysqlHistory(data.rawHistory || data.history);
           
           // Generate a new session ID for this history load
           const sessionId = `${data.machineId}-${Date.now()}`;
@@ -854,6 +922,22 @@ function MonitoringApp({ mode = 'snapshot' }) {
     wsLogger.debug('Requesting full history for:', machineId);
     wsRef.current.send(JSON.stringify(request));
   };
+
+  // Request Event Viewer history (MySQL raw data)
+  const requestEventViewerHistory = (machineId) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      wsLogger.error('WebSocket not connected for Event Viewer');
+      return;
+    }
+    
+    const request = {
+      action: 'GET_EVENT_VIEWER_HISTORY',
+      machineId: machineId
+    };
+    
+    wsLogger.debug('Requesting Event Viewer history for:', machineId);
+    wsRef.current.send(JSON.stringify(request));
+  };
   
   // Request registry status to get last added/removed machines
   const requestRegistryStatus = () => {
@@ -958,6 +1042,53 @@ function MonitoringApp({ mode = 'snapshot' }) {
     }
   };
 
+  const sendEventToArbitraryMachine = () => {
+    wsLogger.debug('sendEventToArbitraryMachine called');
+    wsLogger.debug('isConnected:', isConnected, 'arbitraryMachineId:', arbitraryMachineId);
+    
+    if (!arbitraryMachineId || !arbitraryMachineId.trim()) {
+      alert('Please enter a machine ID');
+      return;
+    }
+
+    if (!isConnected || !wsRef.current) {
+      alert('WebSocket is not connected. Please wait for connection or refresh the page.');
+      return;
+    }
+
+    try {
+      const payload = eventPayload ? JSON.parse(eventPayload) : {};
+      const message = {
+        type: 'EVENT_TO_ARBITRARY',
+        machineId: arbitraryMachineId.trim(),
+        eventType: selectedEvent,
+        payload: payload
+      };
+      
+      wsLogger.debug('Sending event to arbitrary machine:', message);
+      
+      if (sendWebSocketMessage(message)) {
+        wsLogger.debug('Event sent successfully to arbitrary machine:', arbitraryMachineId);
+        
+        // Clear the input after successful send
+        setArbitraryMachineId('');
+        
+        // If this machine gets rehydrated, it should appear in the list
+        // Request updated machine list after a short delay
+        setTimeout(() => {
+          sendWebSocketMessage({
+            action: 'GET_MACHINES'
+          });
+        }, 500);
+      } else {
+        alert('Failed to send event. WebSocket connection might be unstable.');
+      }
+    } catch (error) {
+      wsLogger.error('Error preparing event:', error);
+      alert('Invalid JSON payload: ' + error.message);
+    }
+  };
+
   const handleEventSelection = (event) => {
     const eventType = event.target.value;
     setSelectedEvent(eventType);
@@ -1053,6 +1184,14 @@ function MonitoringApp({ mode = 'snapshot' }) {
                         setSelectedMachine(machineId);
                         selectedMachineRef.current = machineId;  // Update ref to avoid closure issues
                         
+                        // Send selection to backend via treeViewStore
+                        treeViewStore.selectMachine(machineId);
+                        
+                        // Request MySQL history for Event Viewer
+                        if (machineId) {
+                          requestMachineHistory(machineId);
+                        }
+                        
                         // When a machine is selected, request its history from backend
                         if (machineId) {
                           wsLogger.debug('Requesting history for machine:', machineId);
@@ -1133,6 +1272,52 @@ function MonitoringApp({ mode = 'snapshot' }) {
                     >
                       Send Event → {!isConnected ? '(Not Connected)' : !selectedMachine ? '(No Machine Selected)' : ''}
                     </button>
+                    
+                    {/* Send to Arbitrary Machine */}
+                    <div style={{ 
+                      marginTop: '20px', 
+                      paddingTop: '20px', 
+                      borderTop: '2px solid #e9ecef' 
+                    }}>
+                      <div className="panel-subtitle">🚀 Send to Arbitrary Machine</div>
+                      <p style={{ 
+                        fontSize: '12px', 
+                        color: '#6c757d', 
+                        marginBottom: '10px' 
+                      }}>
+                        Send events to offline or unregistered machines
+                      </p>
+                      <input 
+                        type="text" 
+                        className="machine-id-input"
+                        placeholder="Enter Machine ID (e.g., call-001)"
+                        value={arbitraryMachineId}
+                        onChange={(e) => setArbitraryMachineId(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          marginBottom: '10px',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                      <button 
+                        className="send-event-btn"
+                        onClick={() => {
+                          wsLogger.debug('Sending event to arbitrary machine:', arbitraryMachineId);
+                          sendEventToArbitraryMachine();
+                        }}
+                        disabled={!isConnected || !arbitraryMachineId || !arbitraryMachineId.trim()}
+                        style={{
+                          background: '#17a2b8',
+                          borderColor: '#17a2b8'
+                        }}
+                      >
+                        Send to {arbitraryMachineId || 'Machine'} → 
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1157,6 +1342,16 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       fontFamily: '"Inter", sans-serif'
                     }}>
                       Machine: {selectedMachine}, Current State: <span style={{ color: '#ffc107', fontWeight: '600' }}>{liveState || 'IDLE'}</span>
+                      {countdownState === liveState && countdownRemaining > 0 && (
+                        <span style={{ 
+                          marginLeft: '12px', 
+                          color: '#ff6b6b',
+                          fontWeight: '600',
+                          animation: countdownRemaining <= 5 ? 'pulse 1s infinite' : 'none'
+                        }}>
+                          ⏱️ {countdownRemaining}s
+                        </span>
+                      )}
                     </div>
                     <button
                       onClick={() => setViewMode('tree')}
@@ -1291,31 +1486,23 @@ function MonitoringApp({ mode = 'snapshot' }) {
                 </div>
               )
             ) : (
-              // Live mode display
-              selectedMachine ? (
+              // Live mode display - always show tree when connected
+              isConnected ? (
                 (() => {
-                  wsLogger.debug('Rendering LiveHistoryDisplay with liveHistory.length:', liveHistory.length);
+                  wsLogger.debug('Rendering LiveHistoryDisplay with treeViewData:', treeViewData);
+                  // Pass transitions and selectedMachineId from treeViewStore
+                  const transitions = treeViewData.transitions || [];
+                  const selectedMachineId = treeViewData.selectedMachineId || null;
+                  
+                  wsLogger.log('MonitoringApp', 'Selected machine:', selectedMachineId);
+                  wsLogger.log('MonitoringApp', 'Transitions count:', transitions.length);
+                  
                   return (
                 <LiveHistoryDisplay 
-                  liveHistory={liveHistory.length > 0 ? liveHistory : [{
-                    stepNumber: 1,
-                    fromState: 'Initial',
-                    toState: liveState || 'IDLE',
-                    event: 'Current State',
-                    timestamp: new Date().toISOString(),
-                    duration: 0,
-                    eventData: {},
-                    contextBefore: {
-                      registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-                      persistentContext: {},
-                      volatileContext: {}
-                    },
-                    contextAfter: {
-                      registryStatus: { status: 'ACTIVE', hydrated: false, online: true },
-                      persistentContext: {},
-                      volatileContext: {}
-                    }
-                  }]}
+                  wsConnection={wsRef.current}
+                  transitions={transitions}
+                  mysqlHistory={mysqlHistory}
+                  selectedMachineId={selectedMachineId}
                   countdownState={countdownState}
                   countdownRemaining={countdownRemaining}
                   viewMode={viewMode}
@@ -1324,8 +1511,8 @@ function MonitoringApp({ mode = 'snapshot' }) {
                 })()
               ) : (
                 <div className="empty-state">
-                  <h3>🔴 Live Monitoring Active</h3>
-                  <p>{isConnected ? 'Select a machine from the dropdown to view its state' : 'Connecting to WebSocket server...'}</p>
+                  <h3>🔴 Live Monitoring</h3>
+                  <p>Connecting to WebSocket server...</p>
                 </div>
               )
             )}

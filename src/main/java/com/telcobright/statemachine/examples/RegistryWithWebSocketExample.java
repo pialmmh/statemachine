@@ -20,7 +20,7 @@ public class RegistryWithWebSocketExample {
         
         // Enable live debugging with WebSocket server
         // This automatically starts WebSocket server on the specified port
-        registry.enableLiveDebug(webSocketPort);
+        registry.enableDebugMode(webSocketPort);
         
         System.out.println("\n=== Registry with WebSocket Debug Mode ===");
         System.out.println("WebSocket server is running on port: " + registry.getWebSocketPort());

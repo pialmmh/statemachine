@@ -40,12 +40,8 @@ public class CallMachineRunnerProper {
         // This ensures the FluentStateMachineBuilder uses the correct instances
         StateMachineFactory.setDefaultInstances(timeoutManager, registry);
         
-        // Enable snapshot debug mode for history tracking
-        registry.enableSnapshotDebug();
-        
-        // Enable live debug mode (hardcoded)
-        registry.enableLiveDebug(WS_PORT);
-        System.out.println("🔴 Live debugging ENABLED - WebSocket server started on port " + WS_PORT);
+        // Enable debug mode (combines WebSocket and history tracking)
+        registry.enableDebugMode(WS_PORT);
         
         // Initialize state machines AFTER setting factory defaults
         initializeStateMachines();

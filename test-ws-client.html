@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test Client</title>
+</head>
+<body>
+    <h1>WebSocket Test Client</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    
+    <script>
+        const ws = new WebSocket('ws://localhost:9999');
+        const statusEl = document.getElementById('status');
+        const messagesEl = document.getElementById('messages');
+        
+        ws.onopen = function() {
+            statusEl.textContent = 'Connected!';
+            console.log('Connected to WebSocket');
+            
+            // Simulate STORE_CHANGED event
+            setTimeout(() => {
+                const storeChangedMsg = {
+                    type: 'STORE_CHANGED',
+                    changeType: 'TEST_CHANGE',
+                    store: {
+                        stateInstances: [{
+                            state: 'IDLE',
+                            instanceNumber: 1,
+                            transitions: []
+                        }],
+                        version: 1
+                    },
+                    timestamp: new Date().toISOString(),
+                    version: 1
+                };
+                
+                console.log('Sending STORE_CHANGED:', storeChangedMsg);
+                ws.send(JSON.stringify(storeChangedMsg));
+                
+                const msgDiv = document.createElement('div');
+                msgDiv.textContent = 'Sent: STORE_CHANGED';
+                messagesEl.appendChild(msgDiv);
+            }, 1000);
+            
+            // Request machines list
+            setTimeout(() => {
+                ws.send(JSON.stringify({ action: 'GET_MACHINES' }));
+                
+                const msgDiv = document.createElement('div');
+                msgDiv.textContent = 'Sent: GET_MACHINES';
+                messagesEl.appendChild(msgDiv);
+            }, 2000);
+        };
+        
+        ws.onmessage = function(event) {
+            console.log('Received:', event.data);
+            const msgDiv = document.createElement('div');
+            const data = JSON.parse(event.data);
+            msgDiv.textContent = 'Received: ' + data.type;
+            messagesEl.appendChild(msgDiv);
+        };
+        
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+            statusEl.textContent = 'Error: ' + error;
+        };
+        
+        ws.onclose = function() {
+            statusEl.textContent = 'Disconnected';
+        };
+    </script>
+</body>
+</html>

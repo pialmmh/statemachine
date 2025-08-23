@@ -1,7 +1,6 @@
 package com.telcobright.statemachine;
 
 import com.telcobright.statemachine.config.RegistryConfig;
-import com.telcobright.statemachine.monitoring.SimpleDatabaseSnapshotRecorder;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 
 /**
@@ -27,18 +26,9 @@ public class ConfigurableStateMachineRegistry extends StateMachineRegistry {
      * Apply configuration settings
      */
     private void applyConfiguration() {
-        // Apply snapshot debugging if enabled
-        if (config.isSnapshotDebugEnabled()) {
-            if (config.getCustomSnapshotRecorder() != null) {
-                enableSnapshotDebug(config.getCustomSnapshotRecorder());
-            } else {
-                enableSnapshotDebug();
-            }
-        }
-        
-        // Apply live debugging if enabled
-        if (config.isLiveDebugEnabled() && config.isAutoStartWebSocket()) {
-            enableLiveDebug(config.getWebSocketPort());
+        // Apply debug mode if enabled
+        if (config.isSnapshotDebugEnabled() || config.isLiveDebugEnabled()) {
+            enableDebugMode(config.getWebSocketPort());
         }
         
         // Log configuration
@@ -116,15 +106,7 @@ public class ConfigurableStateMachineRegistry extends StateMachineRegistry {
             return this;
         }
         
-        public Builder withCustomSnapshotRecorder(SimpleDatabaseSnapshotRecorder recorder) {
-            configBuilder.withCustomSnapshotRecorder(recorder);
-            return this;
-        }
-        
-        public Builder withSnapshotSessionPrefix(String prefix) {
-            configBuilder.withSnapshotSessionPrefix(prefix);
-            return this;
-        }
+        // Snapshot recorder removed - using History instead
         
         public Builder withMetrics(boolean enable) {
             configBuilder.withMetrics(enable);

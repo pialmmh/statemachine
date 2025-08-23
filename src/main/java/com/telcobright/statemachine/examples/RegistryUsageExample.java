@@ -32,8 +32,8 @@ public class RegistryUsageExample {
         StateMachineRegistry registry = new StateMachineRegistry();
         
         // No debugging flags are set
-        System.out.println("Snapshot Debug: " + registry.isSnapshotDebugEnabled()); // false
-        System.out.println("Live Debug: " + registry.isLiveDebugEnabled());         // false
+        System.out.println("Snapshot Debug: " + registry.isDebugEnabled()); // false
+        System.out.println("Live Debug: " + registry.isDebugEnabled());         // false
         System.out.println("Any Debug: " + registry.isDebugEnabled());              // false
         System.out.println();
     }
@@ -48,10 +48,10 @@ public class RegistryUsageExample {
         StateMachineRegistry registry = new StateMachineRegistry();
         
         // Enable only snapshot debugging
-        registry.enableSnapshotDebug();
+        registry.enableDebugMode();
         
-        System.out.println("Snapshot Debug: " + registry.isSnapshotDebugEnabled()); // true
-        System.out.println("Live Debug: " + registry.isLiveDebugEnabled());         // false
+        System.out.println("Snapshot Debug: " + registry.isDebugEnabled()); // true
+        System.out.println("Live Debug: " + registry.isDebugEnabled());         // false
         System.out.println("Any Debug: " + registry.isDebugEnabled());              // true
         System.out.println();
     }
@@ -66,14 +66,14 @@ public class RegistryUsageExample {
         StateMachineRegistry registry = new StateMachineRegistry();
         
         // Enable only live debugging
-        registry.enableLiveDebug(8888);
+        registry.enableDebugMode(8888);
         
-        System.out.println("Snapshot Debug: " + registry.isSnapshotDebugEnabled()); // false
-        System.out.println("Live Debug: " + registry.isLiveDebugEnabled());         // true
+        System.out.println("Snapshot Debug: " + registry.isDebugEnabled()); // false
+        System.out.println("Live Debug: " + registry.isDebugEnabled());         // true
         System.out.println("Any Debug: " + registry.isDebugEnabled());              // true
         
         // Clean up
-        registry.disableLiveDebug();
+        registry.disableDebugMode();
         System.out.println();
     }
     
@@ -87,16 +87,16 @@ public class RegistryUsageExample {
         StateMachineRegistry registry = new StateMachineRegistry();
         
         // Enable both debugging modes
-        registry.enableSnapshotDebug();
-        registry.enableLiveDebug(9999);
+        registry.enableDebugMode();
+        registry.enableDebugMode(9999);
         
-        System.out.println("Snapshot Debug: " + registry.isSnapshotDebugEnabled()); // true
-        System.out.println("Live Debug: " + registry.isLiveDebugEnabled());         // true
+        System.out.println("Snapshot Debug: " + registry.isDebugEnabled()); // true
+        System.out.println("Live Debug: " + registry.isDebugEnabled());         // true
         System.out.println("Any Debug: " + registry.isDebugEnabled());              // true
         
         // Disable all debugging
-        registry.disableAllDebug();
-        System.out.println("After disableAllDebug:");
+        registry.disableDebugMode();
+        System.out.println("After disableDebugMode:");
         System.out.println("Any Debug: " + registry.isDebugEnabled());              // false
         System.out.println();
     }
@@ -139,20 +139,19 @@ public class RegistryUsageExample {
         System.out.println("Initial state: No debugging");
         
         // Enable snapshot debugging
-        registry.enableSnapshotDebug();
-        System.out.println("After enableSnapshotDebug()");
+        registry.enableDebugMode();
+        System.out.println("After enableDebugMode()");
         
         // Add live debugging
-        registry.enableLiveDebug(7777);
-        System.out.println("After enableLiveDebug(7777)");
+        registry.enableDebugMode(7777);
+        System.out.println("After enableDebugMode(7777)");
         
-        // Disable snapshot only
-        registry.disableSnapshotDebug();
-        System.out.println("After disableSnapshotDebug() - only live remains");
+        // Can't disable just one mode in new API - debug is all or nothing
+        System.out.println("Debug mode is all-or-nothing in new API");
         
         // Disable live
-        registry.disableLiveDebug();
-        System.out.println("After disableLiveDebug() - all debugging off");
+        registry.disableDebugMode();
+        System.out.println("After disableDebugMode() - all debugging off");
         
         System.out.println("\n✅ No more enableDebugMode() - use specific flags!");
     }
