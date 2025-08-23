@@ -34,6 +34,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const lastHistoryId = useRef(0);
   const historyPollInterval = useRef(null);
   const historySessionId = useRef(null); // Track current history session
+  const lastEventCount = useRef(0); // Track last event count to prevent flickering
 
   // Update currentMode when prop changes
   useEffect(() => {
@@ -46,24 +47,25 @@ function MonitoringApp({ mode = 'snapshot' }) {
     wsLogger.debug('Updated selectedMachineRef to: ' + selectedMachine);
   }, [selectedMachine]);
 
-  // Auto-refresh Event Viewer history every 5 seconds
+  // Auto-refresh Event Viewer history every 1 second
   useEffect(() => {
     if (viewMode === 'events' && selectedMachine && isConnected) {
       // Request initial Event Viewer history
       requestEventViewerHistory(selectedMachine);
+      lastEventCount.current = 0; // Reset event count when switching machines
       
-      // Set up interval to refresh every 5 seconds
+      // Set up interval to refresh every 1 second
       const intervalId = setInterval(() => {
         if (selectedMachineRef.current) {
-          wsLogger.debug('Auto-refreshing Event Viewer history for:', selectedMachineRef.current);
           requestEventViewerHistory(selectedMachineRef.current);
         }
-      }, 5000);
+      }, 1000);
       
       // Cleanup interval on unmount or when conditions change
       return () => {
         wsLogger.debug('Stopping Event Viewer auto-refresh');
         clearInterval(intervalId);
+        lastEventCount.current = 0; // Reset on cleanup
       };
     }
   }, [viewMode, selectedMachine, isConnected]);
@@ -679,13 +681,18 @@ function MonitoringApp({ mode = 'snapshot' }) {
         });
       } else if (data.type === 'EVENT_VIEWER_HISTORY') {
         // Event Viewer history received (MySQL raw data)
-        wsLogger.debug('=== EVENT_VIEWER_HISTORY received ===');
-        wsLogger.debug('  Machine ID:', data.machineId);
-        wsLogger.debug('  Events length:', data.events ? data.events.length : 0);
+        const eventCount = data.events ? data.events.length : 0;
         
+        // Only update UI if there are new events to prevent flickering
         if (data.machineId === selectedMachineRef.current && data.events) {
-          wsLogger.debug('Processing Event Viewer history for', data.machineId);
-          setMysqlHistory(data.events);
+          if (eventCount !== lastEventCount.current) {
+            wsLogger.debug('=== EVENT_VIEWER_HISTORY received (new events) ===');
+            wsLogger.debug('  Machine ID:', data.machineId);
+            wsLogger.debug('  Events: ', lastEventCount.current, '->', eventCount);
+            setMysqlHistory(data.events);
+            lastEventCount.current = eventCount;
+          }
+          // Else silently ignore - no new events
         }
       } else if (data.type === 'HISTORY_DATA') {
         // Full history data received
