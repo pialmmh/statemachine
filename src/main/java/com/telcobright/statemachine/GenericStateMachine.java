@@ -55,6 +55,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     // Callbacks
     private Consumer<String> onStateTransition;
     private Consumer<GenericStateMachine<TPersistingEntity, TContext>> onOfflineTransition;
+    private Runnable onRehydration;
     
     // Entry action tracking
     private boolean entryActionExecuted = false;
@@ -161,6 +162,11 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         }
         System.out.println("=".repeat(60) + "\n");
         
+        // Call rehydration callback if set
+        if (onRehydration != null) {
+            onRehydration.run();
+        }
+        
         // Check for timeout after rehydration
         checkAndHandleTimeout();
     }
@@ -245,29 +251,47 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         if (registry != null && registry instanceof AbstractStateMachineRegistry) {
             AbstractStateMachineRegistry abstractRegistry = (AbstractStateMachineRegistry) registry;
             if (abstractRegistry.getHistory() != null) {
+                System.out.println("[GenericStateMachine] Recording transition in History: " + id + 
+                    " from " + oldState + " to " + newState);
                 abstractRegistry.getHistory().recordTransition(id, oldState, newState, currentEvent, 
                     persistingEntity, persistingEntity, System.currentTimeMillis() - startTime);
+            } else {
+                System.out.println("[GenericStateMachine] No History available for recording transition");
             }
+        } else {
+            System.out.println("[GenericStateMachine] No registry available for recording transition");
         }
         
         // Create snapshot asynchronously
         // TODO: Implement ShardingEntity persistence
         persistState();
         
-        // Check if new state is offline or final
-        EnhancedStateConfig config = stateConfigs.get(newState);
-        if (config != null) {
-            if (config.isOffline()) {
-                if (onOfflineTransition != null) {
-                    onOfflineTransition.accept(this);
-                }
+        // Check if we're transitioning from offline to online state
+        EnhancedStateConfig oldConfig = stateConfigs.get(oldState);
+        EnhancedStateConfig newConfig = stateConfigs.get(newState);
+        
+        boolean wasOffline = oldConfig != null && oldConfig.isOffline();
+        boolean isNowOffline = newConfig != null && newConfig.isOffline();
+        
+        // Handle offline -> online transition (machine coming back online)
+        if (wasOffline && !isNowOffline) {
+            System.out.println("StateMachine " + id + " coming back online from " + oldState + " to " + newState);
+            // Notify registry to bring machine back online
+            if (registry != null && registry instanceof StateMachineRegistry) {
+                ((StateMachineRegistry) registry).bringMachineOnline(id, this);
             }
-            
-            // Check if this is a final state and mark entity as complete
-            if (config.isFinal() && persistingEntity != null) {
-                persistingEntity.markComplete();
-                System.out.println("StateMachine " + id + " marked as complete - reached final state: " + newState);
+        }
+        // Handle online -> offline transition (machine going offline)
+        else if (!wasOffline && isNowOffline) {
+            if (onOfflineTransition != null) {
+                onOfflineTransition.accept(this);
             }
+        }
+        
+        // Check if new state is final
+        if (newConfig != null && newConfig.isFinal() && persistingEntity != null) {
+            persistingEntity.markComplete();
+            System.out.println("StateMachine " + id + " marked as complete - reached final state: " + newState);
         }
         
         // State transition logging handled by MySQL history tracker
@@ -638,6 +662,10 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     
     public void setOnOfflineTransition(Consumer<GenericStateMachine<TPersistingEntity, TContext>> callback) {
         this.onOfflineTransition = callback;
+    }
+    
+    public void setOnRehydration(Runnable callback) {
+        this.onRehydration = callback;
     }
     
     public EnhancedStateConfig getStateConfig(String stateId) {

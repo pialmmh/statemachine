@@ -101,6 +101,20 @@ public class History {
     }
     
     /**
+     * Record machine coming back online
+     */
+    public synchronized void recordMachineOnline(String machineId) {
+        List<TransitionInfo> transitions = machineTransitions.get(machineId);
+        if (transitions != null && !transitions.isEmpty()) {
+            // Mark the last transition as back online
+            TransitionInfo lastTransition = transitions.get(transitions.size() - 1);
+            lastTransition.isOffline = false;
+            System.out.println("[History] Machine " + machineId + " marked as back online at state: " + lastTransition.toState);
+            broadcastStore();
+        }
+    }
+    
+    /**
      * Record machine removal
      */
     public synchronized void recordMachineRemoval(String machineId) {

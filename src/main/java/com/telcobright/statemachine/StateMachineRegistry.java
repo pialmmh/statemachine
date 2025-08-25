@@ -11,6 +11,8 @@ import com.telcobright.statemachine.StateMachineContextEntity;
 import com.telcobright.statemachine.persistence.MysqlConnectionProvider;
 import com.telcobright.statemachine.persistence.PersistenceProvider;
 import com.telcobright.statemachine.persistence.MySQLPersistenceProvider;
+import com.telcobright.statemachine.persistence.OptimizedMySQLPersistenceProvider;
+import com.telcobright.statemachine.persistence.BaseStateMachineEntity;
 import com.telcobright.statemachine.persistence.ShardingEntityStateMachineRepository;
 import com.telcobright.statemachine.persistence.IdLookUpMode;
 import com.telcobright.db.PartitionedRepository;
@@ -448,6 +450,45 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     }
     
     /**
+     * Bring a machine back online from offline state
+     * Moves machine from offline cache back to active machines
+     */
+    public void bringMachineOnline(String id, GenericStateMachine<?, ?> machine) {
+        // Remove from offline cache
+        GenericStateMachine<?, ?> offlineMachine = offlineMachinesForDebug.remove(id);
+        
+        if (offlineMachine != null || machine != null) {
+            // Use the provided machine or the one from offline cache
+            GenericStateMachine<?, ?> machineToRestore = machine != null ? machine : offlineMachine;
+            
+            // Add back to active machines
+            activeMachines.put(id, machineToRestore);
+            
+            System.out.println("[Registry] Machine " + id + " brought back online (moved from offline cache to active)");
+            
+            // Update lastAddedMachine since it's coming back online
+            lastAddedMachine = id;
+            
+            // Broadcast updated machines list and offline list
+            if (webSocketServer != null) {
+                webSocketServer.broadcastMachinesList();
+                webSocketServer.broadcastOfflineMachines();
+            }
+            
+            // Record in history
+            if (debugMode && history != null) {
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        history.recordMachineOnline(id);
+                    } catch (Exception e) {
+                        System.err.println("[Registry] Error recording machine online: " + e.getMessage());
+                    }
+                }, asyncExecutor);
+            }
+        }
+    }
+    
+    /**
      * Rehydrate a machine from persistence (implements abstract method)
      */
     @Override
@@ -508,6 +549,39 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             connectionProvider = null;
             persistenceProvider = null;
         }
+    }
+    
+    /**
+     * Set optimized persistence provider for a specific entity type
+     * This provider uses pre-compiled SQL and async writes for optimal performance
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T extends StateMachineContextEntity<?>> void setOptimizedPersistenceProvider(
+            Class<T> entityClass, String tableName) {
+        if (connectionProvider != null) {
+            try {
+                OptimizedMySQLPersistenceProvider optimizedProvider = 
+                    new OptimizedMySQLPersistenceProvider(connectionProvider, entityClass, tableName);
+                optimizedProvider.initialize();
+                
+                // Replace the default provider with optimized one
+                this.persistenceProvider = optimizedProvider;
+                
+                System.out.println("[Registry] Switched to optimized persistence provider for entity: " + 
+                                 entityClass.getSimpleName() + " (table: " + tableName + ")");
+            } catch (Exception e) {
+                System.err.println("[Registry] Failed to set optimized persistence provider: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Set optimized persistence provider with auto-inferred table name
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T extends StateMachineContextEntity<?>> void setOptimizedPersistenceProvider(Class<T> entityClass) {
+        String tableName = OptimizedMySQLPersistenceProvider.inferTableName(entityClass);
+        setOptimizedPersistenceProvider(entityClass, tableName);
     }
     
     /**

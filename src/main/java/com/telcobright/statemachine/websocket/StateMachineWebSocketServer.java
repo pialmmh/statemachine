@@ -990,7 +990,7 @@ public class StateMachineWebSocketServer extends WebSocketServer
                 
             .state(CallState.CONNECTED)
                 .offline()  // Mark as offline state
-                .timeout(120, TimeUnit.SECONDS, CallState.IDLE.name())
+                .timeout(30, TimeUnit.SECONDS, CallState.IDLE.name())  // Match CallMachineRunnerProper's 30 second timeout
                 .on(com.telcobright.statemachineexamples.callmachine.events.Hangup.class)
                     .to(CallState.IDLE)
                 .done()

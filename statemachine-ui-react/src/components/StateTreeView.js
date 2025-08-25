@@ -67,7 +67,47 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
         }
         
         // Update current state to the target state
+        const previousState = currentState;
         currentState = transition.toState;
+        
+        // If we're transitioning to a different state, create a new state group for the target
+        // This ensures we show the final state after transitions like HANGUP -> IDLE
+        if (transition.fromState !== transition.toState && currentState !== previousState) {
+          // Check if we need to create a new instance for the target state
+          const existingTargetGroups = stateGroups.filter(g => g.state === transition.toState);
+          const needsNewInstance = existingTargetGroups.length === 0 || 
+                                  existingTargetGroups[existingTargetGroups.length - 1].state !== previousState;
+          
+          if (needsNewInstance) {
+            if (!stateInstanceMap[transition.toState]) {
+              stateInstanceMap[transition.toState] = 0;
+            }
+            stateInstanceMap[transition.toState]++;
+            
+            // Create new state group for the target state
+            const newGroup = {
+              state: transition.toState,
+              instanceNumber: stateInstanceMap[transition.toState],
+              transitions: [],
+              isOffline: false
+            };
+            
+            // Add an entry transition to show we arrived at this state
+            newGroup.transitions.push({
+              stepNumber: transition.stepNumber,
+              fromState: transition.fromState,
+              toState: transition.toState,
+              event: 'Entry',
+              timestamp: transition.timestamp,
+              duration: transition.duration,
+              machineId: transition.machineId,
+              eventData: {},
+              entryActionStatus: 'none'
+            });
+            
+            stateGroups.push(newGroup);
+          }
+        }
         
         // If this transition leads to offline, mark the last state group
         if (leadsToOffline && stateGroups.length > 0) {

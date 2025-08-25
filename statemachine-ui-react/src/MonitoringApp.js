@@ -25,6 +25,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
   const [lastAddedMachine, setLastAddedMachine] = useState(null);
   const [lastRemovedMachine, setLastRemovedMachine] = useState(null);
   const [arbitraryMachineId, setArbitraryMachineId] = useState('');
+  const [manualMachineId, setManualMachineId] = useState('');
   const [offlineMachines, setOfflineMachines] = useState([]);
   const [offlineSelectedEvent, setOfflineSelectedEvent] = useState('INCOMING_CALL');
   const [offlineEventPayload, setOfflineEventPayload] = useState('{\n  "phoneNumber": "+1-555-9999"\n}');
@@ -437,6 +438,10 @@ function MonitoringApp({ mode = 'snapshot' }) {
             const latestOfflineMachine = data.machines[data.machines.length - 1];
             setArbitraryMachineId(latestOfflineMachine.id);
             wsLogger.debug('Auto-selected offline machine:', latestOfflineMachine.id);
+          } else {
+            // Clear selection when no offline machines
+            setArbitraryMachineId('');
+            wsLogger.debug('Cleared offline machine selection - no offline machines');
           }
         }
       } else if (data.type === 'CURRENT_STATE') {
@@ -1083,11 +1088,14 @@ function MonitoringApp({ mode = 'snapshot' }) {
   };
 
   const sendEventToArbitraryMachine = () => {
-    wsLogger.debug('sendEventToArbitraryMachine called');
-    wsLogger.debug('isConnected:', isConnected, 'arbitraryMachineId:', arbitraryMachineId);
+    // Use either dropdown selection or manual input
+    const targetMachine = arbitraryMachineId || manualMachineId;
     
-    if (!arbitraryMachineId || !arbitraryMachineId.trim()) {
-      alert('Please select an offline machine');
+    wsLogger.debug('sendEventToArbitraryMachine called');
+    wsLogger.debug('isConnected:', isConnected, 'targetMachine:', targetMachine);
+    
+    if (!targetMachine || !targetMachine.trim()) {
+      alert('Please select an offline machine or enter a machine ID');
       return;
     }
 
@@ -1100,7 +1108,7 @@ function MonitoringApp({ mode = 'snapshot' }) {
       const payload = offlineEventPayload ? JSON.parse(offlineEventPayload) : {};
       const message = {
         type: 'EVENT_TO_ARBITRARY',
-        machineId: arbitraryMachineId.trim(),
+        machineId: targetMachine.trim(),
         eventType: offlineSelectedEvent,
         payload: payload
       };
@@ -1108,10 +1116,11 @@ function MonitoringApp({ mode = 'snapshot' }) {
       wsLogger.debug('Sending event to arbitrary machine:', message);
       
       if (sendWebSocketMessage(message)) {
-        wsLogger.debug('Event sent successfully to arbitrary machine:', arbitraryMachineId);
+        wsLogger.debug('Event sent successfully to arbitrary machine:', targetMachine);
         
-        // Clear the input after successful send
+        // Clear the inputs after successful send
         setArbitraryMachineId('');
+        setManualMachineId('');
         
         // If this machine gets rehydrated, it should appear in the list
         // Request updated machine list after a short delay
@@ -1328,8 +1337,14 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       <select 
                         className="event-select"
                         value={arbitraryMachineId}
-                        onChange={(e) => setArbitraryMachineId(e.target.value)}
-                        style={{ marginBottom: '12px' }}
+                        onChange={(e) => {
+                          setArbitraryMachineId(e.target.value);
+                          // Clear manual input when a machine is selected
+                          if (e.target.value) {
+                            setManualMachineId('');
+                          }
+                        }}
+                        style={{ marginBottom: '8px' }}
                       >
                         <option value="">Select Machine</option>
                         {offlineMachines.map(machine => (
@@ -1338,6 +1353,31 @@ function MonitoringApp({ mode = 'snapshot' }) {
                           </option>
                         ))}
                       </select>
+                      
+                      {/* Manual Machine ID Input */}
+                      <div style={{ marginBottom: '12px' }}>
+                        <div className="panel-subtitle" style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                          Or enter machine ID manually:
+                        </div>
+                        <input
+                          type="text"
+                          className="event-select"
+                          placeholder="Enter machine ID (e.g., call-002)"
+                          value={manualMachineId}
+                          onChange={(e) => {
+                            setManualMachineId(e.target.value);
+                            // Clear dropdown selection when typing manually
+                            if (e.target.value) {
+                              setArbitraryMachineId('');
+                            }
+                          }}
+                          disabled={!!arbitraryMachineId}
+                          style={{
+                            opacity: arbitraryMachineId ? 0.5 : 1,
+                            cursor: arbitraryMachineId ? 'not-allowed' : 'text'
+                          }}
+                        />
+                      </div>
                       
                       <div className="panel-subtitle" style={{ marginBottom: '6px', marginTop: '10px', fontSize: '13px' }}>📮 Send Event</div>
                       
@@ -1372,12 +1412,13 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       <button 
                         className="send-event-btn"
                         onClick={() => {
-                          wsLogger.debug('Sending event to arbitrary machine:', arbitraryMachineId);
+                          const targetMachine = arbitraryMachineId || manualMachineId;
+                          wsLogger.debug('Sending event to machine:', targetMachine);
                           sendEventToArbitraryMachine();
                         }}
-                        disabled={!isConnected || !arbitraryMachineId || !arbitraryMachineId.trim()}
+                        disabled={!isConnected || (!arbitraryMachineId && !manualMachineId.trim())}
                       >
-                        Send Event → {!isConnected ? '(Not Connected)' : !arbitraryMachineId ? '(No Machine Selected)' : ''}
+                        Send Event → {!isConnected ? '(Not Connected)' : (!arbitraryMachineId && !manualMachineId) ? '(No Machine Specified)' : ''}
                       </button>
                     </div>
                   </div>
