@@ -429,6 +429,38 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
         }
         
         /**
+         * Set entry action for this state
+         */
+        public StateBuilder onEntry(Runnable entryAction) {
+            stateConfig.onEntry(state -> entryAction.run());
+            return this;
+        }
+        
+        /**
+         * Set entry action for this state with machine access
+         */
+        public StateBuilder onEntry(java.util.function.Consumer<GenericStateMachine<TPersistingEntity, TContext>> entryAction) {
+            stateConfig.onEntry(state -> entryAction.accept(stateMachine));
+            return this;
+        }
+        
+        /**
+         * Set exit action for this state
+         */
+        public StateBuilder onExit(Runnable exitAction) {
+            stateConfig.onExit(state -> exitAction.run());
+            return this;
+        }
+        
+        /**
+         * Set exit action for this state with machine access
+         */
+        public StateBuilder onExit(java.util.function.Consumer<GenericStateMachine<TPersistingEntity, TContext>> exitAction) {
+            stateConfig.onExit(state -> exitAction.accept(stateMachine));
+            return this;
+        }
+        
+        /**
          * Continue with next state (same as done())
          */
         public FluentStateMachineBuilder<TPersistingEntity, TContext> then() {

@@ -241,10 +241,48 @@ public class CallMachineRunnerEnhanced {
                 .initialState(CallState.IDLE.name())
                 
                 .state(CallState.IDLE.name())
+                    .onEntry(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [ENTRY-" + runId + "] Entered IDLE state for " + m.getId());
+                        CallVolatileContext vol = m.getContext();
+                        if (vol != null) {
+                            vol.logEvent("[ENTRY-" + runId + "] Entered IDLE state");
+                        }
+                        // Check if this is a call end (coming from a non-IDLE state)
+                        CallPersistentContext persistent = m.getPersistingEntity();
+                        if (persistent != null && persistent.getCallStartTime() != null && 
+                            !CallState.IDLE.name().equals(persistent.getCurrentState())) {
+                            handleCallEnd(m, runId);
+                        }
+                    })
+                    .onExit(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [EXIT-" + runId + "] Exiting IDLE state for " + m.getId());
+                        CallVolatileContext vol = m.getContext();
+                        if (vol != null) {
+                            vol.logEvent("[EXIT-" + runId + "] Exiting IDLE state");
+                        }
+                    })
                     .on(IncomingCall.class).to(CallState.RINGING.name())
                     .done()
                     
                 .state(CallState.RINGING.name())
+                    .onEntry(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [ENTRY-" + runId + "] Entered RINGING state for " + m.getId());
+                        CallVolatileContext vol = m.getContext();
+                        if (vol != null) {
+                            vol.logEvent("[ENTRY-" + runId + "] Started ringing");
+                        }
+                    })
+                    .onExit(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [EXIT-" + runId + "] Exiting RINGING state for " + m.getId());
+                        CallVolatileContext vol = m.getContext();
+                        if (vol != null) {
+                            vol.logEvent("[EXIT-" + runId + "] Stopped ringing");
+                        }
+                    })
                     .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name())
                     .on(Answer.class).to(CallState.CONNECTED.name())
                     .on(Hangup.class).to(CallState.IDLE.name())
@@ -257,28 +295,25 @@ public class CallMachineRunnerEnhanced {
                     .done()
                     
                 .state(CallState.CONNECTED.name())
+                    .onEntry(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [ENTRY-" + runId + "] Entered CONNECTED state for " + m.getId());
+                        handleConnectedEntry(m, runId);
+                    })
+                    .onExit(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [EXIT-" + runId + "] Exiting CONNECTED state for " + m.getId());
+                        CallVolatileContext vol = m.getContext();
+                        if (vol != null) {
+                            vol.logEvent("[EXIT-" + runId + "] Call disconnecting");
+                        }
+                    })
                     .offline() // Mark CONNECTED as offline for testing
                     .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name())
                     .on(Hangup.class).to(CallState.IDLE.name())
                     .done()
                     
                 .build();
-        
-        // Set up state transition callbacks
-        machine.setOnStateTransition(newState -> {
-            CallVolatileContext vol = machine.getContext();
-            if (vol != null) {
-                vol.logEvent("Transitioned to: " + newState);
-            }
-            
-            // Handle specific state entry actions
-            if (CallState.CONNECTED.name().equals(newState)) {
-                handleConnectedEntry(machine);
-            } else if (CallState.IDLE.name().equals(newState) && 
-                       !CallState.IDLE.name().equals(machine.getPersistingEntity().getCurrentState())) {
-                handleCallEnd(machine);
-            }
-        });
         
         // Set up rehydration callback
         machine.setOnRehydration(() -> {
@@ -303,7 +338,7 @@ public class CallMachineRunnerEnhanced {
         System.out.println("  - Media Server: " + volatileContext.getMediaServerEndpoint());
     }
     
-    private void handleConnectedEntry(GenericStateMachine<CallPersistentContext, CallVolatileContext> machine) {
+    private void handleConnectedEntry(GenericStateMachine<CallPersistentContext, CallVolatileContext> machine, String runId) {
         CallPersistentContext persistent = machine.getPersistingEntity();
         CallVolatileContext volatile_ = machine.getContext();
         
@@ -322,8 +357,8 @@ public class CallMachineRunnerEnhanced {
             // Start recording in volatile context
             volatile_.startRecording();
             
-            // Log connection details
-            System.out.println("📞 [CONNECTED] Call established: " + persistent.getCallId());
+            // Log connection details with runId
+            System.out.println("📞 [CONNECTED-" + runId + "] Call established: " + persistent.getCallId());
             System.out.println("   - Caller: " + persistent.getCallerId());
             System.out.println("   - Callee: " + persistent.getCalleeId());
             System.out.println("   - Ring count: " + persistent.getRingCount());
@@ -331,10 +366,13 @@ public class CallMachineRunnerEnhanced {
             System.out.println("   - Quality: " + persistent.getCallQuality());
             System.out.println("   - Recording: " + volatile_.isRecording());
             System.out.println("   - Media server: " + volatile_.getMediaServerEndpoint());
+            
+            // Log to volatile context with runId
+            volatile_.logEvent("[CONNECTED-" + runId + "] Call established with recording");
         }
     }
     
-    private void handleCallEnd(GenericStateMachine<CallPersistentContext, CallVolatileContext> machine) {
+    private void handleCallEnd(GenericStateMachine<CallPersistentContext, CallVolatileContext> machine, String runId) {
         CallPersistentContext persistent = machine.getPersistingEntity();
         CallVolatileContext volatile_ = machine.getContext();
         
@@ -352,7 +390,7 @@ public class CallMachineRunnerEnhanced {
                 double billingRate = 0.05; // $0.05 per minute
                 persistent.setBillingAmount(Math.ceil(durationSeconds / 60.0) * billingRate);
                 
-                System.out.println("📞 [ENDED] Call completed: " + persistent.getCallId());
+                System.out.println("📞 [ENDED-" + runId + "] Call completed: " + persistent.getCallId());
                 System.out.println("   - Duration: " + durationSeconds + " seconds");
                 System.out.println("   - Billing: $" + String.format("%.2f", persistent.getBillingAmount()));
             }
@@ -362,9 +400,12 @@ public class CallMachineRunnerEnhanced {
                 volatile_.stopRecording();
             }
             
-            // Log final event log
+            // Log final event log with runId
             System.out.println("   - Event log entries: " + volatile_.getEventLog().size());
             System.out.println("   - Session duration: " + volatile_.getSessionDuration() + "ms");
+            
+            // Log to volatile context with runId  
+            volatile_.logEvent("[ENDED-" + runId + "] Call finalized and cleaned up");
         }
     }
     

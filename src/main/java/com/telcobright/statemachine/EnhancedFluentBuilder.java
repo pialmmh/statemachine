@@ -219,6 +219,26 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
             return this;
         }
         
+        public StateBuilder onEntry(Runnable entryAction) {
+            delegateState.onEntry(entryAction);
+            return this;
+        }
+        
+        public StateBuilder onExit(Runnable exitAction) {
+            delegateState.onExit(exitAction);
+            return this;
+        }
+        
+        public StateBuilder onEntry(java.util.function.Consumer<GenericStateMachine<TPersistingEntity, TVolatileContext>> entryAction) {
+            delegateState.onEntry(entryAction);
+            return this;
+        }
+        
+        public StateBuilder onExit(java.util.function.Consumer<GenericStateMachine<TPersistingEntity, TVolatileContext>> exitAction) {
+            delegateState.onExit(exitAction);
+            return this;
+        }
+        
         public TransitionBuilder on(Class<? extends com.telcobright.statemachine.events.StateMachineEvent> eventType) {
             return new TransitionBuilder(delegateState.on(eventType));
         }
