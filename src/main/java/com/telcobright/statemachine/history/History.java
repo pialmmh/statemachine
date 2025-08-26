@@ -51,6 +51,20 @@ public class History {
                                              StateMachineContextEntity<?> contextBefore,
                                              StateMachineContextEntity<?> contextAfter,
                                              long duration) {
+        recordTransitionWithIgnoreFlag(machineId, fromState, toState, event, contextBefore, contextAfter, duration, false);
+    }
+    
+    /**
+     * Record a state transition or ignored event for a machine
+     */
+    public synchronized void recordTransitionWithIgnoreFlag(String machineId, 
+                                             String fromState, 
+                                             String toState, 
+                                             StateMachineEvent event,
+                                             StateMachineContextEntity<?> contextBefore,
+                                             StateMachineContextEntity<?> contextAfter,
+                                             long duration,
+                                             boolean eventIgnored) {
         
         System.out.println("[History] Recording transition: " + machineId + " " + 
                           (fromState != null ? fromState : "Initial") + " -> " + toState);
@@ -68,6 +82,7 @@ public class History {
         transition.timestamp = LocalDateTime.now().format(TIME_FORMAT);
         transition.duration = duration;
         transition.stepNumber = transitions.size() + 1;
+        transition.eventIgnored = eventIgnored;
         
         // Add to machine's transition list
         transitions.add(transition);
@@ -80,10 +95,20 @@ public class History {
     }
     
     /**
+     * Record an ignored event (event that didn't cause transition or action)
+     */
+    public synchronized void recordIgnoredEvent(String machineId, 
+                                               String currentState, 
+                                               StateMachineEvent event,
+                                               StateMachineContextEntity<?> context) {
+        recordTransitionWithIgnoreFlag(machineId, currentState, currentState, event, context, context, 0, true);
+    }
+    
+    /**
      * Record machine initialization
      */
     public synchronized void recordMachineStart(String machineId, String initialState) {
-        recordTransition(machineId, null, initialState, null, null, null, 0);
+        recordTransitionWithIgnoreFlag(machineId, null, initialState, null, null, null, 0, false);
     }
     
     /**
@@ -191,6 +216,7 @@ public class History {
                 transitionObj.addProperty("duration", transition.duration);
                 transitionObj.addProperty("machineId", transition.machineId);
                 transitionObj.addProperty("isOffline", transition.isOffline);
+                transitionObj.addProperty("eventIgnored", transition.eventIgnored);
                 
                 transitionsArray.add(transitionObj);
             }
@@ -237,5 +263,6 @@ public class History {
         long duration;
         int stepNumber;
         boolean isOffline = false;  // Track if this transition led to offline state
+        boolean eventIgnored = false;  // Track if the event was ignored (no transition or action)
     }
 }

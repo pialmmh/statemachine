@@ -358,12 +358,41 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                                 System.out.println("   ✓ Executing stay action for " + event.getEventType());
                                 action.accept(this, event);
                             } else {
-                                System.out.println("   ✗ No stay action found for " + event.getEventType());
+                                System.out.println("   ✗ No stay action found for " + event.getEventType() + " - event ignored");
+                                // Record as ignored event
+                                if (historyTracker != null) {
+                                    historyTracker.recordEventIgnored(currentState, event.getEventType(), event, 
+                                                                     persistingEntity, context);
+                                }
+                                // Notify registry of ignored event
+                                if (registry != null) {
+                                    registry.notifyEventIgnored(id, currentState, event.getEventType(), persistingEntity, context);
+                                }
+                            }
+                        } else {
+                            System.out.println("   ✗ No stay actions defined for state " + currentState + " - event ignored");
+                            // Record as ignored event
+                            if (historyTracker != null) {
+                                historyTracker.recordEventIgnored(currentState, event.getEventType(), event, 
+                                                                 persistingEntity, context);
+                            }
+                            // Notify registry of ignored event
+                            if (registry != null) {
+                                registry.notifyEventIgnored(id, currentState, event.getEventType(), persistingEntity, context);
                             }
                         }
                     }
                 } else {
-                    System.out.println("   ⚠️ No transitions defined for state " + currentState);
+                    System.out.println("   ⚠️ No transitions defined for state " + currentState + " - event ignored");
+                    // Record as ignored event
+                    if (historyTracker != null) {
+                        historyTracker.recordEventIgnored(currentState, event.getEventType(), event, 
+                                                         persistingEntity, context);
+                    }
+                    // Notify registry of ignored event
+                    if (registry != null) {
+                        registry.notifyEventIgnored(id, currentState, event.getEventType(), persistingEntity, context);
+                    }
                 }
             }
         } catch (Exception e) {

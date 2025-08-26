@@ -35,4 +35,17 @@ public interface StateMachineListener<TPersistentContext extends StateMachineCon
      */
     void onStateMachineEvent(String machineId, String oldState, String newState, 
                              TPersistentContext contextEntity, TVolatileContext volatileContext);
+    
+    /**
+     * Called when an event is ignored (no transition or action defined)
+     * @param machineId The ID of the state machine
+     * @param currentState The current state
+     * @param eventType The type of event that was ignored
+     * @param contextEntity The persistent context
+     * @param volatileContext The volatile context
+     */
+    default void onEventIgnored(String machineId, String currentState, String eventType,
+                                TPersistentContext contextEntity, TVolatileContext volatileContext) {
+        // Default implementation does nothing - backward compatibility
+    }
 }

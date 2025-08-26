@@ -12,6 +12,12 @@ import java.util.function.Supplier;
 public interface PersistenceProvider<T extends StateMachineContextEntity<?>> {
     
     /**
+     * Initialize the persistence provider (e.g., create database tables)
+     * Should be called before using the provider
+     */
+    void initialize();
+    
+    /**
      * Save or update a state machine context
      * 
      * @param machineId The unique identifier of the state machine

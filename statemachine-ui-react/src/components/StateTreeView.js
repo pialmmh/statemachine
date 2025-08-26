@@ -181,8 +181,10 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
   };
 
   // Get icon for event - Windows file style
-  const getEventIcon = (event) => {
-    if (event === 'Entry' || event === 'Initial State' || event === 'Initial' || event === 'Start') {
+  const getEventIcon = (event, eventIgnored) => {
+    if (eventIgnored) {
+      return '🚫'; // Prohibited/no-entry icon for ignored events
+    } else if (event === 'Entry' || event === 'Initial State' || event === 'Initial' || event === 'Start') {
       return '🎯'; // Target/shooting practice icon for Entry
     } else if (event === 'TIMEOUT') {
       return '⏰'; // Clock icon for timeout
@@ -347,8 +349,8 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
                     OFFLINE
                   </span>
                 )}
-                {/* Show countdown only on the latest instance of this state */}
-                {isLatestInstance && countdownState === instance.state && countdownRemaining > 0 && (
+                {/* Show countdown only on the latest instance of this state and NOT offline */}
+                {isLatestInstance && !instance.isOffline && countdownState === instance.state && countdownRemaining > 0 && (
                   <span style={{ 
                     marginLeft: '6px',
                     color: countdownRemaining <= 5 ? '#ff6b6b' : '#6c757d',
@@ -362,8 +364,8 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
                     ({countdownRemaining}s)
                   </span>
                 )}
-                {/* Show static timeout on latest instance if no active countdown */}
-                {isLatestInstance && (!countdownState || countdownState !== instance.state) && getStateTimeout(instance.state) && (
+                {/* Show static timeout on latest instance if no active countdown and NOT offline */}
+                {isLatestInstance && !instance.isOffline && (!countdownState || countdownState !== instance.state) && getStateTimeout(instance.state) && (
                   <span style={{ 
                     marginLeft: '6px',
                     color: '#6c757d',
@@ -413,7 +415,7 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
                         transition: 'all 0.15s',
                         position: 'relative'
                       }}
-                      onClick={() => onSelectTransition(transition)}
+                      onClick={() => onSelectTransition({ ...transition, isOffline: instance.isOffline })}
                       onMouseEnter={(e) => {
                         if (selectedTransition !== transition) {
                           e.currentTarget.style.background = '#f0f2f5';
@@ -434,7 +436,7 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
                         top: '50%'
                       }}></span>
                       <span style={{ marginRight: '6px', fontSize: '14px' }}>
-                        {getEventIcon(transition.event)}
+                        {getEventIcon(transition.event, transition.eventIgnored)}
                       </span>
                       <div style={{ flex: 1 }}>
                         {/* Transition Header */}
@@ -444,18 +446,34 @@ function StateTreeView({ transitions, selectedMachineId, onSelectTransition, sel
                           marginBottom: '2px'
                         }}>
                           <span style={{ 
-                            color: '#495057',
+                            color: transition.eventIgnored ? '#6c757d' : '#495057',
                             fontSize: '11px',
-                            fontWeight: '600'
+                            fontWeight: '600',
+                            opacity: transition.eventIgnored ? 0.7 : 1
                           }}>
                             {transition.event}
                           </span>
+                          {transition.eventIgnored && (
+                            <span style={{ 
+                              color: '#dc3545',
+                              fontSize: '10px',
+                              marginLeft: '6px',
+                              fontWeight: '600'
+                            }}>
+                              (ignored)
+                            </span>
+                          )}
                           <span style={{ 
                             color: '#6c757d',
                             fontSize: '10px',
                             marginLeft: '6px'
                           }}>
-                            {transition.fromState !== transition.toState && `(→ ${transition.toState})`}
+                            {!transition.eventIgnored && 
+                             transition.event !== 'Entry' && 
+                             transition.event !== 'Start' && 
+                             transition.event !== 'Initial' &&
+                             transition.fromState !== transition.toState && 
+                             `(→ ${transition.toState})`}
                           </span>
                         </div>
 

@@ -1,10 +1,25 @@
 import React from 'react';
 
-function TransitionDetailPanel({ transition, countdownState, countdownRemaining }) {
+function TransitionDetailPanel({ transition, countdownState, countdownRemaining, allTransitions }) {
   console.log('TransitionDetailPanel received transition:', transition);
-  if (transition) {
-    console.log('  Context before:', transition.contextBefore);
-    console.log('  Context after:', transition.contextAfter);
+  
+  // Derive context before from previous transition
+  let contextBefore = null;
+  let volatileContextBefore = null;
+  
+  if (transition && allTransitions && transition.stepNumber > 1) {
+    // Find the previous transition to get its context as our "before" context
+    const prevTransition = allTransitions.find(t => t.stepNumber === transition.stepNumber - 1);
+    if (prevTransition) {
+      contextBefore = prevTransition.persistentContext;
+      volatileContextBefore = prevTransition.volatileContext;
+    }
+  }
+  
+  // For the first transition, context before is empty/initial
+  if (transition && transition.stepNumber === 1) {
+    contextBefore = {};
+    volatileContextBefore = {};
   }
   
   if (!transition) {
@@ -126,8 +141,8 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
           <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d', fontFamily: '"Inter", sans-serif' }}>
             {transition.timestamp}
           </span>
-          {/* Countdown Timer - Show if there's an active countdown, regardless of selected transition */}
-          {countdownState && countdownRemaining > 0 && (
+          {/* Countdown Timer - Show if there's an active countdown and NOT offline */}
+          {countdownState && countdownRemaining > 0 && !transition?.isOffline && (
             <div style={{ 
               background: 'rgba(102, 126, 234, 0.1)', 
               padding: '4px 10px', 
@@ -212,9 +227,9 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
               lineHeight: '1.6',
               letterSpacing: '-0.01em'
             }}>
-              Status: {(transition.contextBefore?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${transition.contextBefore?.registryStatus?.status}`} | 
-              Hydrated: {transition.contextBefore?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
-              Online: {transition.contextBefore?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
+              Status: {(contextBefore?.registryStatus?.status || 'ACTIVE') === 'ACTIVE' ? '✅ ACTIVE' : `❌ ${contextBefore?.registryStatus?.status}`} | 
+              Hydrated: {contextBefore?.registryStatus?.hydrated ? '✅ Yes' : '🔄 No'} | 
+              Online: {contextBefore?.registryStatus?.online !== false ? '🟢 Yes' : '🔴 No'}
             </div>
           </div>
 
@@ -292,7 +307,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   maxHeight: '200px',
                   overflowY: 'auto'
                 }}>
-                  {JSON.stringify(transition.persistentContext || {}, null, 2)}
+                  {JSON.stringify(contextBefore || {}, null, 2)}
                 </pre>
               </div>
 
@@ -313,7 +328,7 @@ function TransitionDetailPanel({ transition, countdownState, countdownRemaining 
                   maxHeight: '200px',
                   overflowY: 'auto'
                 }}>
-                  {JSON.stringify(transition.volatileContext || {}, null, 2)}
+                  {JSON.stringify(volatileContextBefore || {}, null, 2)}
                 </pre>
               </div>
             </div>

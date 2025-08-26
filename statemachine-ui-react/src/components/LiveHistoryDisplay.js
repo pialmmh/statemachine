@@ -93,6 +93,7 @@ function LiveHistoryDisplay({ transitions, mysqlHistory, selectedMachineId, coun
               transition={selectedTransition}
               countdownState={countdownState}
               countdownRemaining={countdownRemaining}
+              allTransitions={transitions}
             />
           </div>
         </div>
@@ -162,7 +163,8 @@ function LiveHistoryDisplay({ transitions, mysqlHistory, selectedMachineId, coun
                     <td style={{ padding: '10px 8px', textAlign: 'left' }}>
                       <span style={{ fontWeight: '500', color: transition.eventIgnored ? '#6c757d' : '#212529' }}>
                         {/* Use same icons as tree view */}
-                        {transition.event === 'Entry' || transition.event === 'Initial State' || 
+                        {transition.eventIgnored ? '🚫 ' :
+                         transition.event === 'Entry' || transition.event === 'Initial State' || 
                          transition.event === 'Initial' || transition.event === 'Start' ? '🎯 ' : 
                          transition.event === 'TIMEOUT' ? '⏰ ' : '⚡ '}
                         {transition.event}

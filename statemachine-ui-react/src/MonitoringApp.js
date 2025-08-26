@@ -1322,11 +1322,15 @@ function MonitoringApp({ mode = 'snapshot' }) {
                       Send Event → {!isConnected ? '(Not Connected)' : !selectedMachine ? '(No Machine Selected)' : ''}
                     </button>
                     
-                    {/* Horizontal Separator Line */}
+                    {/* Horizontal Separator Line - Enhanced with Color */}
                     <hr style={{ 
-                      margin: '15px 0 12px 0',
+                      margin: '20px 0 16px 0',
                       border: 'none',
-                      borderTop: '2px solid #e9ecef'
+                      borderTop: '4px solid #ff6b6b',
+                      borderRadius: '2px',
+                      boxShadow: '0 2px 4px rgba(255,107,107,0.2)',
+                      background: 'linear-gradient(90deg, transparent, #ff6b6b, transparent)',
+                      height: '1px'
                     }} />
                     
                     {/* Send to Offline Debug Machines */}

@@ -3,6 +3,7 @@ package com.telcobright.statemachine.websocket;
 import com.telcobright.statemachine.*;
 import com.telcobright.statemachine.events.EventTypeRegistry;
 import com.telcobright.statemachine.events.StateMachineEvent;
+import com.telcobright.statemachine.events.GenericStateMachineEvent;
 import com.telcobright.statemachineexamples.callmachine.CallState;
 import com.telcobright.statemachineexamples.callmachine.events.*;
 
@@ -528,6 +529,38 @@ public class CallMachineRunnerEnhanced {
                 runner.sendEvent("call-001", new Hangup());
                 
                 System.out.println("\n=== Demo complete ===\n");
+                
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+        */
+        
+        // TEST IGNORED EVENTS - Commented out to avoid cluttering the UI
+        // Uncomment this block if you want to test ignored event tracking
+        /*
+        new Thread(() -> {
+            try {
+                Thread.sleep(3000);
+                System.out.println("\n=== Testing Ignored Event Tracking ===");
+                
+                // Test 1: Send DIAL event in IDLE state (no transition defined)
+                System.out.println("Test 1: Sending DIAL event to call-001 in IDLE state (should be ignored)...");
+                runner.sendEvent("call-001", new GenericStateMachineEvent("DIAL"));
+                Thread.sleep(1000);
+                
+                // Test 2: Send undefined event type 
+                System.out.println("Test 2: Sending undefined UNDEFINED_EVENT to call-002 (should be ignored)...");
+                runner.sendEvent("call-002", new GenericStateMachineEvent("UNDEFINED_EVENT"));
+                Thread.sleep(1000);
+                
+                // Test 3: Send REJECT event in IDLE state (no transition defined)
+                System.out.println("Test 3: Sending REJECT event to call-003 in IDLE state (should be ignored)...");
+                runner.sendEvent("call-003", new GenericStateMachineEvent("REJECT"));
+                Thread.sleep(1000);
+                
+                System.out.println("\n=== Ignored Event Test Complete ===");
+                System.out.println("Check the UI to see ignored events marked with 🚫 icon and '(ignored)' label\n");
                 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

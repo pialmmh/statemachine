@@ -34,6 +34,9 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     // Persistence provider for state machine contexts
     private PersistenceProvider<StateMachineContextEntity<?>> persistenceProvider;
     
+    // Track the entity class for persistence loading
+    private Class<? extends StateMachineContextEntity<?>> persistenceEntityClass;
+    
     // Optional ShardingEntity repository for advanced persistence
     private ShardingEntityStateMachineRepository<? extends ShardingEntity<?>, ?> shardingRepository;
     
@@ -133,6 +136,16 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         GenericStateMachine<?, ?> machine = activeMachines.remove(id);
         if (machine != null) {
             lastRemovedMachine = id; // Track last removed machine
+            
+            // Persist the machine's context before removal
+            if (persistenceProvider != null && machine.getPersistingEntity() != null) {
+                try {
+                    persistenceProvider.save(id, (StateMachineContextEntity<?>) machine.getPersistingEntity());
+                    System.out.println("[Registry] Persisted machine " + id + " during removal (state: " + machine.getCurrentState() + ")");
+                } catch (Exception e) {
+                    System.err.println("[Registry] Failed to persist machine " + id + " during removal: " + e.getMessage());
+                }
+            }
         }
         
         // Close history tracker if machine has one
@@ -164,15 +177,15 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     @Override
     public GenericStateMachine<?, ?> getMachine(String id) {
-        // First check active machines
+        // Only return machines from active registry
+        // Offline machines should NOT be returned directly - they need rehydration
         GenericStateMachine<?, ?> machine = activeMachines.get(id);
         
-        // If not found and WebSocket clients are connected, check offline debug cache
-        if (machine == null && hasWebSocketClients()) {
-            machine = offlineMachinesForDebug.get(id);
-            if (machine != null) {
-                System.out.println("[Registry] Retrieved machine " + id + " from offline debug cache");
-            }
+        if (machine == null && hasWebSocketClients() && offlineMachinesForDebug.containsKey(id)) {
+            // Machine exists in offline cache but we don't return it
+            // It will need to be rehydrated when an event is sent
+            System.out.println("[Registry] Machine " + id + " is in offline debug cache - requires rehydration");
+            return null;
         }
         
         return machine;
@@ -203,63 +216,193 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      * If not in persistence, create new one
      */
     public <TPersistingEntity extends StateMachineContextEntity<?>, TContext> GenericStateMachine<TPersistingEntity, TContext> createOrGet(String id, Supplier<GenericStateMachine<TPersistingEntity, TContext>> factory) {
-        // Check if already in memory
-        @SuppressWarnings("unchecked")
+        // Step 1: Check if machine already exists in memory
+        GenericStateMachine<TPersistingEntity, TContext> existingMachine = checkIfInMemory(id);
+        if (existingMachine != null) {
+            return existingMachine;
+        }
+        
+        // Step 2: Check if machine can be rehydrated from persistence
+        TPersistingEntity persistedContext = attemptRehydration(id);
+        if (persistedContext != null) {
+            return rehydrateMachine(id, factory, persistedContext);
+        }
+        
+        // Step 3: Create new machine if not found in memory or persistence
+        return createNewMachine(id, factory);
+    }
+    
+    /**
+     * Step 1: Check if machine already exists in active memory
+     */
+    @SuppressWarnings("unchecked")
+    private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> GenericStateMachine<TPersistingEntity, TContext> checkIfInMemory(String id) {
         GenericStateMachine<TPersistingEntity, TContext> existing = (GenericStateMachine<TPersistingEntity, TContext>) activeMachines.get(id);
         if (existing != null) {
             System.out.println("[Registry] Machine " + id + " found in memory");
-            return existing;
+        }
+        return existing;
+    }
+    
+    /**
+     * Step 2: Attempt to load machine context from persistence
+     */
+    @SuppressWarnings("unchecked")
+    private <TPersistingEntity extends StateMachineContextEntity<?>> TPersistingEntity attemptRehydration(String id) {
+        if (persistenceProvider == null || persistenceEntityClass == null) {
+            System.out.println("[Registry] No persistence provider configured for machine " + id);
+            return null;
         }
         
-        // Try to load from persistence if provider is available
-        if (persistenceProvider != null) {
-            try {
-                @SuppressWarnings("unchecked")
-                TPersistingEntity loadedContext = (TPersistingEntity) persistenceProvider.load(id, null);
+        try {
+            System.out.println("[Registry] Attempting to load context for machine " + id + " using class " + persistenceEntityClass.getSimpleName());
+            TPersistingEntity loadedContext = (TPersistingEntity) persistenceProvider.load(id, (Class<StateMachineContextEntity<?>>) persistenceEntityClass);
+            
+            if (loadedContext != null) {
+                System.out.println("[Registry] Successfully loaded context for machine " + id + ": " + loadedContext);
                 
-                if (loadedContext != null) {
-                    // Check if machine is complete - don't rehydrate completed machines
-                    if (loadedContext.isComplete()) {
-                        System.out.println("[Registry] Machine " + id + " is complete - not rehydrating");
-                        return null;
-                    }
-                    
-                    System.out.println("[Registry] Rehydrating machine " + id + " from persistence (state: " + loadedContext.getCurrentState() + ")");
-                    
-                    // Create new machine instance
-                    GenericStateMachine<TPersistingEntity, TContext> machine = factory.get();
-                    
-                    // Set the loaded persistent context
-                    machine.setPersistingEntity(loadedContext);
-                    
-                    // Restore the state (this will check timeouts)
-                    machine.restoreState(loadedContext.getCurrentState());
-                    
-                    // Register the rehydrated machine
-                    register(id, machine);
-                    lastAddedMachine = id; // Track as rehydrated
-                    
-                    // Notify listeners of rehydration
-                    for (StateMachineListener listener : listeners) {
-                        try {
-                            listener.onRegistryRehydrate(id);
-                        } catch (Exception e) {
-                            System.err.println("Error notifying listener of registry rehydrate: " + e.getMessage());
-                        }
-                    }
-                    
-                    return machine;
+                // Don't rehydrate completed machines
+                if (loadedContext.isComplete()) {
+                    System.out.println("[Registry] Machine " + id + " is complete - not rehydrating");
+                    return null;
                 }
-            } catch (Exception e) {
-                System.err.println("[Registry] Failed to load from persistence for machine " + id + ": " + e.getMessage());
+                
+                return loadedContext;
+            } else {
+                System.out.println("[Registry] No persisted context found for machine " + id);
+                return null;
             }
+        } catch (Exception e) {
+            System.err.println("[Registry] Failed to load from persistence for machine " + id + ": " + e.getMessage());
+            return null;
         }
+    }
+    
+    /**
+     * Step 3a: Rehydrate machine from persisted context
+     */
+    private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> GenericStateMachine<TPersistingEntity, TContext> rehydrateMachine(
+            String id, 
+            Supplier<GenericStateMachine<TPersistingEntity, TContext>> factory, 
+            TPersistingEntity persistedContext) {
         
-        // Not in persistence or persistence unavailable - create new machine
+        System.out.println("[Registry] Rehydrating machine " + id + " from persistence (state: " + persistedContext.getCurrentState() + ")");
+        
+        // Create machine instance
+        GenericStateMachine<TPersistingEntity, TContext> machine = factory.get();
+        
+        // Set persistent context
+        setPersistentContext(machine, persistedContext);
+        
+        // Restore state
+        restoreState(machine, persistedContext.getCurrentState());
+        
+        // Register machine
+        registerRehydratedMachine(id, machine);
+        
+        // Notify rehydration listeners
+        notifyRehydrationListeners(id);
+        
+        return machine;
+    }
+    
+    /**
+     * Step 3b: Create completely new machine
+     */
+    private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> GenericStateMachine<TPersistingEntity, TContext> createNewMachine(
+            String id, 
+            Supplier<GenericStateMachine<TPersistingEntity, TContext>> factory) {
+        
         System.out.println("[Registry] Creating new machine " + id);
         GenericStateMachine<TPersistingEntity, TContext> machine = factory.get();
         register(id, machine);
         return machine;
+    }
+    
+    /**
+     * Set the persistent context on a machine
+     */
+    private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> void setPersistentContext(
+            GenericStateMachine<TPersistingEntity, TContext> machine, 
+            TPersistingEntity context) {
+        machine.setPersistingEntity(context);
+        System.out.println("[Registry] Set persistent context for machine: " + context);
+    }
+    
+    /**
+     * Set volatile context/data on a machine (non-persisted data)
+     * This could be used for runtime data that doesn't need persistence
+     */
+    private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> void setVolatileContext(
+            GenericStateMachine<TPersistingEntity, TContext> machine, 
+            TContext volatileContext) {
+        if (volatileContext != null) {
+            // Note: GenericStateMachine doesn't have a direct setContext method for volatile data
+            // This is a placeholder for future extension if needed
+            System.out.println("[Registry] Would set volatile context (feature not implemented): " + volatileContext);
+        }
+    }
+    
+    /**
+     * Restore the machine state (handles timeout checks)
+     */
+    private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> void restoreState(
+            GenericStateMachine<TPersistingEntity, TContext> machine, 
+            String state) {
+        machine.restoreState(state);
+    }
+    
+    /**
+     * Register a rehydrated machine and track it
+     */
+    private void registerRehydratedMachine(String id, GenericStateMachine<?, ?> machine) {
+        register(id, machine);
+        lastAddedMachine = id; // Track as rehydrated
+    }
+    
+    /**
+     * Notify all listeners of machine rehydration
+     */
+    private void notifyRehydrationListeners(String id) {
+        for (StateMachineListener listener : listeners) {
+            try {
+                listener.onRegistryRehydrate(id);
+            } catch (Exception e) {
+                System.err.println("Error notifying listener of registry rehydrate: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Check if machine is offline (exists in debug cache but not in active memory)
+     */
+    private boolean checkIfOffline(String id) {
+        boolean inMemory = activeMachines.containsKey(id);
+        boolean inOfflineCache = hasWebSocketClients() && offlineMachinesForDebug.containsKey(id);
+        
+        if (inOfflineCache && !inMemory) {
+            System.out.println("[Registry] Machine " + id + " is in offline debug cache - requires rehydration");
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Validate that machine context is ready for operation
+     */
+    private <TPersistingEntity extends StateMachineContextEntity<?>> boolean validateContext(TPersistingEntity context) {
+        if (context == null) {
+            System.err.println("[Registry] Machine context is null");
+            return false;
+        }
+        
+        if (context.isComplete()) {
+            System.out.println("[Registry] Machine context is marked as complete");
+            return false;
+        }
+        
+        System.out.println("[Registry] Context validation passed");
+        return true;
     }
     
     /**
@@ -498,7 +641,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             Supplier<T> contextSupplier, 
             Function<T, GenericStateMachine<T, ?>> machineBuilder) {
         
-        // Check if already in memory
+        // Check if already in active memory
         GenericStateMachine<?, ?> existing = activeMachines.get(machineId);
         if (existing != null && existing.getPersistingEntity() != null) {
             try {
@@ -509,9 +652,63 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             }
         }
         
-        // Create new context and machine
-        T context = contextSupplier.get();
+        // Store offline cache reference for validation if in debug mode
+        GenericStateMachine<?, ?> offlineMachine = null;
+        T offlinePersistentContext = null;
+        Object offlineVolatileContext = null;
+        
+        if (debugMode && offlineMachinesForDebug.containsKey(machineId)) {
+            offlineMachine = offlineMachinesForDebug.get(machineId);
+            if (offlineMachine != null) {
+                try {
+                    offlinePersistentContext = contextClass.cast(offlineMachine.getPersistingEntity());
+                    // Note: Volatile context is not directly accessible from GenericStateMachine
+                    System.out.println("[Registry] Found machine " + machineId + " in offline cache for validation");
+                } catch (Exception e) {
+                    System.err.println("[Registry] Could not extract contexts from offline machine: " + e.getMessage());
+                }
+            }
+        }
+        
+        // Load from persistence
+        T persistedContext = null;
+        if (persistenceProvider != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                T loaded = (T) persistenceProvider.load(machineId, null);
+                if (loaded != null) {
+                    persistedContext = loaded;
+                    System.out.println("[Registry] Loaded context from persistence for " + machineId + " (state: " + loaded.getCurrentState() + ")");
+                }
+            } catch (Exception e) {
+                System.err.println("[Registry] Failed to load from persistence: " + e.getMessage());
+            }
+        }
+        
+        // If not found in persistence, use context supplier
+        T context = persistedContext != null ? persistedContext : contextSupplier.get();
+        
+        // Validate contexts if in debug mode and offline machine exists
+        if (debugMode && offlinePersistentContext != null && persistedContext != null) {
+            validateContextConsistency(machineId, offlinePersistentContext, persistedContext, offlineVolatileContext);
+        }
+        
+        // Create machine with the loaded/supplied context
         GenericStateMachine<T, ?> machine = machineBuilder.apply(context);
+        
+        // Restore state if we loaded from persistence
+        if (persistedContext != null) {
+            machine.setPersistingEntity(persistedContext);
+            machine.restoreState(persistedContext.getCurrentState());
+            System.out.println("[Registry] Restored machine " + machineId + " to state: " + persistedContext.getCurrentState());
+        }
+        
+        // Remove from offline cache if present
+        if (offlineMachinesForDebug.remove(machineId) != null) {
+            System.out.println("[Registry] Removed " + machineId + " from offline debug cache");
+        }
+        
+        // Register the rehydrated machine
         register(machineId, machine);
         lastAddedMachine = machineId; // Track as rehydrated
         
@@ -524,9 +721,61 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             }
         }
         
-        // Registry events logged via MySQL history
-        
         return context;
+    }
+    
+    /**
+     * Validate context consistency between offline cache and persisted data
+     */
+    private <T extends StateMachineContextEntity<?>> void validateContextConsistency(
+            String machineId, T offlineContext, T persistedContext, Object offlineVolatileContext) {
+        
+        System.out.println("[Registry] Validating context consistency for machine " + machineId);
+        
+        // Compare persistent contexts
+        boolean persistentMatch = true;
+        StringBuilder persistentDiff = new StringBuilder();
+        
+        // Check current state
+        if (!offlineContext.getCurrentState().equals(persistedContext.getCurrentState())) {
+            persistentMatch = false;
+            persistentDiff.append("\n  - State mismatch: offline=").append(offlineContext.getCurrentState())
+                        .append(", persisted=").append(persistedContext.getCurrentState());
+        }
+        
+        // Check completion status
+        if (offlineContext.isComplete() != persistedContext.isComplete()) {
+            persistentMatch = false;
+            persistentDiff.append("\n  - Complete flag mismatch: offline=").append(offlineContext.isComplete())
+                        .append(", persisted=").append(persistedContext.isComplete());
+        }
+        
+        // Note: ID checking would require specific context type knowledge
+        // For now, we rely on state and completion status checks
+        
+        // Additional context-specific validation can be added here
+        // For now, we do a toString comparison as a catch-all
+        String offlineStr = offlineContext.toString();
+        String persistedStr = persistedContext.toString();
+        if (!offlineStr.equals(persistedStr)) {
+            System.out.println("[Registry] WARNING: Context toString mismatch detected");
+            System.out.println("  Offline:   " + offlineStr);
+            System.out.println("  Persisted: " + persistedStr);
+        }
+        
+        if (!persistentMatch) {
+            String errorMsg = "[Registry] ASSERTION FAILED: Persistent context mismatch for machine " + machineId + persistentDiff.toString();
+            System.err.println(errorMsg);
+            throw new IllegalStateException(errorMsg);
+        }
+        
+        // Log volatile context for debugging (can't really validate it as it's recreated)
+        if (offlineVolatileContext != null) {
+            System.out.println("[Registry] Offline volatile context exists (will be recreated): " + 
+                             offlineVolatileContext.getClass().getSimpleName());
+        }
+        
+        System.out.println("[Registry] ✓ Context validation passed for machine " + machineId);
     }
     
     /**
@@ -541,7 +790,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             
             // Initialize persistence provider for rehydration
             persistenceProvider = new MySQLPersistenceProvider(connectionProvider);
-            ((MySQLPersistenceProvider) persistenceProvider).initialize();
+            persistenceProvider.initialize();
             System.out.println("[Registry] Initialized persistence provider for state rehydration");
             
         } catch (Exception e) {
@@ -566,6 +815,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
                 
                 // Replace the default provider with optimized one
                 this.persistenceProvider = optimizedProvider;
+                this.persistenceEntityClass = entityClass;
                 
                 System.out.println("[Registry] Switched to optimized persistence provider for entity: " + 
                                  entityClass.getSimpleName() + " (table: " + tableName + ")");

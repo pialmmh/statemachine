@@ -249,6 +249,28 @@ public abstract class AbstractStateMachineRegistry {
         }
     }
     
+    /**
+     * Notify listeners that an event was ignored
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void notifyEventIgnored(String machineId, String currentState, String eventType,
+                                   StateMachineContextEntity contextEntity, Object volatileContext) {
+        // Record in history if debug mode is enabled
+        if (debugMode && history != null) {
+            history.recordIgnoredEvent(machineId, currentState, 
+                new com.telcobright.statemachine.events.GenericStateMachineEvent(eventType), contextEntity);
+        }
+        
+        // Notify all listeners
+        for (StateMachineListener listener : listeners) {
+            try {
+                listener.onEventIgnored(machineId, currentState, eventType, contextEntity, volatileContext);
+            } catch (Exception e) {
+                System.err.println("Error notifying listener of ignored event: " + e.getMessage());
+            }
+        }
+    }
+    
     // Abstract methods to be implemented by concrete classes
     public abstract void register(String machineId, GenericStateMachine<?, ?> machine);
     public abstract GenericStateMachine<?, ?> getMachine(String machineId);

@@ -472,31 +472,62 @@ public class StateMachineWebSocketServer extends WebSocketServer
         
         GenericStateMachine<?, ?> machine = registry.getMachine(machineId);
         
-        // If machine not in memory, try to rehydrate
+        // If machine not found (could be offline), try to rehydrate
         if (machine == null && registry instanceof StateMachineRegistry) {
-            System.out.println("[Event] Machine " + machineId + " not in memory, attempting rehydration...");
+            StateMachineRegistry typedRegistry = (StateMachineRegistry) registry;
+            
+            // Check if machine is in offline debug cache
+            boolean isInOfflineCache = typedRegistry.getOfflineMachinesForDebug().containsKey(machineId);
+            
+            if (isInOfflineCache) {
+                System.out.println("[Event] Machine " + machineId + " is offline, triggering rehydration...");
+            } else {
+                System.out.println("[Event] Machine " + machineId + " not in memory, attempting rehydration...");
+            }
             
             // For rehydration, we need to know how to create the machine
             // In a real system, you'd have a factory registry or determine type from ID pattern
             // For now, we'll check if it looks like a call machine
             if (machineId.startsWith("call-")) {
-                StateMachineRegistry typedRegistry = (StateMachineRegistry) registry;
-                
-                // Try to rehydrate using the registry's createOrGet method
-                // This will load from persistence if available
-                // Using raw types to avoid type inference issues
-                @SuppressWarnings("unchecked")
-                GenericStateMachine<StateMachineContextEntity<?>, Object> typedMachine = 
-                    (GenericStateMachine<StateMachineContextEntity<?>, Object>) typedRegistry.createOrGet(
-                        machineId, 
-                        () -> (GenericStateMachine<StateMachineContextEntity<?>, Object>) createCallMachineForRehydration(machineId)
-                    );
-                machine = typedMachine;
-                
-                if (machine != null) {
-                    System.out.println("[Event] Successfully rehydrated machine: " + machineId);
-                } else {
-                    System.out.println("[Event] Machine " + machineId + " is complete or could not be rehydrated");
+                // Use rehydrateMachine for proper rehydration with context validation
+                try {
+                    com.telcobright.statemachine.websocket.CallMachineRunnerEnhanced.CallPersistentContext context = 
+                        typedRegistry.rehydrateMachine(
+                            machineId,
+                            com.telcobright.statemachine.websocket.CallMachineRunnerEnhanced.CallPersistentContext.class,
+                            () -> {
+                                // Create new context for machines that don't exist in persistence
+                                // Using dummy caller/callee for rehydration test
+                                return new com.telcobright.statemachine.websocket.CallMachineRunnerEnhanced.CallPersistentContext(
+                                    machineId,
+                                    "+1-555-0000",  // dummy caller
+                                    "+1-555-1111"   // dummy callee
+                                );
+                            },
+                            (ctx) -> {
+                                // Create properly typed machine
+                                @SuppressWarnings("unchecked")
+                                GenericStateMachine<com.telcobright.statemachine.websocket.CallMachineRunnerEnhanced.CallPersistentContext, ?> typedMachine = 
+                                    (GenericStateMachine<com.telcobright.statemachine.websocket.CallMachineRunnerEnhanced.CallPersistentContext, ?>) 
+                                    createCallMachineForRehydration(machineId);
+                                return typedMachine;
+                            }
+                        );
+                    
+                    // Get the rehydrated machine
+                    machine = typedRegistry.getMachine(machineId);
+                    
+                    if (machine != null) {
+                        System.out.println("[Event] Successfully rehydrated machine: " + machineId + " (state: " + context.getCurrentState() + ")");
+                    } else {
+                        System.out.println("[Event] Machine " + machineId + " could not be retrieved after rehydration");
+                    }
+                } catch (Exception e) {
+                    System.err.println("[Event] Failed to rehydrate machine " + machineId + ": " + e.getMessage());
+                    if (e instanceof IllegalStateException && e.getMessage().contains("ASSERTION FAILED")) {
+                        // Context validation failed - this is expected in debug mode
+                        throw e;
+                    }
                 }
             }
         }
