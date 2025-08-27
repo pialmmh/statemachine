@@ -198,6 +198,9 @@ public class CallMachineRunnerEnhanced {
         // IMPORTANT: Set the factory's default instances BEFORE creating any state machines
         StateMachineFactory.setDefaultInstances(timeoutManager, registry);
         
+        // Configure registry sample logging (1 in 2 events - 50% sampling rate as requested)
+        registry.setRegistrySampleLogging(SampleLoggingConfig.oneIn2());
+        
         // Enable debug mode (combines WebSocket and history tracking)
         registry.enableDebugMode(WS_PORT);
         
@@ -232,12 +235,13 @@ public class CallMachineRunnerEnhanced {
         CallVolatileContext volatileContext = new CallVolatileContext();
         volatileContext.logEvent("Machine initialized for " + caller + " -> " + callee);
         
-        // Build machine using enhanced builder
+        // Build machine using enhanced builder with sample logging configured
         GenericStateMachine<CallPersistentContext, CallVolatileContext> machine = 
             EnhancedFluentBuilder.<CallPersistentContext, CallVolatileContext>create(machineId)
                 .withPersistentContext(persistentContext)
                 .withVolatileContext(volatileContext)
                 .withVolatileContextFactory(() -> CallVolatileContext.createFromPersistent(persistentContext))
+                .withSampleLogging(2) // 1 in 2 events - 50% sampling rate as requested
                 .initialState(CallState.IDLE.name())
                 
                 .state(CallState.IDLE.name())
