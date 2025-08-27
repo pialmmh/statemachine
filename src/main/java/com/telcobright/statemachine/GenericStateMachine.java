@@ -52,6 +52,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private String debugSessionId;
     private StateMachineSnapshotRepository snapshotRepository;
     
+    // Sample logging configuration
+    private SampleLoggingConfig sampleLoggingConfig = SampleLoggingConfig.ALL;
+    
     // Callbacks
     private Consumer<String> onStateTransition;
     private Consumer<GenericStateMachine<TPersistingEntity, TContext>> onOfflineTransition;
@@ -864,19 +867,21 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     }
     
     /**
-     * Initialize history tracker if debug or snapshot mode is enabled
+     * Initialize history tracker if debug, snapshot, or sample logging is enabled
      */
     private void initializeHistoryTracker() {
-        // Check if debug or snapshot mode is enabled through registry or local settings
+        // Check if history tracking should be enabled
         boolean shouldTrackHistory = false;
         
         if (registry != null && registry instanceof AbstractStateMachineRegistry) {
             AbstractStateMachineRegistry abstractRegistry = (AbstractStateMachineRegistry) registry;
-            // Enable history for both debug mode and snapshot mode
-            shouldTrackHistory = abstractRegistry.isDebugEnabled();
+            // Enable history for debug mode, snapshot mode, or if sampling is configured
+            shouldTrackHistory = abstractRegistry.isDebugEnabled() || 
+                                sampleLoggingConfig.isEnabled();
         } else {
-            // Fallback to local debug setting or snapshot persistence
-            shouldTrackHistory = debugEnabled || persistSnapshotsToDb;
+            // Fallback to local debug setting, snapshot persistence, or sampling
+            shouldTrackHistory = debugEnabled || persistSnapshotsToDb || 
+                               sampleLoggingConfig.isEnabled();
         }
         
         if (shouldTrackHistory) {
@@ -914,6 +919,21 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private void recordEventInHistory(StateMachineEvent event, String stateBefore, String stateAfter, 
                                      long duration, boolean transitioned) {
         if (historyTracker == null || !historyTracker.isActive()) {
+            return;
+        }
+        
+        // Determine if we should log based on debug mode and sampling
+        boolean shouldLog = false;
+        
+        if (debugEnabled || registryControlledDebug) {
+            // Debug mode: log all events (ignore sampling)
+            shouldLog = true;
+        } else {
+            // Non-debug mode: apply sample logging if configured
+            shouldLog = sampleLoggingConfig.shouldLog();
+        }
+        
+        if (!shouldLog) {
             return;
         }
         
@@ -963,6 +983,21 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             historyTracker.close();
             historyTracker = null;
         }
+    }
+    
+    /**
+     * Configure sample logging for state machine events
+     */
+    public void setSampleLoggingConfig(SampleLoggingConfig config) {
+        this.sampleLoggingConfig = config != null ? config : SampleLoggingConfig.ALL;
+        System.out.println("[StateMachine-" + id + "] Sample logging configured: " + this.sampleLoggingConfig);
+    }
+    
+    /**
+     * Get sample logging configuration
+     */
+    public SampleLoggingConfig getSampleLoggingConfig() {
+        return sampleLoggingConfig;
     }
     
     /**

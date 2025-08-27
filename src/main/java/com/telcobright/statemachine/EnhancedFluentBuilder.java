@@ -30,6 +30,9 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
     private PartitionedRepository<TPersistingEntity, ?> persistenceRepository;
     private PersistenceProvider<TPersistingEntity> persistenceProvider;
     
+    // Sample logging configuration
+    private SampleLoggingConfig sampleLoggingConfig = SampleLoggingConfig.ALL;
+    
     private EnhancedFluentBuilder(String machineId) {
         this.machineId = machineId;
         this.delegateBuilder = FluentStateMachineBuilder.<TPersistingEntity, TVolatileContext>create(machineId);
@@ -115,6 +118,23 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
     }
     
     /**
+     * Configure sample logging - logs only 1 in N events to reduce database load
+     * @param config Sample logging configuration
+     */
+    public EnhancedFluentBuilder<TPersistingEntity, TVolatileContext> withSampleLogging(SampleLoggingConfig config) {
+        this.sampleLoggingConfig = config != null ? config : SampleLoggingConfig.DISABLED;
+        System.out.println("[Builder] Configured sample logging: " + this.sampleLoggingConfig);
+        return this;
+    }
+    
+    /**
+     * Convenience method for sample logging - 1 in N events
+     */
+    public EnhancedFluentBuilder<TPersistingEntity, TVolatileContext> withSampleLogging(int oneInN) {
+        return withSampleLogging(SampleLoggingConfig.oneInN(oneInN));
+    }
+    
+    /**
      * Set initial state
      */
     public EnhancedFluentBuilder<TPersistingEntity, TVolatileContext> initialState(String state) {
@@ -146,6 +166,9 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
         } else if (volatileContextFactory != null) {
             machine.setContext(volatileContextFactory.get());
         }
+        
+        // Configure sample logging
+        machine.setSampleLoggingConfig(sampleLoggingConfig);
         
         return machine;
     }
@@ -250,6 +273,11 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
         public StateBuilder stay(Class<? extends com.telcobright.statemachine.events.StateMachineEvent> eventType, 
                                  java.util.function.BiConsumer<GenericStateMachine<TPersistingEntity, TVolatileContext>, com.telcobright.statemachine.events.StateMachineEvent> action) {
             delegateState.stay(eventType, action);
+            return this;
+        }
+        
+        public StateBuilder finalState() {
+            delegateState.finalState();
             return this;
         }
         

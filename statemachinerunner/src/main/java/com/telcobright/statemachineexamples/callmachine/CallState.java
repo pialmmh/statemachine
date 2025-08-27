@@ -6,5 +6,6 @@ package com.telcobright.statemachineexamples.callmachine;
 public enum CallState {
     IDLE,
     RINGING,
-    CONNECTED
+    CONNECTED,
+    HUNGUP  // Final state - machine will be evicted when reaching this state
 }

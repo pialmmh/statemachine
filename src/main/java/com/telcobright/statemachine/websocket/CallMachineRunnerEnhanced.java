@@ -192,8 +192,8 @@ public class CallMachineRunnerEnhanced {
         // Create timeout manager for handling state timeouts
         this.timeoutManager = new com.telcobright.statemachine.timeout.TimeoutManager();
         
-        // Create registry with timeout manager and hardcoded WebSocket port
-        this.registry = new StateMachineRegistry(timeoutManager, WS_PORT);
+        // Create registry with unique ID, timeout manager and hardcoded WebSocket port
+        this.registry = new StateMachineRegistry("call", timeoutManager, WS_PORT);
         
         // IMPORTANT: Set the factory's default instances BEFORE creating any state machines
         StateMachineFactory.setDefaultInstances(timeoutManager, registry);
@@ -248,11 +248,12 @@ public class CallMachineRunnerEnhanced {
                         if (vol != null) {
                             vol.logEvent("[ENTRY-" + runId + "] Entered IDLE state");
                         }
-                        // Check if this is a call end (coming from a non-IDLE state)
+                        // IDLE is no longer a final state - just log entry
                         CallPersistentContext persistent = m.getPersistingEntity();
-                        if (persistent != null && persistent.getCallStartTime() != null && 
-                            !CallState.IDLE.name().equals(persistent.getCurrentState())) {
-                            handleCallEnd(m, runId);
+                        if (persistent != null) {
+                            // Reset call start time when returning to IDLE (for reuse)
+                            persistent.setCallStartTime(null);
+                            persistent.setCallEndTime(null);
                         }
                     })
                     .onExit(m -> {
@@ -264,6 +265,7 @@ public class CallMachineRunnerEnhanced {
                         }
                     })
                     .on(IncomingCall.class).to(CallState.RINGING.name())
+                    .on(Hangup.class).to(CallState.HUNGUP.name())
                     .done()
                     
                 .state(CallState.RINGING.name())
@@ -283,9 +285,9 @@ public class CallMachineRunnerEnhanced {
                             vol.logEvent("[EXIT-" + runId + "] Stopped ringing");
                         }
                     })
-                    .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name())
+                    .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.HUNGUP.name())
                     .on(Answer.class).to(CallState.CONNECTED.name())
-                    .on(Hangup.class).to(CallState.IDLE.name())
+                    .on(Hangup.class).to(CallState.HUNGUP.name())
                     .stay(SessionProgress.class, (m, e) -> {
                         CallPersistentContext ctx = m.getPersistingEntity();
                         CallVolatileContext vol = m.getContext();
@@ -309,8 +311,21 @@ public class CallMachineRunnerEnhanced {
                         }
                     })
                     .offline() // Mark CONNECTED as offline for testing
-                    .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.IDLE.name())
-                    .on(Hangup.class).to(CallState.IDLE.name())
+                    .timeout(30, com.telcobright.statemachine.timeout.TimeUnit.SECONDS, CallState.HUNGUP.name())
+                    .on(Hangup.class).to(CallState.HUNGUP.name())
+                    .done()
+                    
+                .state(CallState.HUNGUP.name())
+                    .onEntry(m -> {
+                        String runId = m.getRunId() != null ? m.getRunId() : "unknown";
+                        System.out.println("🔄 [ENTRY-" + runId + "] Entered HUNGUP final state for " + m.getId());
+                        handleCallEnd(m, runId);
+                        CallVolatileContext vol = m.getContext();
+                        if (vol != null) {
+                            vol.logEvent("[ENTRY-" + runId + "] Call ended - final state reached");
+                        }
+                    })
+                    .finalState() // Mark as final state
                     .done()
                     
                 .build();
@@ -419,25 +434,21 @@ public class CallMachineRunnerEnhanced {
     }
     
     /**
-     * Send event to a specific machine
+     * Send event to a specific machine using registry with final state checking
      */
     public void sendEvent(String machineId, StateMachineEvent event) {
-        GenericStateMachine<CallPersistentContext, CallVolatileContext> machine = machines.get(machineId);
-        if (machine != null) {
-            String oldState = machine.getCurrentState();
-            machine.fire(event);
-            String newState = machine.getCurrentState();
-            
-            System.out.println("[Event] Sent " + event.getClass().getSimpleName() + 
-                             " to " + machineId + " (" + oldState + " -> " + newState + ")");
-            
-            // Log in volatile context
-            CallVolatileContext volatile_ = machine.getContext();
-            if (volatile_ != null) {
-                volatile_.logEvent("Received event: " + event.getClass().getSimpleName());
+        // Use registry's sendEvent method which handles final state checking
+        boolean sent = registry.sendEvent(machineId, event);
+        
+        if (sent) {
+            // Log in volatile context if machine is still active
+            GenericStateMachine<CallPersistentContext, CallVolatileContext> machine = machines.get(machineId);
+            if (machine != null) {
+                CallVolatileContext volatile_ = machine.getContext();
+                if (volatile_ != null) {
+                    volatile_.logEvent("Received event: " + event.getClass().getSimpleName());
+                }
             }
-        } else {
-            System.err.println("[Event] Machine not found: " + machineId);
         }
     }
     

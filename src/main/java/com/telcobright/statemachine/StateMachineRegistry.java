@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
@@ -28,11 +29,31 @@ import java.util.concurrent.CompletableFuture;
  */
 public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
+    // Unique registry ID
+    private final String registryId;
+    
     // MySQL connection provider for history tracking
     private MysqlConnectionProvider connectionProvider;
     
     // Persistence provider for state machine contexts
     private PersistenceProvider<StateMachineContextEntity<?>> persistenceProvider;
+    
+    // Asynchronous logging executor
+    private final ExecutorService asyncLogExecutor;
+    
+    // Sample logging configuration for registry events
+    private SampleLoggingConfig registrySampleLogging = SampleLoggingConfig.ALL;
+    
+    /**
+     * Create async logging executor
+     */
+    private ExecutorService createAsyncLogExecutor() {
+        return Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "RegistryLogger-" + registryId);
+            t.setDaemon(true); // Don't prevent JVM shutdown
+            return t;
+        });
+    }
     
     // Track the entity class for persistence loading
     private Class<? extends StateMachineContextEntity<?>> persistenceEntityClass;
@@ -52,6 +73,18 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public StateMachineRegistry() {
         super();
+        this.registryId = "default";
+        this.asyncLogExecutor = createAsyncLogExecutor();
+        initializeConnectionProvider();
+    }
+    
+    /**
+     * Constructor with registry ID
+     */
+    public StateMachineRegistry(String registryId) {
+        super();
+        this.registryId = registryId;
+        this.asyncLogExecutor = createAsyncLogExecutor();
         initializeConnectionProvider();
     }
     
@@ -60,6 +93,18 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public StateMachineRegistry(TimeoutManager timeoutManager) {
         super(timeoutManager);
+        this.registryId = "default";
+        this.asyncLogExecutor = createAsyncLogExecutor();
+        initializeConnectionProvider();
+    }
+    
+    /**
+     * Constructor with registry ID and timeout manager
+     */
+    public StateMachineRegistry(String registryId, TimeoutManager timeoutManager) {
+        super(timeoutManager);
+        this.registryId = registryId;
+        this.asyncLogExecutor = createAsyncLogExecutor();
         initializeConnectionProvider();
     }
     
@@ -68,7 +113,44 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public StateMachineRegistry(TimeoutManager timeoutManager, int webSocketPort) {
         super(timeoutManager, webSocketPort);
+        this.registryId = "default";
+        this.asyncLogExecutor = createAsyncLogExecutor();
         initializeConnectionProvider();
+    }
+    
+    /**
+     * Constructor with registry ID, timeout manager and WebSocket port
+     */
+    public StateMachineRegistry(String registryId, TimeoutManager timeoutManager, int webSocketPort) {
+        super(timeoutManager, webSocketPort);
+        this.registryId = registryId;
+        
+        // Initialize asynchronous logging executor with single thread
+        this.asyncLogExecutor = createAsyncLogExecutor();
+        
+        initializeConnectionProvider();
+    }
+    
+    /**
+     * Override to enable registry logging when debug mode is activated
+     */
+    @Override
+    public void enableDebugMode(int port) {
+        // Call parent to enable debug mode
+        super.enableDebugMode(port);
+        
+        // Now log registry startup since debug mode is enabled
+        logRegistryEventSync(RegistryEventType.STARTUP, null, 
+            "Registry '" + registryId + "' debug mode enabled", 
+            "WebSocket port: " + port + ", sample logging: " + registrySampleLogging);
+    }
+    
+    /**
+     * Configure sample logging for registry events
+     */
+    public void setRegistrySampleLogging(SampleLoggingConfig config) {
+        this.registrySampleLogging = config != null ? config : SampleLoggingConfig.DISABLED;
+        System.out.println("[Registry-" + registryId + "] Registry sample logging configured: " + this.registrySampleLogging);
     }
     
     /**
@@ -79,7 +161,11 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     public void register(String id, GenericStateMachine<?, ?> machine) {
         activeMachines.put(id, machine);
         lastAddedMachine = id; // Track last added machine
-        System.out.println("[Registry] Machine registered: " + id + " - setting lastAddedMachine to: " + id);
+        
+        // Log machine registration
+        logRegistryEvent(RegistryEventType.REGISTER, id, "Machine registered with initial state: " + machine.getCurrentState(), null);
+        
+        System.out.println("[Registry-" + registryId + "] Machine registered: " + id + " - setting lastAddedMachine to: " + id);
         
         // Set up state transition callback to notify listeners (including WebSocket)
         // This ensures timeout transitions are also broadcast
@@ -92,18 +178,26 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             // This will trigger WebSocket broadcast if live debug is enabled
             notifyStateMachineEvent(id, oldState, newState, 
                 machine.getPersistingEntity(), machine.getContext());
+                
+            // Check if machine should be evicted after reaching final state
+            evictIfFinalState(id);
         });
         
         // Set up offline transition callback to persist and evict machine
         machine.setOnOfflineTransition(m -> {
             System.out.println("[Registry] Machine " + id + " entering offline state");
             
+            // Log offline transition
+            logRegistryEvent(RegistryEventType.OFFLINE, id, "Machine going offline from state: " + m.getCurrentState(), "Moving to offline storage");
+            
             // Persist the machine state before removing from memory
             if (persistenceProvider != null && m.getPersistingEntity() != null) {
                 try {
                     persistenceProvider.save(id, (StateMachineContextEntity<?>) m.getPersistingEntity());
+                    logRegistryEvent(RegistryEventType.PERSISTENCE, id, "Machine state persisted successfully", "State: " + m.getCurrentState());
                     System.out.println("[Registry] Persisted offline machine " + id + " (state: " + m.getCurrentState() + ")");
                 } catch (Exception e) {
+                    logRegistryEvent(RegistryEventType.ERROR, id, "Failed to persist machine state", e.getMessage());
                     System.err.println("[Registry] Failed to persist offline machine " + id + ": " + e.getMessage());
                 }
             }
@@ -141,9 +235,9 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             if (persistenceProvider != null && machine.getPersistingEntity() != null) {
                 try {
                     persistenceProvider.save(id, (StateMachineContextEntity<?>) machine.getPersistingEntity());
-                    System.out.println("[Registry] Persisted machine " + id + " during removal (state: " + machine.getCurrentState() + ")");
+                    System.out.println("[Registry-" + registryId + "] Persisted machine " + id + " during removal (state: " + machine.getCurrentState() + ")");
                 } catch (Exception e) {
-                    System.err.println("[Registry] Failed to persist machine " + id + " during removal: " + e.getMessage());
+                    System.err.println("[Registry-" + registryId + "] Failed to persist machine " + id + " during removal: " + e.getMessage());
                 }
             }
         }
@@ -156,6 +250,47 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         notifyRegistryRemove(id);
         
         // Registry events logged via MySQL history
+    }
+    
+    /**
+     * Evict machine when it reaches a final state
+     */
+    public void evictIfFinalState(String machineId) {
+        GenericStateMachine<?, ?> machine = activeMachines.get(machineId);
+        if (machine != null) {
+            // Check if current state is marked as final
+            if (isFinalState(machine.getCurrentState())) {
+                System.out.println("[Registry-" + registryId + "] Machine " + machineId + " reached final state: " + machine.getCurrentState() + " - evicting from memory");
+                
+                // Mark machine as complete before eviction
+                if (machine.getPersistingEntity() != null) {
+                    machine.getPersistingEntity().setComplete(true);
+                }
+                
+                // Log eviction to registry table
+                logRegistryEvent(RegistryEventType.EVICT, machineId, "Final state: " + machine.getCurrentState(), "Machine reached final state and was evicted");
+                
+                // Remove from active machines
+                removeMachine(machineId);
+                
+                System.out.println("[Registry-" + registryId + "] Machine " + machineId + " evicted successfully");
+            }
+        }
+    }
+    
+    /**
+     * Check if a state is marked as final
+     */
+    private boolean isFinalState(String stateName) {
+        // For now, check if state name contains "FINAL" or specific final state names
+        if (stateName == null) return false;
+        
+        String upperState = stateName.toUpperCase();
+        return upperState.contains("FINAL") || 
+               upperState.equals("HUNGUP") || 
+               upperState.equals("COMPLETED") || 
+               upperState.equals("TERMINATED") || 
+               upperState.equals("FINISHED");
     }
     
     /**
@@ -786,18 +921,258 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         // It will be used when debug mode is enabled later
         try {
             connectionProvider = new MysqlConnectionProvider();
-            System.out.println("[Registry] Initialized MySQL connection provider for history tracking");
+            System.out.println("[Registry-" + registryId + "] Initialized MySQL connection provider for history tracking");
             
             // Initialize persistence provider for rehydration
             persistenceProvider = new MySQLPersistenceProvider(connectionProvider);
             persistenceProvider.initialize();
-            System.out.println("[Registry] Initialized persistence provider for state rehydration");
+            System.out.println("[Registry-" + registryId + "] Initialized persistence provider for state rehydration");
+            
+            // Create registry table for event logging
+            createRegistryTable();
             
         } catch (Exception e) {
-            System.err.println("[Registry] Failed to initialize MySQL connection provider: " + e.getMessage());
+            System.err.println("[Registry-" + registryId + "] Failed to initialize MySQL connection provider: " + e.getMessage());
             connectionProvider = null;
             persistenceProvider = null;
         }
+    }
+    
+    /**
+     * Create simplified registry table for event logging
+     * Focuses on registry-level events rather than state tracking
+     * Creates table when debug mode OR sampling is configured
+     */
+    private void createRegistryTable() {
+        // Create registry table when debug mode is enabled OR sampling is configured
+        if (connectionProvider == null) return;
+        
+        String tableName = "registry_" + registryId;
+        
+        try (var connection = connectionProvider.getConnection()) {
+            // First, drop the old table if it exists to start fresh with new simplified structure
+            String dropTableSQL = String.format("DROP TABLE IF EXISTS %s", tableName);
+            try (var stmt = connection.prepareStatement(dropTableSQL)) {
+                stmt.execute();
+            }
+            
+            // Create the new simplified table structure
+            String createTableSQL = String.format("""
+                CREATE TABLE %s (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    event_type VARCHAR(50) NOT NULL,
+                    machine_id VARCHAR(255),
+                    event_details VARCHAR(500),
+                    reason VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_event_type (event_type),
+                    INDEX idx_machine_id (machine_id),
+                    INDEX idx_created_at (created_at)
+                )
+                """, tableName);
+            
+            try (var stmt = connection.prepareStatement(createTableSQL)) {
+                stmt.execute();
+                System.out.println("[Registry-" + registryId + "] Created/verified simplified registry table: " + tableName);
+            }
+        } catch (Exception e) {
+            System.err.println("[Registry-" + registryId + "] Failed to create registry table: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Log simplified registry event to table asynchronously 
+     * - If sampling is configured, applies sampling regardless of debug mode
+     * - In debug mode, logs ALL events (ignores sampling)
+     */
+    public void logRegistryEvent(RegistryEventType eventType, String machineId, String eventDetails, String reason) {
+        // Skip if no connection or executor is shutdown
+        if (connectionProvider == null || asyncLogExecutor.isShutdown()) {
+            return;
+        }
+        
+        // In debug mode, log everything (ignore sampling)
+        if (debugMode) {
+            // Debug mode: log all events
+        } else {
+            // Non-debug mode: apply sampling if configured
+            if (!registrySampleLogging.shouldLog()) {
+                return;
+            }
+        }
+        
+        // Submit logging task asynchronously to avoid blocking main thread
+        CompletableFuture.runAsync(() -> {
+            String tableName = "registry_" + registryId;
+            String insertSQL = String.format("""
+                INSERT INTO %s (event_type, machine_id, event_details, reason)
+                VALUES (?, ?, ?, ?)
+                """, tableName);
+            
+            try (var connection = connectionProvider.getConnection();
+                 var stmt = connection.prepareStatement(insertSQL)) {
+                stmt.setString(1, eventType.getEventName());
+                stmt.setString(2, machineId);
+                stmt.setString(3, eventDetails);
+                stmt.setString(4, reason);
+                stmt.executeUpdate();
+                
+                String logMessage = String.format("[Registry-%s] %s", registryId, eventType.getEventName());
+                if (machineId != null) {
+                    logMessage += " for machine " + machineId;
+                }
+                if (reason != null) {
+                    logMessage += " (reason: " + reason + ")";
+                }
+                System.out.println(logMessage);
+            } catch (Exception e) {
+                System.err.println("[Registry-" + registryId + "] Failed to log registry event asynchronously: " + e.getMessage());
+            }
+        }, asyncLogExecutor);
+    }
+    
+    /**
+     * Convenience method to log ignored events
+     */
+    public void logIgnoredEvent(String machineId, String eventName, String reason) {
+        logRegistryEvent(RegistryEventType.IGNORE, machineId, "Event: " + eventName, reason);
+    }
+    
+    /**
+     * Shutdown the async logging executor
+     */
+    public void shutdownAsyncLogging() {
+        // Log shutdown event synchronously to ensure it's recorded
+        if (connectionProvider != null && !asyncLogExecutor.isShutdown()) {
+            logRegistryEventSync(RegistryEventType.SHUTDOWN, null, "Registry '" + registryId + "' shutting down", "Cleanup and resource release");
+        }
+        
+        // Shutdown async executor gracefully
+        asyncLogExecutor.shutdown();
+        try {
+            if (!asyncLogExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                asyncLogExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            asyncLogExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        
+        System.out.println("[Registry-" + registryId + "] Async logging shutdown complete");
+    }
+    
+    /**
+     * Synchronous version for critical logging (shutdown, startup)
+     * - If sampling is configured, applies sampling regardless of debug mode
+     * - In debug mode, logs ALL events (ignores sampling)
+     */
+    private void logRegistryEventSync(RegistryEventType eventType, String machineId, String eventDetails, String reason) {
+        // Skip if no connection
+        if (connectionProvider == null) return;
+        
+        // In debug mode, log everything (ignore sampling)
+        if (debugMode) {
+            // Debug mode: log all events
+        } else {
+            // Non-debug mode: apply sampling if configured
+            if (!registrySampleLogging.shouldLog()) {
+                return;
+            }
+        }
+        
+        String tableName = "registry_" + registryId;
+        String insertSQL = String.format("""
+            INSERT INTO %s (event_type, machine_id, event_details, reason)
+            VALUES (?, ?, ?, ?)
+            """, tableName);
+        
+        try (var connection = connectionProvider.getConnection();
+             var stmt = connection.prepareStatement(insertSQL)) {
+            stmt.setString(1, eventType.getEventName());
+            stmt.setString(2, machineId);
+            stmt.setString(3, eventDetails);
+            stmt.setString(4, reason);
+            stmt.executeUpdate();
+            
+            String logMessage = String.format("[Registry-%s] %s", registryId, eventType.getEventName());
+            if (machineId != null) {
+                logMessage += " for machine " + machineId;
+            }
+            if (reason != null) {
+                logMessage += " (reason: " + reason + ")";
+            }
+            System.out.println(logMessage);
+        } catch (Exception e) {
+            System.err.println("[Registry-" + registryId + "] Failed to log registry event synchronously: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Check if machine exists in persistence and get its last state
+     */
+    private String getPersistedMachineState(String machineId) {
+        if (persistenceProvider == null || persistenceEntityClass == null) {
+            return null;
+        }
+        
+        try {
+            @SuppressWarnings("unchecked")
+            StateMachineContextEntity<?> context = persistenceProvider.load(machineId, (Class<StateMachineContextEntity<?>>) persistenceEntityClass);
+            return context != null ? context.getCurrentState() : null;
+        } catch (Exception e) {
+            System.err.println("[Registry-" + registryId + "] Failed to check persisted state for machine " + machineId + ": " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Get registry ID
+     */
+    public String getRegistryId() {
+        return registryId;
+    }
+    
+    /**
+     * Send event to a machine with final state checking
+     */
+    public boolean sendEvent(String machineId, com.telcobright.statemachine.events.StateMachineEvent event) {
+        // First check if machine is in active memory
+        GenericStateMachine<?, ?> machine = activeMachines.get(machineId);
+        
+        if (machine != null) {
+            // Machine is active - send event normally
+            String oldState = machine.getCurrentState();
+            machine.fire(event);
+            String newState = machine.getCurrentState();
+            
+            // Log successful event processing - but we don't log every state transition here since that's in history
+            // Only log if it's a significant registry event
+            
+            System.out.println("[Registry-" + registryId + "] Event " + event.getClass().getSimpleName() + " sent to " + machineId + " (" + oldState + " -> " + newState + ")");
+            return true;
+        }
+        
+        // Machine not in memory - check persistence
+        String persistedState = getPersistedMachineState(machineId);
+        
+        if (persistedState == null) {
+            // Machine doesn't exist in persistence - ignore event
+            logIgnoredEvent(machineId, event.getClass().getSimpleName(), "Machine not found in persistence");
+            System.out.println("[Registry-" + registryId + "] Event " + event.getClass().getSimpleName() + " ignored for " + machineId + " - machine not found");
+            return false;
+        }
+        
+        if (isFinalState(persistedState)) {
+            // Machine is in final state - ignore event  
+            logIgnoredEvent(machineId, event.getClass().getSimpleName(), "Machine in final state: " + persistedState);
+            System.out.println("[Registry-" + registryId + "] Event " + event.getClass().getSimpleName() + " ignored for " + machineId + " - machine in final state: " + persistedState);
+            return false;
+        }
+        
+        // Machine exists but not in final state - could rehydrate, but for now just log
+        logIgnoredEvent(machineId, event.getClass().getSimpleName(), "Machine not in memory, rehydration needed");
+        System.out.println("[Registry-" + registryId + "] Event " + event.getClass().getSimpleName() + " ignored for " + machineId + " - machine not in memory (last state: " + persistedState + ")");
+        return false;
     }
     
     /**
@@ -1015,11 +1390,14 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             System.out.println("[Registry] Closed MySQL connection provider");
         }
         
+        // Shutdown async logging first
+        shutdownAsyncLogging();
+        
         // Shutdown async executor
         if (asyncExecutor != null) {
             asyncExecutor.shutdown();
             try {
-                if (!asyncExecutor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (!asyncExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
                     asyncExecutor.shutdownNow();
                 }
             } catch (InterruptedException e) {
