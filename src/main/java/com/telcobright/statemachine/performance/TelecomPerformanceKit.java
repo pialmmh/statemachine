@@ -68,6 +68,10 @@ public class TelecomPerformanceKit {
         return new TelecomPerformanceKit(registryId, "/var/lib/telecom/state-" + registryId + ".mmap", maxMachines);
     }
     
+    public static TelecomPerformanceKit forDevelopment(String registryId, int maxMachines) throws IOException {
+        return new TelecomPerformanceKit(registryId, System.getProperty("java.io.tmpdir") + "/telecom-state-" + registryId + ".mmap", maxMachines);
+    }
+    
     private void startStatisticsReporting() {
         statsExecutor.scheduleWithFixedDelay(() -> {
             System.out.println("\n=== Telecom Performance Statistics ===");

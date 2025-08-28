@@ -1006,4 +1006,13 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     public MachineHistoryMySQLTracker getHistoryTracker() {
         return historyTracker;
     }
+    
+    /**
+     * Enable optimized processing mode
+     * This method provides API compatibility for OptimizedFluentBuilder
+     */
+    public void setOptimizedProcessing(boolean enabled) {
+        // Implementation could be added here for machine-level optimizations
+        // For now, this provides API compatibility
+    }
 }
