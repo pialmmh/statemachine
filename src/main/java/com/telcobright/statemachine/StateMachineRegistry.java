@@ -16,12 +16,14 @@ import com.telcobright.statemachine.persistence.OptimizedMySQLPersistenceProvide
 import com.telcobright.statemachine.persistence.BaseStateMachineEntity;
 import com.telcobright.statemachine.persistence.ShardingEntityStateMachineRepository;
 import com.telcobright.statemachine.persistence.IdLookUpMode;
-import com.telcobright.db.PartitionedRepository;
-import com.telcobright.db.entity.ShardingEntity;
+import com.telcobright.statemachine.db.PartitionedRepository;
+import com.telcobright.statemachine.db.entity.ShardingEntity;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Registry for managing state machine instances
@@ -38,11 +40,40 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     // Persistence provider for state machine contexts
     private PersistenceProvider<StateMachineContextEntity<?>> persistenceProvider;
     
+    // Performance configuration
+    private final RegistryPerformanceConfig performanceConfig;
+    
+    // Virtual thread executor for business logic (sized for target TPS)
+    private final ExecutorService virtualThreadExecutor;
+    
+    // Machine limits
+    private final Semaphore concurrentMachineLimit;
+    
     // Asynchronous logging executor
     private final ExecutorService asyncLogExecutor;
     
     // Sample logging configuration for registry events
     private SampleLoggingConfig registrySampleLogging = SampleLoggingConfig.ALL;
+    
+    /**
+     * Create virtual thread executor sized for target TPS capacity
+     */
+    private ExecutorService createVirtualThreadExecutor() {
+        if (performanceConfig.isUseAdaptiveThreading()) {
+            // Use virtual thread per task executor (unlimited for maximum TPS capacity)
+            System.out.println("[Registry-" + registryId + "] Using adaptive virtual threading for target TPS: " + performanceConfig.getTargetTps());
+            return Executors.newVirtualThreadPerTaskExecutor();
+        } else {
+            // Use fixed-size virtual thread pool optimized for target TPS
+            int poolSize = performanceConfig.getVirtualThreadPoolSize();
+            System.out.println("[Registry-" + registryId + "] Using fixed virtual thread pool size: " + poolSize + " for target TPS: " + performanceConfig.getTargetTps());
+            
+            ThreadFactory virtualThreadFactory = Thread.ofVirtual()
+                .name("StateMachine-Virtual-" + registryId + "-", 0)
+                .factory();
+            return Executors.newFixedThreadPool(poolSize, virtualThreadFactory);
+        }
+    }
     
     /**
      * Create async logging executor
@@ -72,63 +103,99 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      * Default constructor for testing
      */
     public StateMachineRegistry() {
-        super();
-        this.registryId = "default";
-        this.asyncLogExecutor = createAsyncLogExecutor();
-        initializeConnectionProvider();
+        this(RegistryPerformanceConfig.forDevelopment());
+    }
+    
+    /**
+     * Constructor with performance configuration
+     */
+    public StateMachineRegistry(RegistryPerformanceConfig config) {
+        this("default", config);
     }
     
     /**
      * Constructor with registry ID
      */
     public StateMachineRegistry(String registryId) {
+        this(registryId, RegistryPerformanceConfig.forDevelopment());
+    }
+    
+    /**
+     * Constructor with registry ID and performance configuration
+     */
+    public StateMachineRegistry(String registryId, RegistryPerformanceConfig config) {
         super();
         this.registryId = registryId;
+        this.performanceConfig = config;
+        this.virtualThreadExecutor = createVirtualThreadExecutor();
+        this.concurrentMachineLimit = new Semaphore(config.getMaxConcurrentMachines());
         this.asyncLogExecutor = createAsyncLogExecutor();
         initializeConnectionProvider();
+        
+        System.out.println("[Registry-" + registryId + "] Initialized with performance config: " + config.toString());
     }
     
     /**
      * Constructor with timeout manager
      */
     public StateMachineRegistry(TimeoutManager timeoutManager) {
-        super(timeoutManager);
-        this.registryId = "default";
-        this.asyncLogExecutor = createAsyncLogExecutor();
-        initializeConnectionProvider();
+        this("default", RegistryPerformanceConfig.forDevelopment(), timeoutManager);
     }
     
     /**
      * Constructor with registry ID and timeout manager
      */
     public StateMachineRegistry(String registryId, TimeoutManager timeoutManager) {
+        this(registryId, RegistryPerformanceConfig.forDevelopment(), timeoutManager);
+    }
+    
+    /**
+     * Constructor with performance config and timeout manager
+     */
+    public StateMachineRegistry(String registryId, RegistryPerformanceConfig config, TimeoutManager timeoutManager) {
         super(timeoutManager);
         this.registryId = registryId;
+        this.performanceConfig = config;
+        this.virtualThreadExecutor = createVirtualThreadExecutor();
+        this.concurrentMachineLimit = new Semaphore(config.getMaxConcurrentMachines());
         this.asyncLogExecutor = createAsyncLogExecutor();
         initializeConnectionProvider();
+        
+        System.out.println("[Registry-" + registryId + "] Initialized with performance config and timeout manager: " + config.toString());
     }
     
     /**
      * Constructor with timeout manager and WebSocket port
      */
     public StateMachineRegistry(TimeoutManager timeoutManager, int webSocketPort) {
-        super(timeoutManager, webSocketPort);
-        this.registryId = "default";
-        this.asyncLogExecutor = createAsyncLogExecutor();
-        initializeConnectionProvider();
+        this("default", RegistryPerformanceConfig.forDevelopment(), timeoutManager, webSocketPort);
     }
     
     /**
      * Constructor with registry ID, timeout manager and WebSocket port
      */
     public StateMachineRegistry(String registryId, TimeoutManager timeoutManager, int webSocketPort) {
+        this(registryId, RegistryPerformanceConfig.forDevelopment(), timeoutManager, webSocketPort);
+    }
+    
+    /**
+     * Full constructor with all parameters
+     */
+    public StateMachineRegistry(String registryId, RegistryPerformanceConfig config, 
+                               TimeoutManager timeoutManager, int webSocketPort) {
         super(timeoutManager, webSocketPort);
         this.registryId = registryId;
+        this.performanceConfig = config;
+        this.virtualThreadExecutor = createVirtualThreadExecutor();
+        this.concurrentMachineLimit = new Semaphore(config.getMaxConcurrentMachines());
         
         // Initialize asynchronous logging executor with single thread
         this.asyncLogExecutor = createAsyncLogExecutor();
         
         initializeConnectionProvider();
+        
+        System.out.println("[Registry-" + registryId + "] Initialized with full config: " + config.toString() + 
+                          ", WebSocket port: " + webSocketPort);
     }
     
     /**
@@ -154,11 +221,38 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     }
     
     /**
-     * Register a state machine
+     * Check if we can create a new machine (respects concurrent machine limit)
+     */
+    private boolean canCreateMachine() {
+        return concurrentMachineLimit.tryAcquire();
+    }
+    
+    /**
+     * Release machine permit when machine is removed
+     */
+    private void releaseMachinePermit() {
+        concurrentMachineLimit.release();
+    }
+    
+    /**
+     * Register a state machine with performance controls
      * Automatically applies debug mode if enabled
      */
     @Override
     public void register(String id, GenericStateMachine<?, ?> machine) {
+        // Don't allow registration if we're at machine limit
+        // (This is checked at creation time, but double-check here for safety)
+        if (!canCreateMachine()) {
+            // Log machine creation refusal to registry event table
+            logRegistryEvent(RegistryEventType.MACHINE_CREATION_REFUSED, id, 
+                "Machine creation refused - concurrent machine limit reached: " + 
+                performanceConfig.getMaxConcurrentMachines() + " (active: " + activeMachines.size() + ")", 
+                "CAPACITY_LIMIT_REACHED");
+            
+            throw new IllegalStateException("Cannot register machine " + id + " - concurrent machine limit reached: " + 
+                                          performanceConfig.getMaxConcurrentMachines());
+        }
+        
         activeMachines.put(id, machine);
         lastAddedMachine = id; // Track last added machine
         
@@ -223,11 +317,16 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     }
     
     /**
-     * Remove a state machine from the registry
+     * Remove a state machine from the registry with performance controls
      */
     @Override
     public void removeMachine(String id) {
         GenericStateMachine<?, ?> machine = activeMachines.remove(id);
+        
+        // Release the machine permit
+        if (machine != null) {
+            releaseMachinePermit();
+        }
         if (machine != null) {
             lastRemovedMachine = id; // Track last removed machine
             
@@ -337,6 +436,12 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             throw new IllegalStateException("State machine with ID " + id + " already exists. Use createOrGet() instead.");
         }
         
+        // Check machine limits
+        if (!canCreateMachine()) {
+            throw new IllegalStateException("Cannot create machine " + id + " - concurrent machine limit reached: " + 
+                                          performanceConfig.getMaxConcurrentMachines());
+        }
+        
         // Create new machine directly without persistence lookup
         GenericStateMachine<TPersistingEntity, TContext> machine = factory.get();
         register(id, machine);
@@ -442,11 +547,18 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     }
     
     /**
-     * Step 3b: Create completely new machine
+     * Step 3b: Create completely new machine with performance controls
      */
     private <TPersistingEntity extends StateMachineContextEntity<?>, TContext> GenericStateMachine<TPersistingEntity, TContext> createNewMachine(
             String id, 
             Supplier<GenericStateMachine<TPersistingEntity, TContext>> factory) {
+        
+        // Check machine limits
+        if (!canCreateMachine()) {
+            System.out.println("[Registry] Cannot create machine " + id + " - concurrent limit reached: " + 
+                             performanceConfig.getMaxConcurrentMachines());
+            return null;
+        }
         
         System.out.println("[Registry] Creating new machine " + id);
         GenericStateMachine<TPersistingEntity, TContext> machine = factory.get();
@@ -1133,22 +1245,28 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     }
     
     /**
-     * Send event to a machine with final state checking
+     * Send event to a machine with virtual thread processing for high TPS capacity
      */
     public boolean sendEvent(String machineId, com.telcobright.statemachine.events.StateMachineEvent event) {
         // First check if machine is in active memory
         GenericStateMachine<?, ?> machine = activeMachines.get(machineId);
         
         if (machine != null) {
-            // Machine is active - send event normally
+            // Machine is active - process event on virtual thread for non-blocking high TPS
             String oldState = machine.getCurrentState();
-            machine.fire(event);
-            String newState = machine.getCurrentState();
             
-            // Log successful event processing - but we don't log every state transition here since that's in history
-            // Only log if it's a significant registry event
+            // Submit to virtual thread executor optimized for target TPS capacity
+            CompletableFuture.runAsync(() -> {
+                try {
+                    machine.fire(event);
+                    String newState = machine.getCurrentState();
+                    System.out.println("[Registry-" + registryId + "] Event " + event.getClass().getSimpleName() + 
+                                     " processed for " + machineId + " (" + oldState + " -> " + newState + ")");
+                } catch (Exception e) {
+                    System.err.println("[Registry-" + registryId + "] Error processing event: " + e.getMessage());
+                }
+            }, virtualThreadExecutor);
             
-            System.out.println("[Registry-" + registryId + "] Event " + event.getClass().getSimpleName() + " sent to " + machineId + " (" + oldState + " -> " + newState + ")");
             return true;
         }
         
@@ -1319,10 +1437,8 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             // Cast event to appropriate type
             if (event instanceof com.telcobright.statemachine.events.StateMachineEvent) {
                 machine.fire((com.telcobright.statemachine.events.StateMachineEvent) event);
-            } else if (event instanceof String) {
-                machine.fire((String) event);
             } else {
-                System.err.println("[Registry] Unsupported event type: " + event.getClass().getName());
+                System.err.println("[Registry] Unsupported event type - must be StateMachineEvent: " + event.getClass().getName());
                 return false;
             }
             System.out.println("[Registry] Event routed successfully to machine " + machineId);
@@ -1348,10 +1464,8 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             // Cast event to appropriate type
             if (event instanceof com.telcobright.statemachine.events.StateMachineEvent) {
                 machine.fire((com.telcobright.statemachine.events.StateMachineEvent) event);
-            } else if (event instanceof String) {
-                machine.fire((String) event);
             } else {
-                System.err.println("[Registry] Unsupported event type: " + event.getClass().getName());
+                System.err.println("[Registry] Unsupported event type - must be StateMachineEvent: " + event.getClass().getName());
                 return false;
             }
             System.out.println("[Registry] Event routed to existing machine " + machineId);
@@ -1360,6 +1474,30 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             System.err.println("[Registry] Failed to route event to machine " + machineId + ": " + e.getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Get performance statistics
+     */
+    public Map<String, Object> getPerformanceStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("registryId", registryId);
+        stats.put("activeMachines", activeMachines.size());
+        stats.put("maxConcurrentMachines", performanceConfig.getMaxConcurrentMachines());
+        stats.put("availableMachinePermits", concurrentMachineLimit.availablePermits());
+        stats.put("targetTps", performanceConfig.getTargetTps());
+        stats.put("virtualThreadPoolSize", performanceConfig.getVirtualThreadPoolSize());
+        stats.put("useAdaptiveThreading", performanceConfig.isUseAdaptiveThreading());
+        stats.put("eventQueueCapacity", performanceConfig.getEventQueueCapacity());
+        stats.put("machineEvictionThreshold", performanceConfig.getMachineEvictionThreshold());
+        return stats;
+    }
+    
+    /**
+     * Get current performance configuration
+     */
+    public RegistryPerformanceConfig getPerformanceConfig() {
+        return performanceConfig;
     }
     
     /**
@@ -1392,6 +1530,21 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         
         // Shutdown async logging first
         shutdownAsyncLogging();
+        
+        // Shutdown virtual thread executor
+        if (virtualThreadExecutor != null) {
+            virtualThreadExecutor.shutdown();
+            try {
+                if (!virtualThreadExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    virtualThreadExecutor.shutdownNow();
+                    System.out.println("[Registry-" + registryId + "] Virtual thread executor forced shutdown");
+                }
+            } catch (InterruptedException e) {
+                virtualThreadExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            System.out.println("[Registry-" + registryId + "] Virtual thread executor shutdown complete");
+        }
         
         // Shutdown async executor
         if (asyncExecutor != null) {

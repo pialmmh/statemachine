@@ -1,10 +1,10 @@
 package com.telcobright.statemachine.persistence;
 
-import com.telcobright.db.PartitionedRepository;
-import com.telcobright.db.entity.ShardingEntity;
-import com.telcobright.db.entity.Id;
-import com.telcobright.db.entity.ShardingKey;
-import com.telcobright.idkit.IdGenerator;
+import com.telcobright.statemachine.db.PartitionedRepository;
+import com.telcobright.statemachine.db.entity.ShardingEntity;
+import com.telcobright.statemachine.db.entity.Id;
+import com.telcobright.statemachine.db.entity.ShardingKey;
+import com.telcobright.statemachine.idkit.IdGenerator;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;

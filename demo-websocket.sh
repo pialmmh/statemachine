@@ -13,7 +13,7 @@ read option
 case $option in
     1)
         echo "Starting WebSocket Server on port 9999..."
-        java -cp target/classes com.telcobright.statemachine.websocket.StateMachineRunnerWithWebServer
+        java -cp target/classes com.telcobright.statemachine.statemachinedebugger.StateMachineRunnerWithWebServer
         ;;
     2)
         echo -n "Enter WebSocket server URL [ws://localhost:9999]: "
@@ -26,7 +26,7 @@ case $option in
         ;;
     3)
         echo "Starting WebSocket Server in background..."
-        gnome-terminal --title="WebSocket Server" -- bash -c "java -cp target/classes com.telcobright.statemachine.websocket.StateMachineRunnerWithWebServer; read -p 'Press Enter to close...'"
+        gnome-terminal --title="WebSocket Server" -- bash -c "java -cp target/classes com.telcobright.statemachine.statemachinedebugger.StateMachineRunnerWithWebServer; read -p 'Press Enter to close...'"
         
         sleep 2
         

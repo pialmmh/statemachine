@@ -13,7 +13,7 @@ import com.telcobright.statemachine.events.EventTypeRegistry;
 import com.telcobright.statemachine.persistence.ShardingEntityStateMachineRepository;
 import com.telcobright.statemachine.StateMachineContextEntity;
 import com.telcobright.statemachine.persistence.IdLookUpMode;
-import com.telcobright.db.PartitionedRepository;
+import com.telcobright.statemachine.db.PartitionedRepository;
 import com.telcobright.statemachine.state.EnhancedStateConfig;
 import com.telcobright.statemachine.timeout.TimeUnit;
 import com.telcobright.statemachine.timeout.TimeoutConfig;
@@ -404,13 +404,6 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
             return currentTransitionBuilder;
         }
         
-        /**
-         * Start defining a transition on a string event
-         */
-        public TransitionBuilder on(String eventName) {
-            currentTransitionBuilder = new TransitionBuilder(this, eventName);
-            return currentTransitionBuilder;
-        }
         
         /**
          * Mark this state as offline
@@ -480,19 +473,10 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
          * Define a stay action - handle an event within state without transitioning
          */
         public StateBuilder stay(Class<? extends StateMachineEvent> eventType, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
-            // Use EventTypeRegistry to avoid reflection
-            String eventTypeName = EventTypeRegistry.getEventType(eventType);
-            stateMachine.stayAction(stateId, eventTypeName, action);
-            return this;
-        }
-
-        /**
-         * Define a stay action with string event type
-         */
-        public StateBuilder stay(String eventType, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
             stateMachine.stayAction(stateId, eventType, action);
             return this;
         }
+
         
         private void finishState() {
             // Automatically register OnEntry and OnExit handlers if they exist
@@ -503,9 +487,8 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
             
             // Register any event transitions
             for (Map.Entry<Class<? extends StateMachineEvent>, String> entry : eventTransitions.entrySet()) {
-                // Use EventTypeRegistry to avoid reflection
-                String eventType = EventTypeRegistry.getEventType(entry.getKey());
-                stateMachine.transition(stateId, eventType, entry.getValue());
+                System.out.println("[Builder] Registering transition: " + stateId + " --[" + entry.getKey().getSimpleName() + "]--> " + entry.getValue());
+                stateMachine.transition(stateId, entry.getKey(), entry.getValue());
             }
         }
         
@@ -513,8 +496,8 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
          * Automatically register OnEntry and OnExit handlers based on package structure
          */
         private void registerImplicitHandlers() {
-            // Use a naming convention: com.telcobright.statemachine.examples.callmachine.<statename>
-            String basePackage = "com.telcobright.statemachine.examples.callmachine";
+            // Use a naming convention: com.telcobright.examples.callmachine.<statename>
+            String basePackage = "com.telcobright.examples.callmachine";
             String statePackage = basePackage + "." + stateId.toLowerCase();
             
             // Try to register OnEntry handler
@@ -562,9 +545,6 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
             eventTransitions.put(eventType, targetState);
         }
         
-        private void addEventTransition(String eventName, String targetState) {
-            stateMachine.transition(stateId, eventName, targetState);
-        }
     }
     
     /**
@@ -573,29 +553,17 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
     public class TransitionBuilder {
         private final StateBuilder stateBuilder;
         private final Class<? extends StateMachineEvent> eventType;
-        private final String eventName;
         
         private TransitionBuilder(StateBuilder stateBuilder, Class<? extends StateMachineEvent> eventType) {
             this.stateBuilder = stateBuilder;
             this.eventType = eventType;
-            this.eventName = null;
-        }
-        
-        private TransitionBuilder(StateBuilder stateBuilder, String eventName) {
-            this.stateBuilder = stateBuilder;
-            this.eventType = null;
-            this.eventName = eventName;
         }
         
         /**
          * Set the target state for this transition
          */
         public StateBuilder target(String targetState) {
-            if (eventType != null) {
-                stateBuilder.addEventTransition(eventType, targetState);
-            } else {
-                stateBuilder.addEventTransition(eventName, targetState);
-            }
+            stateBuilder.addEventTransition(eventType, targetState);
             return stateBuilder;
         }
         

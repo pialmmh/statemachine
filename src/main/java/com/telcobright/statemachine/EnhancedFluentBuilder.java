@@ -1,6 +1,6 @@
 package com.telcobright.statemachine;
 
-import com.telcobright.db.PartitionedRepository;
+import com.telcobright.statemachine.db.PartitionedRepository;
 import com.telcobright.statemachine.persistence.IdLookUpMode;
 import com.telcobright.statemachine.persistence.PersistenceProvider;
 import com.telcobright.statemachine.persistence.BaseStateMachineEntity;
@@ -32,6 +32,9 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
     
     // Sample logging configuration
     private SampleLoggingConfig sampleLoggingConfig = SampleLoggingConfig.ALL;
+    
+    // Machine creation callback for client response handling
+    private MachineCreationCallback creationCallback;
     
     private EnhancedFluentBuilder(String machineId) {
         this.machineId = machineId;
@@ -135,6 +138,15 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
     }
     
     /**
+     * Set callback for machine creation success/failure notifications
+     * This is useful for ESL/FreeSWITCH scenarios where you need to respond to the client
+     */
+    public EnhancedFluentBuilder<TPersistingEntity, TVolatileContext> withCreationCallback(MachineCreationCallback callback) {
+        this.creationCallback = callback;
+        return this;
+    }
+    
+    /**
      * Set initial state
      */
     public EnhancedFluentBuilder<TPersistingEntity, TVolatileContext> initialState(String state) {
@@ -171,6 +183,56 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
         machine.setSampleLoggingConfig(sampleLoggingConfig);
         
         return machine;
+    }
+    
+    /**
+     * Build and register the machine with the registry, handling callbacks for success/failure
+     * This method is perfect for ESL/FreeSWITCH scenarios where you need to respond to the client
+     * 
+     * @param registry The registry to register the machine with
+     * @return The created machine if successful, null if registration fails
+     */
+    public GenericStateMachine<TPersistingEntity, TVolatileContext> buildAndRegister(StateMachineRegistry registry) {
+        try {
+            // Build the machine first
+            GenericStateMachine<TPersistingEntity, TVolatileContext> machine = build();
+            
+            try {
+                // Try to register with the registry
+                registry.register(machineId, machine);
+                
+                // Success - notify callback if provided
+                if (creationCallback != null) {
+                    creationCallback.onMachineCreated(machineId, machine);
+                }
+                
+                return machine;
+                
+            } catch (Exception registrationException) {
+                // Registration failed (likely capacity limit) - notify callback
+                String reason = "REGISTRY_REGISTRATION_FAILED";
+                if (registrationException.getMessage() != null && 
+                    registrationException.getMessage().contains("concurrent machine limit")) {
+                    reason = "CAPACITY_LIMIT_REACHED";
+                }
+                
+                if (creationCallback != null) {
+                    creationCallback.onMachineCreationFailed(machineId, reason, registrationException);
+                }
+                
+                // Return null to indicate failure
+                return null;
+            }
+            
+        } catch (Exception buildException) {
+            // Build failed - notify callback
+            if (creationCallback != null) {
+                creationCallback.onMachineCreationFailed(machineId, "BUILD_FAILED", buildException);
+            }
+            
+            // Return null to indicate failure  
+            return null;
+        }
     }
     
     /**
@@ -266,9 +328,6 @@ public class EnhancedFluentBuilder<TPersistingEntity extends StateMachineContext
             return new TransitionBuilder(delegateState.on(eventType));
         }
         
-        public TransitionBuilder on(String eventName) {
-            return new TransitionBuilder(delegateState.on(eventName));
-        }
         
         public StateBuilder stay(Class<? extends com.telcobright.statemachine.events.StateMachineEvent> eventType, 
                                  java.util.function.BiConsumer<GenericStateMachine<TPersistingEntity, TVolatileContext>, com.telcobright.statemachine.events.StateMachineEvent> action) {

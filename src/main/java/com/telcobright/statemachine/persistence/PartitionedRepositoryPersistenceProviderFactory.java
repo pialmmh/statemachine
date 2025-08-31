@@ -1,8 +1,8 @@
 package com.telcobright.statemachine.persistence;
 
 import com.telcobright.statemachine.StateMachineContextEntity;
-import com.telcobright.db.PartitionedRepository;
-import com.telcobright.db.entity.ShardingEntity;
+import com.telcobright.statemachine.db.PartitionedRepository;
+import com.telcobright.statemachine.db.entity.ShardingEntity;
 
 /**
  * Factory for creating PartitionedRepositoryPersistenceProvider instances

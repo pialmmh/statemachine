@@ -279,7 +279,7 @@ public void closeHistoryTracker()         // Called on machine removal
 
         <div class="class-info">
             <h3>5. StateMachineWebSocketServer</h3>
-            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine.websocket</span></p>
+            <p><strong>Package:</strong> <span class="inline-code">com.telcobright.statemachine.statemachinedebugger</span></p>
             <p><strong>Purpose:</strong> WebSocket server for real-time monitoring</p>
             
             <h4>History Endpoints:</h4>
@@ -400,7 +400,7 @@ public CallMachineRunnerProper() {
 
 // Run with Maven
 mvn compile
-mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.CallMachineRunnerProper"
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.statemachinedebugger.CallMachineRunnerProper"
         </div>
 
         <h3>2. Verify MySQL Tables</h3>
@@ -491,7 +491,7 @@ mysql -u root -p123456 -e "CREATE DATABASE IF NOT EXISTS statedb;"
 
 # Run backend
 mvn compile
-mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.CallMachineRunnerProper"
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.statemachinedebugger.CallMachineRunnerProper"
 
 # Run frontend
 cd statemachine-ui-react

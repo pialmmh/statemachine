@@ -205,7 +205,7 @@ StateMachineConfig&lt;S, E, C&gt;
 mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.monitoring.cli.StateMachineCliMonitor"
 
 # WebSocket-enabled Runner
-mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.StateMachineRunnerWithWebServer"
+mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.statemachinedebugger.StateMachineRunnerWithWebServer"
 
 # Minimal Test Runner
 mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.demo.MinimalUpdateRunner"</code></pre>
@@ -349,7 +349,7 @@ URL: jdbc:postgresql://localhost:5432/statemachine_monitoring</code></pre>
 │   │   └── StateMachineCliMonitor.java      # Interactive CLI monitor
 │   └── service/
 │       └── MonitoringService.java           # Database persistence
-├── websocket/
+├── statemachinedebugger/
 │   ├── StateMachineRunnerWithWebServer.java # WebSocket server (port 9999)
 │   └── WebSocketMonitor.java                # WebSocket client
 ├── demo/

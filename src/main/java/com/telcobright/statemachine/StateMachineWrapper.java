@@ -78,12 +78,12 @@ public class StateMachineWrapper {
     }
     
     /**
-     * Define a transition
+     * Define a transition - DEPRECATED: Use Class-based transitions
      */
-    public StateMachineWrapper transition(String fromState, String event, String toState) {
-        stateMachine.transition(fromState, event, toState);
-        return this;
-    }
+    // public StateMachineWrapper transition(String fromState, String event, String toState) {
+    //     stateMachine.transition(fromState, event, toState);
+    //     return this;
+    // }
     
     /**
      * Set initial state
@@ -129,9 +129,9 @@ public class StateMachineWrapper {
         stateMachine.fire(event);
     }
     
-    public void fire(String eventType) {
-        stateMachine.fire(eventType);
-    }
+    // public void fire(String eventType) {
+    //     stateMachine.fire(eventType);
+    // }
     
     public void transitionTo(String newState) {
         stateMachine.transitionTo(newState);

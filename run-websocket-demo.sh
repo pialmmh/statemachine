@@ -13,7 +13,7 @@ read option
 case $option in
     1)
         echo "Starting WebSocket Server on port 9999..."
-        mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.StateMachineRunnerWithWebServer"
+        mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.statemachinedebugger.StateMachineRunnerWithWebServer"
         ;;
     2)
         echo -n "Enter WebSocket server URL [ws://localhost:9999]: "
@@ -27,7 +27,7 @@ case $option in
     3)
         echo "Starting demo..."
         echo "Starting WebSocket Server in background..."
-        mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.StateMachineRunnerWithWebServer" -q &
+        mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.statemachinedebugger.StateMachineRunnerWithWebServer" -q &
         SERVER_PID=$!
         
         echo "Waiting for server to start..."

@@ -1,9 +1,9 @@
 package com.telcobright.statemachine.monitoring;
 
 import com.telcobright.statemachine.StateMachineContextEntity;
-import com.telcobright.db.entity.Id;
-import com.telcobright.db.entity.ShardingKey;
-import com.telcobright.db.entity.Column;
+import com.telcobright.statemachine.db.entity.Id;
+import com.telcobright.statemachine.db.entity.ShardingKey;
+import com.telcobright.statemachine.db.entity.Column;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

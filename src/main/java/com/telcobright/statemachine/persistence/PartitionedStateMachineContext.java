@@ -1,7 +1,7 @@
 package com.telcobright.statemachine.persistence;
 
 import com.telcobright.statemachine.StateMachineContextEntity;
-import com.telcobright.db.entity.ShardingEntity;
+import com.telcobright.statemachine.db.entity.ShardingEntity;
 
 import java.time.LocalDateTime;
 

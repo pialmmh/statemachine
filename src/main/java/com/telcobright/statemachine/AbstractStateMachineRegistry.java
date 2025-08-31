@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 import java.util.function.Function;
 import com.telcobright.statemachine.timeout.TimeoutManager;
 import com.telcobright.statemachine.history.History;
-import com.telcobright.statemachine.websocket.StateMachineWebSocketServer;
+import com.telcobright.debugger.StateMachineWebSocketServer;
 import java.nio.file.Paths;
 import com.telcobright.statemachine.events.EventTypeRegistry;
 import com.telcobright.statemachine.events.StateMachineEvent;

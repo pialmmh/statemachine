@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TreeView Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #status { padding: 10px; margin: 10px 0; background: #f0f0f0; }
+        #log { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
+        .success { color: green; }
+        .error { color: red; }
+        .update { color: blue; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>TreeView Store Test</h1>
+    
+    <div id="status">Status: Disconnected</div>
+    
+    <h2>Test TreeView Actions</h2>
+    <button onclick="selectMachine('call-001')">Select call-001</button>
+    <button onclick="selectMachine('call-002')">Select call-002</button>
+    <button onclick="selectMachine('call-003')">Select call-003</button>
+    
+    <h3>Response Log:</h3>
+    <div id="log"></div>
+    
+    <script>
+        let ws;
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function connect() {
+            ws = new WebSocket('ws://localhost:9999');
+            
+            ws.onopen = () => {
+                status.textContent = 'Status: Connected';
+                status.className = 'success';
+                addLog('Connected to WebSocket server', 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'TREEVIEW_STORE_UPDATE') {
+                        addLog('TREEVIEW_STORE_UPDATE received:', 'update');
+                        const store = data.store || {};
+                        addLog(`  Selected Machine: ${store.selectedMachineId || 'none'}`, 'update');
+                        addLog(`  Available Machines: ${JSON.stringify(store.availableMachines || [])}`, 'update');
+                        addLog(`  Transitions Count: ${store.transitions?.length || 0}`, 'update');
+                        addLog(`  Version: ${store.version || 0}`, 'update');
+                        
+                        // Show full store in pre-formatted block
+                        const pre = document.createElement('pre');
+                        pre.textContent = JSON.stringify(store, null, 2);
+                        log.appendChild(pre);
+                    } else {
+                        console.log('Other message:', data.type);
+                    }
+                } catch (e) {
+                    console.log('Raw message:', event.data);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                addLog('WebSocket error: ' + error, 'error');
+            };
+            
+            ws.onclose = () => {
+                status.textContent = 'Status: Disconnected';
+                status.className = 'error';
+                addLog('Disconnected from server', 'error');
+            };
+        }
+        
+        function addLog(message, className) {
+            const entry = document.createElement('div');
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            entry.className = className || '';
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function selectMachine(machineId) {
+            const message = {
+                type: 'TREEVIEW_ACTION',
+                action: 'SELECT_MACHINE',
+                payload: { machineId: machineId },
+                timestamp: new Date().toISOString()
+            };
+            
+            addLog(`Sending SELECT_MACHINE for ${machineId}...`);
+            ws.send(JSON.stringify(message));
+        }
+        
+        // Connect on load
+        connect();
+    </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test INCOMING_CALL</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #status { padding: 10px; margin: 10px 0; background: #f0f0f0; }
+        #log { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Test INCOMING_CALL Transition</h1>
+    
+    <div id="status">Status: Disconnected</div>
+    
+    <h2>Test Transitions</h2>
+    <button onclick="sendIncomingCall()">Send INCOMING_CALL to call-003</button>
+    <button onclick="requestMachineState()">Get call-003 State</button>
+    <button onclick="requestHistory()">Get History</button>
+    
+    <h3>Response Log:</h3>
+    <div id="log"></div>
+    
+    <script>
+        let ws;
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function connect() {
+            ws = new WebSocket('ws://localhost:9999');
+            
+            ws.onopen = () => {
+                status.textContent = 'Status: Connected';
+                status.className = 'success';
+                addLog('Connected to WebSocket server', 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'EVENT_FIRED') {
+                        addLog(`EVENT_FIRED: ${data.eventType} on ${data.machineId}`, 'success');
+                        addLog(`  State: ${data.oldState} → ${data.newState}`, 'info');
+                    } else if (data.type === 'STATE_CHANGE') {
+                        addLog(`STATE_CHANGE: Machine ${data.machineId}`, 'success');
+                        addLog(`  Transition: ${data.fromState} → ${data.toState}`, 'info');
+                        addLog(`  Event: ${data.event}`, 'info');
+                    } else if (data.type === 'MACHINE_STATE') {
+                        addLog(`MACHINE_STATE: ${data.machineId} = ${data.currentState}`, 'info');
+                    } else if (data.type === 'EVENT_ERROR') {
+                        addLog(`ERROR: ${data.error}`, 'error');
+                    } else if (data.type === 'HISTORY_TABLE') {
+                        addLog('History Table:', 'info');
+                        if (data.history && data.history.length > 0) {
+                            data.history.forEach(entry => {
+                                addLog(`  ${entry.stepNumber}. ${entry.fromState} → ${entry.toState} (${entry.event})`, 'info');
+                            });
+                        } else {
+                            addLog('  No history entries', 'info');
+                        }
+                    } else {
+                        console.log('Other message:', data);
+                    }
+                } catch (e) {
+                    console.log('Raw message:', event.data);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                addLog('WebSocket error: ' + error, 'error');
+            };
+            
+            ws.onclose = () => {
+                status.textContent = 'Status: Disconnected';
+                status.className = 'error';
+                addLog('Disconnected from server', 'error');
+            };
+        }
+        
+        function addLog(message, className) {
+            const entry = document.createElement('div');
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            entry.className = className || '';
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function sendIncomingCall() {
+            const message = {
+                type: 'EVENT',
+                machineId: 'call-003',
+                eventType: 'INCOMING_CALL',
+                payload: { phoneNumber: '+1-555-TEST' }
+            };
+            
+            addLog('Sending INCOMING_CALL to call-003...', 'info');
+            ws.send(JSON.stringify(message));
+        }
+        
+        function requestMachineState() {
+            const message = {
+                action: 'GET_MACHINE_STATE',
+                machineId: 'call-003'
+            };
+            
+            addLog('Requesting state of call-003...', 'info');
+            ws.send(JSON.stringify(message));
+        }
+        
+        function requestHistory() {
+            const message = {
+                action: 'GET_HISTORY',
+                machineId: 'call-003'
+            };
+            
+            addLog('Requesting history for call-003...', 'info');
+            ws.send(JSON.stringify(message));
+        }
+        
+        // Connect on load
+        connect();
+    </script>
+</body>
+</html>

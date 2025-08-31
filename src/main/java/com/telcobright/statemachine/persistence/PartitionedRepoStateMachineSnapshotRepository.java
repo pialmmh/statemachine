@@ -1,7 +1,7 @@
 package com.telcobright.statemachine.persistence;
 
-import com.telcobright.db.PartitionedRepository;
-import com.telcobright.idkit.IdGenerator;
+import com.telcobright.statemachine.db.PartitionedRepository;
+import com.telcobright.statemachine.idkit.IdGenerator;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;

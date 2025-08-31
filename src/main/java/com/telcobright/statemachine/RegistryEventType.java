@@ -28,6 +28,11 @@ public enum RegistryEventType {
     IGNORE("EVENT_IGNORED"),
     
     /**
+     * Machine creation refused due to capacity limits or other constraints
+     */
+    MACHINE_CREATION_REFUSED("MACHINE_CREATION_REFUSED"),
+    
+    /**
      * Machine registered with the registry (initial registration)
      */
     REGISTER("MACHINE_REGISTERED"),

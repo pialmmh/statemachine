@@ -72,8 +72,11 @@ class TreeViewStore {
     wsLogger.log('TreeViewStore', 'sendAction called with:', action, JSON.stringify(payload));
     wsLogger.log('TreeViewStore', 'wsConnection exists:', !!this.wsConnection);
     wsLogger.log('TreeViewStore', 'wsConnection state:', this.wsConnection ? this.wsConnection.readyState : 'null');
+    wsLogger.log('TreeViewStore', 'WebSocket.OPEN value:', WebSocket.OPEN);
+    wsLogger.log('TreeViewStore', 'readyState === OPEN?', this.wsConnection ? (this.wsConnection.readyState === WebSocket.OPEN) : false);
+    wsLogger.log('TreeViewStore', 'readyState === 1?', this.wsConnection ? (this.wsConnection.readyState === 1) : false);
     
-    if (this.wsConnection && this.wsConnection.readyState === WebSocket.OPEN) {
+    if (this.wsConnection && this.wsConnection.readyState === 1) {  // Use numeric value directly
       const message = {
         type: 'TREEVIEW_ACTION',
         action: action,
@@ -81,18 +84,20 @@ class TreeViewStore {
         timestamp: new Date().toISOString()
       };
       
-      wsLogger.log('TreeViewStore', 'Sending action to backend:', action, JSON.stringify(payload));
-      wsLogger.log('TreeViewStore', 'Message being sent:', JSON.stringify(message));
+      wsLogger.log('TreeViewStore', 'Sending TREEVIEW_ACTION to backend:', action, JSON.stringify(payload));
+      wsLogger.log('TreeViewStore', 'Full message being sent:', JSON.stringify(message));
       this.wsConnection.send(JSON.stringify(message));
     } else {
       wsLogger.log('TreeViewStore', 'WebSocket not ready - cannot send action. Connection state:', 
         this.wsConnection ? this.wsConnection.readyState : 'null');
+      wsLogger.log('TreeViewStore', 'WebSocket object:', this.wsConnection);
     }
   }
 
   // UI Actions that send requests to backend
 
   selectMachine(machineId) {
+    wsLogger.log('TreeViewStore', 'selectMachine called with:', machineId);
     this.sendAction('SELECT_MACHINE', { machineId });
   }
 

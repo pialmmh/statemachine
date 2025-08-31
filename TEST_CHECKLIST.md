@@ -58,7 +58,7 @@ Run with: `node test-edge-cases.js`
 ## Manual Testing via UI
 
 ### Setup
-1. Start backend: `mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.websocket.CallMachineRunnerProper"`
+1. Start backend: `mvn exec:java -Dexec.mainClass="com.telcobright.statemachine.statemachinedebugger.CallMachineRunnerProper"`
 2. Start UI: `cd statemachine-ui-react && npm start`
 3. Open browser: `http://localhost:4001`
 

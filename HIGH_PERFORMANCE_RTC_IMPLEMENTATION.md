@@ -9,7 +9,7 @@ This document outlines the technical architecture and implementation guidelines 
 ### State Machine Library Status
 - ✅ **Custom `GenericStateMachine`**: Already optimized for telecom use cases
 - ✅ **StateMachineRegistry**: Well-designed for concurrent call management
-- ⚠️ **de.amr.statemachine**: Present but only used in tests - avoid for production RTC
+- ✅ **No external dependencies**: Pure custom implementation
 - ✅ **ESL Event Processing**: Ready for FreeSWITCH integration
 
 ### Performance Characteristics

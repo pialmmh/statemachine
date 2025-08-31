@@ -33,8 +33,8 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     private final String id;
     private String currentState;
     private final Map<String, EnhancedStateConfig> stateConfigs = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, String>> transitions = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>>> stayActions = new ConcurrentHashMap<>();
+    private final Map<String, Map<Class<? extends StateMachineEvent>, String>> transitions = new ConcurrentHashMap<>();
+    private final Map<String, Map<Class<? extends StateMachineEvent>, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>>> stayActions = new ConcurrentHashMap<>();
     private final TimeoutManager timeoutManager;
     private final StateMachineRegistry registry;
     private ScheduledFuture<?> currentTimeout;
@@ -97,9 +97,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     /**
      * Define a transition from one state to another on an event
      */
-    public GenericStateMachine<TPersistingEntity, TContext> transition(String fromState, String event, String toState) {
+    public GenericStateMachine<TPersistingEntity, TContext> transition(String fromState, Class<? extends StateMachineEvent> eventClass, String toState) {
         transitions.computeIfAbsent(fromState, k -> new ConcurrentHashMap<>())
-                   .put(event, toState);
+                   .put(eventClass, toState);
         return this;
     }
     
@@ -121,9 +121,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     /**
      * Fire a simple event by type
      */
-    public void fire(String eventType) {
-        fire(new com.telcobright.statemachine.events.GenericStateMachineEvent(eventType));
-    }
+    // String-based event firing removed - use typed events only
     
     /**
      * Start the state machine
@@ -345,18 +343,21 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                 transitionTo(timeoutEvent.getTargetState());
             } else {
                 // Normal event handling through transitions map
-                Map<String, String> stateTransitions = transitions.get(currentState);
+                Map<Class<? extends StateMachineEvent>, String> stateTransitions = transitions.get(currentState);
+                System.out.println("   Debug: Available transitions for state " + currentState + ": " + stateTransitions);
                 if (stateTransitions != null) {
-                    String targetState = stateTransitions.get(event.getEventType());
+                    System.out.println("   Debug: Looking for event class: " + event.getClass().getName());
+                    System.out.println("   Debug: Available event classes: " + stateTransitions.keySet());
+                    String targetState = stateTransitions.get(event.getClass());
                     if (targetState != null) {
                         System.out.println("   → Found transition: " + currentState + " --[" + event.getEventType() + "]--> " + targetState);
                         transitionTo(targetState);
                     } else {
-                        System.out.println("   ↻ No transition for event " + event.getEventType() + " in state " + currentState + ", checking stay actions...");
+                        System.out.println("   ↻ No transition for event '" + event.getEventType() + "' in state " + currentState + ", checking stay actions...");
                         // Check for stay actions
-                        Map<String, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
+                        Map<Class<? extends StateMachineEvent>, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent>> stateStayActions = stayActions.get(currentState);
                         if (stateStayActions != null) {
-                            BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getEventType());
+                            BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action = stateStayActions.get(event.getClass());
                             if (action != null) {
                                 System.out.println("   ✓ Executing stay action for " + event.getEventType());
                                 action.accept(this, event);
@@ -672,9 +673,9 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
     /**
      * Define a stay action - handle an event within a state without transitioning
      */
-    public GenericStateMachine<TPersistingEntity, TContext> stayAction(String stateId, String eventType, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
+    public GenericStateMachine<TPersistingEntity, TContext> stayAction(String stateId, Class<? extends StateMachineEvent> eventClass, BiConsumer<GenericStateMachine<TPersistingEntity, TContext>, StateMachineEvent> action) {
         stayActions.computeIfAbsent(stateId, k -> new ConcurrentHashMap<>())
-                   .put(eventType, action);
+                   .put(eventClass, action);
         return this;
     }
 
