@@ -11,10 +11,11 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Comprehensive TPS Test with Detailed Tabular Reports
- * Target: 1000 TPS = 1000 full cycles/sec = 4000 events/sec
+ * Target TPS can be specified via Maven: mvn exec:java -Dexec.args="2000"
+ * Default: 1000 TPS = 1000 full cycles/sec = 4000 events/sec
  */
 public class ComprehensiveTPSTest {
-    private static final int TARGET_TPS = 1000;
+    private static int TARGET_TPS = 1000; // Default, can be overridden via args
     private static final int TEST_DURATION = 10;
     private static final int SETTLE_TIME = 5;
     
@@ -44,6 +45,18 @@ public class ComprehensiveTPSTest {
     }
     
     public static void main(String[] args) throws Exception {
+        // Parse TPS from command line arguments
+        if (args.length > 0) {
+            try {
+                TARGET_TPS = Integer.parseInt(args[0]);
+                System.out.println("\n🎯 Target TPS set to: " + TARGET_TPS + " cycles/sec (" + (TARGET_TPS * 4) + " events/sec)");
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid TPS argument. Using default: " + TARGET_TPS);
+            }
+        } else {
+            System.out.println("\n📌 Using default TPS: " + TARGET_TPS + " (specify via: mvn exec:java -Dexec.args=\"2000\")");
+        }
+        
         System.out.println("\n" + "=".repeat(80));
         System.out.println("   ESL EVENT SIMULATOR - FINAL COMPREHENSIVE REPORT");
         System.out.println("=".repeat(80));
@@ -128,12 +141,9 @@ public class ComprehensiveTPSTest {
                 
                 totalCycles.incrementAndGet();
                 
-                // Remove after delay
-                executor.schedule(() -> {
-                    machines.remove(id);
-                    activeMachines.decrementAndGet();
-                    liveStateCounts.get("HUNGUP").decrementAndGet();
-                }, 100, TimeUnit.MILLISECONDS);
+                // DON'T remove machines - keep them for final state counting
+                // Only decrement active counter
+                activeMachines.decrementAndGet();
                 
             } catch (Exception e) {
                 // Ignore
@@ -150,7 +160,7 @@ public class ComprehensiveTPSTest {
         executor.shutdown();
         executor.awaitTermination(1, TimeUnit.SECONDS);
         
-        // Count final states
+        // Count final states - THE MOST IMPORTANT METRIC
         Map<String, Integer> finalStateCounts = new TreeMap<>();
         finalStateCounts.put("ADMISSION", 0);
         finalStateCounts.put("TRYING", 0);
@@ -158,11 +168,12 @@ public class ComprehensiveTPSTest {
         finalStateCounts.put("CONNECTED", 0);
         finalStateCounts.put("HUNGUP", 0);
         
-        int totalRemaining = 0;
+        int totalRemaining = machines.size();
+        System.out.println("\n📊 Counting final states from " + totalRemaining + " machines...");
+        
         for (GenericStateMachine m : machines.values()) {
             String state = m.getCurrentState();
             finalStateCounts.put(state, finalStateCounts.getOrDefault(state, 0) + 1);
-            totalRemaining++;
         }
         
         // Calculate metrics
@@ -294,6 +305,19 @@ public class ComprehensiveTPSTest {
         System.out.printf("  | Successfully Completed  | %,12d | Reached HUNGUP state           |\n", hangups.get());
         System.out.printf("  | Completion Rate         | %11.1f%% | Hangups/Created ratio          |\n",
             (hangups.get()/(double)totalCycles.get())*100);
+        System.out.println();
+        
+        // Performance Metrics
+        System.out.println("⚡ Performance Metrics");
+        System.out.println();
+        System.out.println("  | Metric                  | Value        | Notes                          |");
+        System.out.println("  |-------------------------|--------------|--------------------------------|");
+        System.out.printf("  | Thread Pool Size        | %,12d | Executor threads               |\n", 8);
+        System.out.printf("  | Events Per Thread       | %,12d | Events/thread                  |\n", totalEvents.get()/8);
+        System.out.printf("  | Avg Latency (est)       | %11.1fms | Per event processing           |\n", 
+            (TEST_DURATION * 1000.0) / totalEvents.get());
+        System.out.printf("  | Memory Usage (est)      | %,11dMB | Heap used                      |\n",
+            (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024*1024));
         System.out.println();
         
         // Test Validation Summary
