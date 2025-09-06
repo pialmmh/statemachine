@@ -13,6 +13,8 @@ import com.telcobright.statemachine.persistence.MysqlConnectionProvider;
 import com.telcobright.statemachine.persistence.PersistenceProvider;
 import com.telcobright.statemachine.persistence.MySQLPersistenceProvider;
 import com.telcobright.statemachine.persistence.OptimizedMySQLPersistenceProvider;
+import com.telcobright.statemachine.persistence.PersistenceType;
+import com.telcobright.statemachine.persistence.PersistenceProviderFactory;
 import com.telcobright.statemachine.persistence.BaseStateMachineEntity;
 import com.telcobright.statemachine.persistence.ShardingEntityStateMachineRepository;
 import com.telcobright.statemachine.persistence.IdLookUpMode;
@@ -51,6 +53,9 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
     // Rehydration control flag
     private boolean disableRehydration = false;
+    
+    // Persistence configuration
+    private PersistenceType persistenceType = PersistenceType.MYSQL_DIRECT;
     
     // Asynchronous logging executor
     private final ExecutorService asyncLogExecutor;
@@ -1044,10 +1049,9 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             connectionProvider = new MysqlConnectionProvider();
             System.out.println("[Registry-" + registryId + "] Initialized MySQL connection provider for history tracking");
             
-            // Initialize persistence provider for rehydration
-            persistenceProvider = new MySQLPersistenceProvider(connectionProvider);
-            persistenceProvider.initialize();
-            System.out.println("[Registry-" + registryId + "] Initialized persistence provider for state rehydration");
+            // Initialize persistence provider based on configured type
+            initializePersistenceProvider();
+            System.out.println("[Registry-" + registryId + "] Initialized " + persistenceType + " provider for state rehydration");
             
             // Create registry table for event logging
             createRegistryTable();
@@ -1516,6 +1520,74 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public RegistryPerformanceConfig getPerformanceConfig() {
         return performanceConfig;
+    }
+    
+    /**
+     * Set the persistence type to use
+     * Must be called before the registry starts using persistence
+     * 
+     * @param type The persistence type to use
+     */
+    public void setPersistenceType(PersistenceType type) {
+        this.persistenceType = type;
+        System.out.println("[Registry-" + registryId + "] Persistence type set to: " + type);
+        
+        // Re-initialize persistence provider if connection is available
+        if (connectionProvider != null && persistenceProvider != null) {
+            initializePersistenceProvider();
+        }
+    }
+    
+    /**
+     * Get the current persistence type
+     * 
+     * @return The current persistence type
+     */
+    public PersistenceType getPersistenceType() {
+        return persistenceType;
+    }
+    
+    /**
+     * Initialize the persistence provider based on the configured type
+     */
+    private void initializePersistenceProvider() {
+        if (connectionProvider == null && persistenceType != PersistenceType.NONE) {
+            System.err.println("[Registry-" + registryId + "] Cannot initialize persistence - no connection provider");
+            return;
+        }
+        
+        try {
+            persistenceProvider = PersistenceProviderFactory.create(persistenceType, connectionProvider);
+            if (persistenceProvider != null) {
+                persistenceProvider.initialize();
+            }
+        } catch (Exception e) {
+            System.err.println("[Registry-" + registryId + "] Failed to initialize " + persistenceType + ": " + e.getMessage());
+            // Fall back to no persistence
+            persistenceType = PersistenceType.NONE;
+            persistenceProvider = null;
+        }
+    }
+    
+    /**
+     * Configure registry to use partitioned repository for persistence
+     * 
+     * @param partitionedRepository The configured partitioned repository
+     * @param entityClass The entity class that implements both StateMachineContextEntity and ShardingEntity
+     */
+    public <T extends StateMachineContextEntity<?> & ShardingEntity<?>> void usePartitionedPersistence(
+            PartitionedRepository<T, String> partitionedRepository,
+            Class<T> entityClass) {
+        
+        this.persistenceType = PersistenceType.PARTITIONED_REPO;
+        this.persistenceProvider = (PersistenceProvider<StateMachineContextEntity<?>>) 
+            PersistenceProviderFactory.createPartitionedProvider(partitionedRepository, entityClass);
+        this.persistenceEntityClass = (Class<StateMachineContextEntity<?>>) entityClass;
+        
+        if (this.persistenceProvider != null) {
+            this.persistenceProvider.initialize();
+            System.out.println("[Registry-" + registryId + "] Configured with partitioned repository persistence");
+        }
     }
     
     /**
