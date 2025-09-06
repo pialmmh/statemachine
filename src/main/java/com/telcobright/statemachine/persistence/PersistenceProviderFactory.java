@@ -33,13 +33,8 @@ public class PersistenceProviderFactory {
                 if (connectionProvider == null) {
                     throw new IllegalArgumentException("MySQL connection provider is required for MYSQL_OPTIMIZED");
                 }
-                // Create with default batch size and cache settings
-                return new OptimizedMySQLPersistenceProvider<>(
-                    connectionProvider,
-                    100,  // batchSize
-                    1000, // cacheSize
-                    60    // cacheExpirySeconds
-                );
+                // For now, return regular MySQL provider as optimized version needs more setup
+                return new MySQLPersistenceProvider<>(connectionProvider);
                 
             case PARTITIONED_REPO:
                 // For partitioned repo, we need more setup
@@ -113,18 +108,11 @@ public class PersistenceProviderFactory {
         // This is a simplified example - actual implementation would need proper configuration
         // based on your PartitionedRepository implementation
         
-        try {
-            // Assuming PartitionedRepository has a builder or constructor that takes these params
-            // You would need to adjust this based on your actual PartitionedRepository implementation
-            return new PartitionedRepository<T, String>(
-                dataSource,
-                entityClass,
-                tableName,
-                partitionStrategy
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create partitioned repository", e);
-        }
+        // This would need to return an actual implementation
+        // For now, throwing exception as the interface cannot be instantiated
+        throw new UnsupportedOperationException(
+            "PartitionedRepository needs concrete implementation. " +
+            "Use MockPartitionedRepository for testing.");
     }
     
     /**

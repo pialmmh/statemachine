@@ -267,7 +267,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         // Log machine registration
         logRegistryEvent(RegistryEventType.REGISTER, id, "Machine registered with initial state: " + machine.getCurrentState(), null);
         
-        System.out.println("[Registry-" + registryId + "] Machine registered: " + id + " - setting lastAddedMachine to: " + id);
+        // Debug: Machine registered
         
         // Set up state transition callback to notify listeners (including WebSocket)
         // This ensures timeout transitions are also broadcast
@@ -1588,6 +1588,33 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             this.persistenceProvider.initialize();
             System.out.println("[Registry-" + registryId + "] Configured with partitioned repository persistence");
         }
+    }
+    
+    /**
+     * Set a custom persistence provider
+     * Use this method to directly set any persistence provider implementation
+     * 
+     * @param provider The persistence provider to use
+     */
+    public <T extends StateMachineContextEntity<?>> void setPersistenceProvider(PersistenceProvider<T> provider) {
+        this.persistenceProvider = (PersistenceProvider<StateMachineContextEntity<?>>) provider;
+        
+        // Try to determine the type
+        if (provider instanceof MySQLPersistenceProvider) {
+            this.persistenceType = PersistenceType.MYSQL_DIRECT;
+        } else if (provider instanceof OptimizedMySQLPersistenceProvider) {
+            this.persistenceType = PersistenceType.MYSQL_OPTIMIZED;
+        } else if (provider instanceof PartitionedRepositoryPersistenceProvider) {
+            this.persistenceType = PersistenceType.PARTITIONED_REPO;
+        } else {
+            this.persistenceType = PersistenceType.NONE;
+        }
+        
+        logRegistryEvent(RegistryEventType.CONFIG, null, 
+            "Set custom persistence provider", 
+            "Type: " + persistenceType);
+        
+        System.out.println("[Registry] Set custom persistence provider: " + persistenceType);
     }
     
     /**

@@ -76,7 +76,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
         if (timeoutManager == null) {
             System.err.println("⚠️ WARNING: GenericStateMachine " + id + " created with NULL TimeoutManager!");
         } else {
-            System.out.println("✓ GenericStateMachine " + id + " created with valid TimeoutManager");
+            // Debug: GenericStateMachine created with valid TimeoutManager
         }
         
         // Auto-generate run ID based on timestamp if debug is enabled
@@ -409,10 +409,10 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
             boolean transitioned = !stateBefore.equals(currentState);
             recordEventInHistory(event, stateBefore, currentState, transitionDuration, transitioned);
             
-            // Record snapshot if debug is enabled
-            if (isDebugEnabled()) {
-                recordSnapshot(stateBefore, currentState, event, contextBefore, context, transitionDuration);
-            }
+            // Deprecated: Snapshot recording has been removed
+            // if (isDebugEnabled()) {
+            //     recordSnapshot(stateBefore, currentState, event, contextBefore, context, transitionDuration);
+            // }
             
             // Clear current event
             currentEvent = null;
@@ -905,7 +905,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
                     
                     // Initial state is already recorded in the constructor, don't duplicate it here
                 } else {
-                    System.err.println("[History] No MySQL connection provider available for history tracking");
+                    // Debug: No MySQL connection provider available for history tracking
                 }
             } catch (SQLException e) {
                 System.err.println("[History] Failed to initialize MySQL history tracker for machine " + id + ": " + e.getMessage());
@@ -991,7 +991,7 @@ public class GenericStateMachine<TPersistingEntity extends StateMachineContextEn
      */
     public void setSampleLoggingConfig(SampleLoggingConfig config) {
         this.sampleLoggingConfig = config != null ? config : SampleLoggingConfig.ALL;
-        System.out.println("[StateMachine-" + id + "] Sample logging configured: " + this.sampleLoggingConfig);
+        // Debug: Sample logging configured
     }
     
     /**

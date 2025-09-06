@@ -487,7 +487,7 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
             
             // Register any event transitions
             for (Map.Entry<Class<? extends StateMachineEvent>, String> entry : eventTransitions.entrySet()) {
-                System.out.println("[Builder] Registering transition: " + stateId + " --[" + entry.getKey().getSimpleName() + "]--> " + entry.getValue());
+                // Debug: Registering transition
                 stateMachine.transition(stateId, entry.getKey(), entry.getValue());
             }
         }
@@ -514,10 +514,10 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
                         System.err.println("Error invoking OnEntry for state " + stateId + ": " + e.getMessage());
                     }
                 });
-                System.out.println("✅ Auto-registered OnEntry handler for state: " + stateId);
+                // Debug: Auto-registered OnEntry handler for state
             } catch (ClassNotFoundException | NoSuchMethodException e) {
                 // OnEntry handler not found - this is optional
-                System.out.println("ℹ️ No OnEntry handler found for state: " + stateId);
+                // Debug: No OnEntry handler found for state
             }
             
             // Try to register OnExit handler
@@ -534,10 +534,10 @@ public class FluentStateMachineBuilder<TPersistingEntity extends StateMachineCon
                         System.err.println("Error invoking OnExit for state " + stateId + ": " + e.getMessage());
                     }
                 });
-                System.out.println("✅ Auto-registered OnExit handler for state: " + stateId);
+                // Debug: Auto-registered OnExit handler for state
             } catch (ClassNotFoundException | NoSuchMethodException e) {
                 // OnExit handler not found - this is optional
-                System.out.println("ℹ️ No OnExit handler found for state: " + stateId);
+                // Debug: No OnExit handler found for state
             }
         }
         
