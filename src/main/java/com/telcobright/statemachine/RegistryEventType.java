@@ -65,7 +65,17 @@ public enum RegistryEventType {
     /**
      * Persistence operation (save/load) completed
      */
-    PERSISTENCE("PERSISTENCE_OPERATION");
+    PERSISTENCE("PERSISTENCE_OPERATION"),
+    
+    /**
+     * Configuration change in registry
+     */
+    CONFIG("CONFIG_CHANGE"),
+    
+    /**
+     * Warning event (non-critical issues)
+     */
+    WARNING("WARNING");
     
     private final String eventName;
     

@@ -49,6 +49,9 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     // Machine limits
     private final Semaphore concurrentMachineLimit;
     
+    // Rehydration control flag
+    private boolean disableRehydration = false;
+    
     // Asynchronous logging executor
     private final ExecutorService asyncLogExecutor;
     
@@ -462,10 +465,16 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             return existingMachine;
         }
         
-        // Step 2: Check if machine can be rehydrated from persistence
-        TPersistingEntity persistedContext = attemptRehydration(id);
-        if (persistedContext != null) {
-            return rehydrateMachine(id, factory, persistedContext);
+        // Step 2: Check if machine can be rehydrated from persistence (if not disabled)
+        if (!disableRehydration) {
+            TPersistingEntity persistedContext = attemptRehydration(id);
+            if (persistedContext != null) {
+                return rehydrateMachine(id, factory, persistedContext);
+            }
+        } else {
+            // Rehydration is disabled - log warning
+            System.out.println("[Registry] WARNING: Rehydration disabled - machine " + id + " not found in memory");
+            logRegistryEvent(RegistryEventType.WARNING, id, "Rehydration disabled", "Machine not found and rehydration is disabled");
         }
         
         // Step 3: Create new machine if not found in memory or persistence
@@ -1456,7 +1465,16 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
         GenericStateMachine<?, ?> machine = getMachine(machineId);
         
         if (machine == null) {
-            System.out.println("[Registry] Machine " + machineId + " not found in memory (rehydration requires factory)");
+            if (disableRehydration) {
+                // Log warning when rehydration is disabled and machine not found
+                System.out.println("[Registry] WARNING: Machine " + machineId + " not found - event dropped (rehydration disabled)");
+                logRegistryEvent(RegistryEventType.WARNING, machineId, 
+                    "Event dropped - machine not found", 
+                    "Event type: " + (event != null ? event.getClass().getSimpleName() : "null") + 
+                    ", Rehydration disabled");
+            } else {
+                System.out.println("[Registry] Machine " + machineId + " not found in memory (rehydration requires factory)");
+            }
             return false;
         }
         
@@ -1498,6 +1516,43 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
      */
     public RegistryPerformanceConfig getPerformanceConfig() {
         return performanceConfig;
+    }
+    
+    /**
+     * Enable or disable rehydration of state machines from persistence
+     * When disabled, events for non-existent machines will be dropped with a warning
+     * 
+     * @param disable true to disable rehydration, false to enable
+     */
+    public void setDisableRehydration(boolean disable) {
+        this.disableRehydration = disable;
+        System.out.println("[Registry-" + registryId + "] Rehydration " + (disable ? "DISABLED" : "ENABLED"));
+        logRegistryEvent(RegistryEventType.CONFIG, registryId, 
+            "Rehydration setting changed", 
+            "Rehydration is now " + (disable ? "disabled" : "enabled"));
+    }
+    
+    /**
+     * Check if rehydration is currently disabled
+     * 
+     * @return true if rehydration is disabled
+     */
+    public boolean isRehydrationDisabled() {
+        return disableRehydration;
+    }
+    
+    /**
+     * Convenience method to disable rehydration
+     */
+    public void disableRehydration() {
+        setDisableRehydration(true);
+    }
+    
+    /**
+     * Convenience method to enable rehydration
+     */
+    public void enableRehydration() {
+        setDisableRehydration(false);
     }
     
     /**
