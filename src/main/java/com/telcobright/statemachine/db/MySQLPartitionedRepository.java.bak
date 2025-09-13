@@ -39,7 +39,7 @@ public class MySQLPartitionedRepository<TEntity extends StateMachineContextEntit
     private int retentionMonths = 6; // For MONTHLY strategy
     
     public enum PartitionStrategy {
-        MONTHLY,      // Multiple physical tables (table_2024_01, table_2024_02, etc.)
+        DAILY,        // Multiple physical tables per day (table_2025-12-01, table_2025-12-02, etc.)
         RANGE,        // Native MySQL RANGE partitioning by date
         HASH          // Hash-based partitioning (for non-time-based sharding)
     }

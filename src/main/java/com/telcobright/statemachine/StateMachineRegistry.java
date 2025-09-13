@@ -18,6 +18,7 @@ import com.telcobright.statemachine.persistence.PersistenceProviderFactory;
 import com.telcobright.statemachine.persistence.BaseStateMachineEntity;
 import com.telcobright.statemachine.persistence.ShardingEntityStateMachineRepository;
 import com.telcobright.statemachine.persistence.IdLookUpMode;
+import com.telcobright.statemachine.persistence.SplitVersePersistenceProvider;
 import com.telcobright.statemachine.db.PartitionedRepository;
 import com.telcobright.statemachine.db.entity.ShardingEntity;
 import java.util.HashMap;
@@ -1604,7 +1605,7 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
             this.persistenceType = PersistenceType.MYSQL_DIRECT;
         } else if (provider instanceof OptimizedMySQLPersistenceProvider) {
             this.persistenceType = PersistenceType.MYSQL_OPTIMIZED;
-        } else if (provider instanceof PartitionedRepositoryPersistenceProvider) {
+        } else if (provider instanceof SplitVersePersistenceProvider) {
             this.persistenceType = PersistenceType.PARTITIONED_REPO;
         } else {
             this.persistenceType = PersistenceType.NONE;

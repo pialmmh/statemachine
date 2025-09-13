@@ -129,6 +129,12 @@
 			<version>1.10.0</version>
 			<scope>test</scope>
 		</dependency>
+		<!-- Split-Verse persistence library -->
+		<dependency>
+			<groupId>com.telcobright.db</groupId>
+			<artifactId>split-verse</artifactId>
+			<version>1.0.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
