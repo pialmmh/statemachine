@@ -9,10 +9,10 @@
 	</parent>
 
 	<groupId>com.telcobright</groupId>
-	<artifactId>statemachine</artifactId>
+	<artifactId>state-walk</artifactId>
 	<version>1.0-SNAPSHOT</version>
-	<name>TelcobrightStateMachine</name>
-	<description>High-performance state machine library for telecom and RTC applications</description>
+	<name>State-Walk</name>
+	<description>High-performance state machine library with full event playback for telecom and RTC applications</description>
 
 	<properties>
 		<maven.compiler.source>21</maven.compiler.source>

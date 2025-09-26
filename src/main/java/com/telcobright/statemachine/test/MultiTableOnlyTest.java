@@ -3,7 +3,7 @@ package com.telcobright.statemachine.test;
 import com.telcobright.core.repository.SplitVerseRepository;
 import com.telcobright.splitverse.config.ShardConfig;
 import com.telcobright.splitverse.config.RepositoryMode;
-import com.telcobright.core.repository.GenericMultiTableRepository.TableGranularity;
+import com.telcobright.core.repository.GenericMultiTableRepository;
 import com.telcobright.core.entity.ShardingEntity;
 import com.telcobright.core.annotation.*;
 
@@ -87,7 +87,7 @@ public class MultiTableOnlyTest {
                 .withSingleShard(config)
                 .withEntityClass(MessageEntity.class)
                 .withRepositoryMode(RepositoryMode.MULTI_TABLE)
-                .withTableGranularity(TableGranularity.DAILY)
+                .withTableGranularity(GenericMultiTableRepository.TableGranularity.DAILY)
                 .withRetentionDays(3)  // Just 3 days for testing
                 .build();
 
