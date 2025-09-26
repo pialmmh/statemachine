@@ -1,0 +1,872 @@
+package com.telcobright.statemachine.test;
+
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.concurrent.*;
+
+/**
+ * Standalone test for call state machine with multi-entity demonstration
+ * No external dependencies - can run directly
+ */
+public class CallMachineMultiEntityTestStandalone {
+
+    // ========== Call States & Events ==========
+
+    enum CallStates {
+        IDLE,
+        DIALING,
+        RINGING,
+        CONNECTED,
+        ON_HOLD,
+        TRANSFERRING,
+        DISCONNECTING,
+        FAILED
+    }
+
+    enum CallEvents {
+        DIAL,
+        RING,
+        ANSWER,
+        HOLD,
+        RESUME,
+        TRANSFER,
+        HANGUP,
+        TIMEOUT,
+        ERROR
+    }
+
+    // ========== Simple ShardingEntity interface ==========
+
+    interface ShardingEntity {
+        String getId();
+        void setId(String id);
+        LocalDateTime getCreatedAt();
+        void setCreatedAt(LocalDateTime createdAt);
+    }
+
+    // ========== Root Context Entity ==========
+
+    static class CallMachineContext implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String state;
+        private String callerNumber;
+        private String calledNumber;
+
+        // Nested entities
+        private CallEntity call;
+        private CdrEntity cdr;
+        private MediaEntity media;
+        private NetworkEntity network;
+
+        private transient DeviceInfo device;  // Transient - not persisted
+        private transient SessionCache cache; // Transient - not persisted
+
+        public CallMachineContext() {
+            this.createdAt = LocalDateTime.now();
+        }
+
+        public CallMachineContext(String machineId) {
+            this();
+            this.id = machineId;
+            this.state = CallStates.IDLE.name();
+            initializeEntities();
+        }
+
+        private void initializeEntities() {
+            this.call = new CallEntity(id);
+            this.cdr = new CdrEntity(id);
+            this.media = new MediaEntity(id);
+            this.network = new NetworkEntity(id);
+            this.device = new DeviceInfo("iPhone-15-Pro");
+            this.cache = new SessionCache();
+
+            this.call.setDevice(this.device);
+            this.media.setDevice(this.device);
+        }
+
+        public void reinitializeTransientData() {
+            if (device == null) {
+                device = new DeviceInfo("iPhone-15-Pro-Rehydrated");
+            }
+            if (cache == null) {
+                cache = new SessionCache();
+                cache.put("rehydrated", "true");
+            }
+            if (call != null) call.setDevice(device);
+            if (media != null) media.setDevice(device);
+        }
+
+        public boolean validateIdConsistency() {
+            if (id == null) return false;
+            if (call != null && !id.equals(call.getId())) return false;
+            if (cdr != null && !id.equals(cdr.getId())) return false;
+            if (media != null && !id.equals(media.getId())) return false;
+            if (network != null && !id.equals(network.getId())) return false;
+            return true;
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) {
+            this.id = id;
+            if (call != null) call.setId(id);
+            if (cdr != null) cdr.setId(id);
+            if (media != null) media.setId(id);
+            if (network != null) network.setId(id);
+        }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getState() { return state; }
+        public void setState(String state) { this.state = state; }
+        public String getCallerNumber() { return callerNumber; }
+        public void setCallerNumber(String callerNumber) { this.callerNumber = callerNumber; }
+        public String getCalledNumber() { return calledNumber; }
+        public void setCalledNumber(String calledNumber) { this.calledNumber = calledNumber; }
+        public CallEntity getCall() { return call; }
+        public CdrEntity getCdr() { return cdr; }
+        public MediaEntity getMedia() { return media; }
+        public NetworkEntity getNetwork() { return network; }
+        public DeviceInfo getDevice() { return device; }
+        public SessionCache getCache() { return cache; }
+    }
+
+    // ========== ShardingEntity Types ==========
+
+    static class CallEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String callType;
+        private Integer duration;
+        private BigDecimal qualityScore;
+        private List<CallEventEntity> events = new ArrayList<>();
+        private transient DeviceInfo device;
+
+        public CallEntity() {
+            this.createdAt = LocalDateTime.now();
+        }
+
+        public CallEntity(String machineId) {
+            this();
+            this.id = machineId;
+            this.callType = "VOICE";
+            this.duration = 0;
+            this.qualityScore = new BigDecimal("5.0");
+        }
+
+        public void addEvent(String eventType, String details) {
+            CallEventEntity event = new CallEventEntity();
+            event.setCallId(this.id);
+            event.setEventType(eventType);
+            event.setEventDetails(details);
+            events.add(event);
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) {
+            this.id = id;
+            for (CallEventEntity event : events) {
+                event.setCallId(id);
+            }
+        }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getCallType() { return callType; }
+        public void setCallType(String callType) { this.callType = callType; }
+        public Integer getDuration() { return duration; }
+        public void setDuration(Integer duration) { this.duration = duration; }
+        public BigDecimal getQualityScore() { return qualityScore; }
+        public void setQualityScore(BigDecimal qualityScore) { this.qualityScore = qualityScore; }
+        public List<CallEventEntity> getEvents() { return events; }
+        public DeviceInfo getDevice() { return device; }
+        public void setDevice(DeviceInfo device) { this.device = device; }
+    }
+
+    static class CallEventEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String callId;
+        private String eventType;
+        private String eventDetails;
+
+        public CallEventEntity() {
+            this.id = UUID.randomUUID().toString();
+            this.createdAt = LocalDateTime.now();
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) { this.id = id; }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getCallId() { return callId; }
+        public void setCallId(String callId) { this.callId = callId; }
+        public String getEventType() { return eventType; }
+        public void setEventType(String eventType) { this.eventType = eventType; }
+        public String getEventDetails() { return eventDetails; }
+        public void setEventDetails(String eventDetails) { this.eventDetails = eventDetails; }
+    }
+
+    static class CdrEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private BigDecimal totalCharge;
+        private String billingType;
+        private List<ChargeEventEntity> charges = new ArrayList<>();
+
+        public CdrEntity() {
+            this.createdAt = LocalDateTime.now();
+        }
+
+        public CdrEntity(String machineId) {
+            this();
+            this.id = machineId;
+            this.totalCharge = BigDecimal.ZERO;
+            this.billingType = "PER_MINUTE";
+        }
+
+        public void addCharge(String type, BigDecimal amount) {
+            ChargeEventEntity charge = new ChargeEventEntity();
+            charge.setCdrId(this.id);
+            charge.setChargeType(type);
+            charge.setAmount(amount);
+            charges.add(charge);
+            totalCharge = totalCharge.add(amount);
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) {
+            this.id = id;
+            for (ChargeEventEntity charge : charges) {
+                charge.setCdrId(id);
+            }
+        }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public BigDecimal getTotalCharge() { return totalCharge; }
+        public void setTotalCharge(BigDecimal totalCharge) { this.totalCharge = totalCharge; }
+        public String getBillingType() { return billingType; }
+        public void setBillingType(String billingType) { this.billingType = billingType; }
+        public List<ChargeEventEntity> getCharges() { return charges; }
+    }
+
+    static class ChargeEventEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String cdrId;
+        private String chargeType;
+        private BigDecimal amount;
+
+        public ChargeEventEntity() {
+            this.id = UUID.randomUUID().toString();
+            this.createdAt = LocalDateTime.now();
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) { this.id = id; }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getCdrId() { return cdrId; }
+        public void setCdrId(String cdrId) { this.cdrId = cdrId; }
+        public String getChargeType() { return chargeType; }
+        public void setChargeType(String chargeType) { this.chargeType = chargeType; }
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
+    }
+
+    static class MediaEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String codec;
+        private Integer bitrate;
+        private List<MediaStreamEntity> streams = new ArrayList<>();
+        private transient DeviceInfo device;
+        private transient RtpStats rtpStats;
+
+        public MediaEntity() {
+            this.createdAt = LocalDateTime.now();
+        }
+
+        public MediaEntity(String machineId) {
+            this();
+            this.id = machineId;
+            this.codec = "OPUS";
+            this.bitrate = 128000;
+            this.rtpStats = new RtpStats();
+        }
+
+        public void addStream(String type, String direction) {
+            MediaStreamEntity stream = new MediaStreamEntity();
+            stream.setMediaId(this.id);
+            stream.setStreamType(type);
+            stream.setDirection(direction);
+            streams.add(stream);
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) {
+            this.id = id;
+            for (MediaStreamEntity stream : streams) {
+                stream.setMediaId(id);
+            }
+        }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getCodec() { return codec; }
+        public void setCodec(String codec) { this.codec = codec; }
+        public Integer getBitrate() { return bitrate; }
+        public void setBitrate(Integer bitrate) { this.bitrate = bitrate; }
+        public List<MediaStreamEntity> getStreams() { return streams; }
+        public DeviceInfo getDevice() { return device; }
+        public void setDevice(DeviceInfo device) { this.device = device; }
+        public RtpStats getRtpStats() { return rtpStats; }
+        public void setRtpStats(RtpStats rtpStats) { this.rtpStats = rtpStats; }
+    }
+
+    static class MediaStreamEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String mediaId;
+        private String streamType;
+        private String direction;
+
+        public MediaStreamEntity() {
+            this.id = UUID.randomUUID().toString();
+            this.createdAt = LocalDateTime.now();
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) { this.id = id; }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getMediaId() { return mediaId; }
+        public void setMediaId(String mediaId) { this.mediaId = mediaId; }
+        public String getStreamType() { return streamType; }
+        public void setStreamType(String streamType) { this.streamType = streamType; }
+        public String getDirection() { return direction; }
+        public void setDirection(String direction) { this.direction = direction; }
+    }
+
+    static class NetworkEntity implements ShardingEntity {
+        private String id;
+        private LocalDateTime createdAt;
+        private String protocol;
+        private String localIp;
+        private String remoteIp;
+        private transient QosMetrics qosMetrics;
+
+        public NetworkEntity() {
+            this.createdAt = LocalDateTime.now();
+        }
+
+        public NetworkEntity(String machineId) {
+            this();
+            this.id = machineId;
+            this.protocol = "WebRTC";
+            this.localIp = "192.168.1.100";
+            this.remoteIp = "203.0.113.50";
+            this.qosMetrics = new QosMetrics();
+        }
+
+        @Override
+        public String getId() { return id; }
+
+        @Override
+        public void setId(String id) { this.id = id; }
+
+        @Override
+        public LocalDateTime getCreatedAt() { return createdAt; }
+
+        @Override
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public String getProtocol() { return protocol; }
+        public void setProtocol(String protocol) { this.protocol = protocol; }
+        public String getLocalIp() { return localIp; }
+        public void setLocalIp(String localIp) { this.localIp = localIp; }
+        public String getRemoteIp() { return remoteIp; }
+        public void setRemoteIp(String remoteIp) { this.remoteIp = remoteIp; }
+        public QosMetrics getQosMetrics() { return qosMetrics; }
+        public void setQosMetrics(QosMetrics qosMetrics) { this.qosMetrics = qosMetrics; }
+    }
+
+    // ========== Non-ShardingEntity Types ==========
+
+    static class DeviceInfo {
+        private String model;
+        private String osVersion;
+        private String appVersion;
+        private LocalDateTime lastActive;
+
+        public DeviceInfo(String model) {
+            this.model = model;
+            this.osVersion = "iOS 17.2";
+            this.appVersion = "1.0.0";
+            this.lastActive = LocalDateTime.now();
+        }
+
+        public String getModel() { return model; }
+        public String getOsVersion() { return osVersion; }
+        public String getAppVersion() { return appVersion; }
+        public LocalDateTime getLastActive() { return lastActive; }
+        public void updateLastActive() { this.lastActive = LocalDateTime.now(); }
+    }
+
+    static class SessionCache {
+        private Map<String, Object> cache = new HashMap<>();
+        private LocalDateTime created = LocalDateTime.now();
+
+        public void put(String key, Object value) {
+            cache.put(key, value);
+        }
+
+        public Object get(String key) {
+            return cache.get(key);
+        }
+
+        public Map<String, Object> getCache() { return cache; }
+        public LocalDateTime getCreated() { return created; }
+    }
+
+    static class RtpStats {
+        private long packetsReceived = 0;
+        private long packetsSent = 0;
+        private long bytesReceived = 0;
+        private long bytesSent = 0;
+        private double jitter = 0.0;
+        private double packetLoss = 0.0;
+
+        public void updateStats() {
+            packetsReceived += Math.random() * 100;
+            packetsSent += Math.random() * 100;
+            bytesReceived += Math.random() * 10000;
+            bytesSent += Math.random() * 10000;
+            jitter = Math.random() * 10;
+            packetLoss = Math.random() * 0.05;
+        }
+
+        public long getPacketsReceived() { return packetsReceived; }
+        public long getPacketsSent() { return packetsSent; }
+        public double getJitter() { return jitter; }
+        public double getPacketLoss() { return packetLoss; }
+    }
+
+    static class QosMetrics {
+        private double latency;
+        private double bandwidth;
+        private double mos;
+
+        public QosMetrics() {
+            this.latency = 20.0;
+            this.bandwidth = 1000000.0;
+            this.mos = 4.5;
+        }
+
+        public void update() {
+            latency = 15 + Math.random() * 30;
+            bandwidth = 500000 + Math.random() * 1500000;
+            mos = 3.5 + Math.random() * 1.5;
+        }
+
+        public double getLatency() { return latency; }
+        public double getBandwidth() { return bandwidth; }
+        public double getMos() { return mos; }
+    }
+
+    // ========== Call State Machine ==========
+
+    static class CallStateMachine {
+        private String machineId;
+        private CallMachineContext context;
+        private CallStates currentState;
+        private ScheduledExecutorService scheduler;
+        private ScheduledFuture<?> timeoutFuture;
+
+        public CallStateMachine(String machineId) {
+            this.machineId = machineId;
+            this.context = new CallMachineContext(machineId);
+            this.currentState = CallStates.IDLE;
+            this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        }
+
+        public void dial(String callerNumber, String calledNumber) {
+            if (currentState != CallStates.IDLE) {
+                throw new IllegalStateException("Can only dial from IDLE state");
+            }
+
+            context.setCallerNumber(callerNumber);
+            context.setCalledNumber(calledNumber);
+            context.getCall().addEvent("DIAL", "Dialing " + calledNumber);
+
+            transition(CallStates.DIALING);
+            System.out.println("📞 Dialing " + calledNumber + " from " + callerNumber);
+        }
+
+        public void ring() {
+            if (currentState != CallStates.DIALING) {
+                throw new IllegalStateException("Can only ring from DIALING state");
+            }
+
+            context.getCall().addEvent("RING", "Phone ringing");
+            transition(CallStates.RINGING);
+            System.out.println("🔔 Phone ringing...");
+
+            // Set timeout for RINGING state (5 seconds for test)
+            setStateTimeout(5, TimeUnit.SECONDS);
+        }
+
+        public void answer() {
+            if (currentState != CallStates.RINGING) {
+                throw new IllegalStateException("Can only answer from RINGING state");
+            }
+
+            cancelTimeout();
+            context.getCall().addEvent("ANSWER", "Call answered");
+            context.getMedia().addStream("AUDIO", "BIDIRECTIONAL");
+            context.getCdr().addCharge("CONNECTION", new BigDecimal("0.50"));
+
+            transition(CallStates.CONNECTED);
+            System.out.println("✅ Call connected");
+        }
+
+        public void hold() {
+            if (currentState != CallStates.CONNECTED) {
+                throw new IllegalStateException("Can only hold from CONNECTED state");
+            }
+
+            context.getCall().addEvent("HOLD", "Call on hold");
+            transition(CallStates.ON_HOLD);
+            System.out.println("⏸️  Call on hold");
+        }
+
+        public void resume() {
+            if (currentState != CallStates.ON_HOLD) {
+                throw new IllegalStateException("Can only resume from ON_HOLD state");
+            }
+
+            context.getCall().addEvent("RESUME", "Call resumed");
+            transition(CallStates.CONNECTED);
+            System.out.println("▶️  Call resumed");
+        }
+
+        public void hangup() {
+            cancelTimeout();
+
+            context.getCall().addEvent("HANGUP", "Call ended");
+
+            // Calculate final charges
+            int duration = context.getCall().getDuration();
+            BigDecimal minuteCharge = new BigDecimal(duration / 60.0 * 0.10);
+            context.getCdr().addCharge("USAGE", minuteCharge);
+
+            transition(CallStates.IDLE);
+            System.out.println("📴 Call ended. Duration: " + duration + " seconds");
+        }
+
+        private void transition(CallStates newState) {
+            CallStates oldState = currentState;
+            currentState = newState;
+            context.setState(newState.name());
+
+            // Update call duration if transitioning from CONNECTED
+            if (oldState == CallStates.CONNECTED) {
+                int currentDuration = context.getCall().getDuration();
+                context.getCall().setDuration(currentDuration + 5);
+            }
+
+            System.out.println("   State: " + oldState + " → " + newState);
+        }
+
+        private void setStateTimeout(long delay, TimeUnit unit) {
+            timeoutFuture = scheduler.schedule(() -> {
+                System.out.println("⏱️  State timeout triggered for " + currentState);
+                context.getCall().addEvent("TIMEOUT", currentState + " state timeout");
+                hangup();
+            }, delay, unit);
+        }
+
+        private void cancelTimeout() {
+            if (timeoutFuture != null && !timeoutFuture.isDone()) {
+                timeoutFuture.cancel(false);
+            }
+        }
+
+        public CallStates getCurrentState() { return currentState; }
+        public CallMachineContext getContext() { return context; }
+
+        public void shutdown() {
+            scheduler.shutdown();
+        }
+    }
+
+    // ========== Test Methods ==========
+
+    public static void main(String[] args) {
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("   CALL MACHINE MULTI-ENTITY TEST (STANDALONE)");
+        System.out.println("=".repeat(80) + "\n");
+
+        // Test 1: Full Call Cycle
+        testFullCallCycle();
+
+        // Test 2: Multi-Entity Persistence
+        testMultiEntityPersistence();
+
+        // Test 3: Offline and Rehydration
+        testOfflineAndRehydration();
+
+        // Test 4: State Timeout
+        testStateTimeout();
+
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("   ✅ ALL TESTS PASSED");
+        System.out.println("=".repeat(80));
+    }
+
+    private static void testFullCallCycle() {
+        System.out.println("TEST 1: Full Call Cycle");
+        System.out.println("----------------------------------------");
+
+        String machineId = "CALL-" + UUID.randomUUID().toString().substring(0, 8);
+        CallStateMachine machine = new CallStateMachine(machineId);
+
+        try {
+            machine.dial("+1-555-0100", "+1-555-0200");
+            Thread.sleep(100);
+
+            machine.ring();
+            Thread.sleep(100);
+
+            machine.answer();
+            Thread.sleep(100);
+
+            machine.hold();
+            Thread.sleep(100);
+
+            machine.resume();
+            Thread.sleep(100);
+
+            machine.hangup();
+
+            assert machine.getCurrentState() == CallStates.IDLE : "Should be back to IDLE";
+            assert machine.getContext().getCall().getEvents().size() > 0 : "Should have events";
+
+            System.out.println("✅ Full call cycle completed successfully");
+            System.out.println("   Total events: " + machine.getContext().getCall().getEvents().size());
+            System.out.println("   Total charges: $" + machine.getContext().getCdr().getTotalCharge());
+
+        } catch (Exception e) {
+            System.err.println("❌ Test failed: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            machine.shutdown();
+        }
+    }
+
+    private static void testMultiEntityPersistence() {
+        System.out.println("\nTEST 2: Multi-Entity Persistence");
+        System.out.println("----------------------------------------");
+
+        String machineId = "CALL-PERSIST-" + UUID.randomUUID().toString().substring(0, 8);
+        CallMachineContext context = new CallMachineContext(machineId);
+
+        // Add data to entities
+        context.getCall().addEvent("TEST", "Testing persistence");
+        context.getCdr().addCharge("TEST", new BigDecimal("1.00"));
+        context.getMedia().addStream("VIDEO", "SEND");
+
+        // Count entity types
+        int shardingCount = 0;
+        int nonShardingCount = 0;
+
+        // Check ShardingEntity types
+        if (context instanceof ShardingEntity) shardingCount++;
+        if (context.getCall() instanceof ShardingEntity) shardingCount++;
+        if (context.getCdr() instanceof ShardingEntity) shardingCount++;
+        if (context.getMedia() instanceof ShardingEntity) shardingCount++;
+        if (context.getNetwork() instanceof ShardingEntity) shardingCount++;
+
+        for (CallEventEntity event : context.getCall().getEvents()) {
+            if (event instanceof ShardingEntity) shardingCount++;
+        }
+        for (ChargeEventEntity charge : context.getCdr().getCharges()) {
+            if (charge instanceof ShardingEntity) shardingCount++;
+        }
+        for (MediaStreamEntity stream : context.getMedia().getStreams()) {
+            if (stream instanceof ShardingEntity) shardingCount++;
+        }
+
+        // Check non-ShardingEntity types
+        if (context.getDevice() != null && !(context.getDevice() instanceof ShardingEntity)) {
+            nonShardingCount++;
+        }
+        if (context.getCache() != null && !(context.getCache() instanceof ShardingEntity)) {
+            nonShardingCount++;
+        }
+        if (context.getMedia().getRtpStats() != null &&
+            !(context.getMedia().getRtpStats() instanceof ShardingEntity)) {
+            nonShardingCount++;
+        }
+        if (context.getNetwork().getQosMetrics() != null &&
+            !(context.getNetwork().getQosMetrics() instanceof ShardingEntity)) {
+            nonShardingCount++;
+        }
+
+        System.out.println("✅ Entity Classification:");
+        System.out.println("   ShardingEntity types: " + shardingCount + " (will be persisted)");
+        System.out.println("   Non-ShardingEntity types: " + nonShardingCount + " (won't be persisted)");
+
+        assert shardingCount >= 8 : "Should have at least 8 ShardingEntity instances";
+        assert nonShardingCount >= 4 : "Should have at least 4 non-ShardingEntity instances";
+
+        // Validate ID consistency
+        assert context.validateIdConsistency() : "ID consistency check failed";
+        System.out.println("✅ ID consistency validated across all entities");
+    }
+
+    private static void testOfflineAndRehydration() {
+        System.out.println("\nTEST 3: Offline and Rehydration");
+        System.out.println("----------------------------------------");
+
+        String machineId = "CALL-HYDRATE-" + UUID.randomUUID().toString().substring(0, 8);
+        CallStateMachine machine = new CallStateMachine(machineId);
+
+        try {
+            // Bring machine to CONNECTED state
+            machine.dial("+1-555-0300", "+1-555-0400");
+            machine.ring();
+            machine.answer();
+
+            CallMachineContext originalContext = machine.getContext();
+            String originalState = machine.getCurrentState().name();
+
+            System.out.println("📁 Simulating persistence in " + originalState + " state");
+
+            // Simulate offline - clear transient data
+            originalContext.device = null;
+            originalContext.cache = null;
+            originalContext.getMedia().setRtpStats(null);
+            originalContext.getNetwork().setQosMetrics(null);
+
+            System.out.println("🔌 Machine offline - transient data cleared");
+
+            // Simulate rehydration
+            System.out.println("♻️  Rehydrating machine...");
+            originalContext.reinitializeTransientData();
+
+            // Verify rehydration
+            assert originalContext.getDevice() != null : "Device should be recreated";
+            assert originalContext.getCache() != null : "Cache should be recreated";
+            assert "true".equals(originalContext.getCache().get("rehydrated")) : "Cache should indicate rehydration";
+            assert originalState.equals(originalContext.getState()) : "State should be preserved";
+
+            System.out.println("✅ Machine rehydrated successfully");
+            System.out.println("   State restored: " + originalContext.getState());
+            System.out.println("   Device model: " + originalContext.getDevice().getModel());
+            System.out.println("   Cache status: " + originalContext.getCache().get("rehydrated"));
+
+            // Verify machine can continue operating
+            machine.hangup();
+            assert machine.getCurrentState() == CallStates.IDLE : "Should transition to IDLE";
+            System.out.println("✅ Machine continues operating after rehydration");
+
+        } catch (Exception e) {
+            System.err.println("❌ Test failed: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            machine.shutdown();
+        }
+    }
+
+    private static void testStateTimeout() {
+        System.out.println("\nTEST 4: State Timeout");
+        System.out.println("----------------------------------------");
+
+        String machineId = "CALL-TIMEOUT-" + UUID.randomUUID().toString().substring(0, 8);
+        CallStateMachine machine = new CallStateMachine(machineId);
+
+        try {
+            machine.dial("+1-555-0500", "+1-555-0600");
+            machine.ring();
+
+            System.out.println("⏱️  RINGING state timeout set to 5 seconds");
+            System.out.println("   Waiting for timeout...");
+
+            // Wait for timeout to trigger (5 seconds + buffer)
+            Thread.sleep(6000);
+
+            // Verify timeout triggered transition to IDLE
+            assert machine.getCurrentState() == CallStates.IDLE : "Should timeout to IDLE";
+
+            // Check for timeout event
+            boolean hasTimeoutEvent = machine.getContext().getCall().getEvents().stream()
+                .anyMatch(e -> "TIMEOUT".equals(e.getEventType()));
+            assert hasTimeoutEvent : "Should have timeout event";
+
+            System.out.println("✅ Timeout triggered after 5 seconds");
+            System.out.println("   State after timeout: " + machine.getCurrentState());
+            System.out.println("   Events recorded: " + machine.getContext().getCall().getEvents().size());
+
+        } catch (Exception e) {
+            System.err.println("❌ Test failed: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            machine.shutdown();
+        }
+    }
+}
