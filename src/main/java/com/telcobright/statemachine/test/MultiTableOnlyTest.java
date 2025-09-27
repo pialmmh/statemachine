@@ -5,9 +5,14 @@ import com.telcobright.splitverse.config.ShardConfig;
 import com.telcobright.splitverse.config.RepositoryMode;
 import com.telcobright.core.repository.GenericMultiTableRepository;
 import com.telcobright.core.entity.ShardingEntity;
-import com.telcobright.core.annotation.*;
+import com.telcobright.core.annotation.Column;
+import com.telcobright.core.annotation.Id;
+import com.telcobright.core.annotation.Table;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -26,7 +31,7 @@ public class MultiTableOnlyTest {
         @Column(name = "machine_id")
         private String id;
 
-        @ShardingKey
+        @com.telcobright.core.annotation.ShardingKey
         @Column(name = "created_at")
         private LocalDateTime createdAt;
 
@@ -108,7 +113,7 @@ public class MultiTableOnlyTest {
         @Column(name = "id")
         private String id;
 
-        @ShardingKey
+        @com.telcobright.core.annotation.ShardingKey
         @Column(name = "created_at")
         private LocalDateTime createdAt;
 
@@ -177,7 +182,7 @@ public class MultiTableOnlyTest {
         @Column(name = "id")
         private String id;
 
-        @ShardingKey
+        @com.telcobright.core.annotation.ShardingKey
         @Column(name = "created_at")
         private LocalDateTime createdAt;
 
@@ -223,7 +228,7 @@ public class MultiTableOnlyTest {
         @Column(name = "id")
         private String id;
 
-        @ShardingKey
+        @com.telcobright.core.annotation.ShardingKey
         @Column(name = "created_at")
         private LocalDateTime createdAt;
 
