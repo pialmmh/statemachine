@@ -3,11 +3,19 @@ package com.telcobright.statewalk.examples;
 import com.telcobright.statemachine.StateMachineContextEntity;
 import com.telcobright.statewalk.annotation.*;
 
+import java.time.LocalDateTime;
+
 /**
  * Example CallContext demonstrating multi-entity graph persistence.
  * This context contains multiple related entities that form an object graph.
  */
-public class CallContext extends StateMachineContextEntity<String> {
+public class CallContext implements StateMachineContextEntity<CallContext> {
+
+    // State machine fields
+    private String id;
+    private String currentState;
+    private LocalDateTime lastStateChange;
+    private boolean isComplete = false;
 
     @Entity(table = "calls", relation = RelationType.ONE_TO_ONE)
     private Call call;
@@ -24,27 +32,70 @@ public class CallContext extends StateMachineContextEntity<String> {
 
     // Constructor
     public CallContext() {
-        super();
+        this.lastStateChange = LocalDateTime.now();
     }
 
     public CallContext(String callId) {
-        super();
+        this();
         setId(callId);
     }
 
-    // Override methods from StateMachineContextEntity
-    @Override
+    // Implement StateMachineContextEntity methods
     public String getId() {
-        return super.getId();
+        return id;
     }
 
-    @Override
     public void setId(String id) {
-        super.setId(id);
+        this.id = id;
         // Also set ID in related entities
         if (call != null) call.setCallId(id);
         if (cdr != null) cdr.setCallId(id);
         if (billInfo != null) billInfo.setCallId(id);
+    }
+
+    @Override
+    public String getCurrentState() {
+        return currentState;
+    }
+
+    @Override
+    public void setCurrentState(String state) {
+        this.currentState = state;
+    }
+
+    @Override
+    public LocalDateTime getLastStateChange() {
+        return lastStateChange;
+    }
+
+    @Override
+    public void setLastStateChange(LocalDateTime lastStateChange) {
+        this.lastStateChange = lastStateChange;
+    }
+
+    @Override
+    public boolean isComplete() {
+        return isComplete;
+    }
+
+    @Override
+    public void setComplete(boolean complete) {
+        this.isComplete = complete;
+    }
+
+    @Override
+    public CallContext deepCopy() {
+        CallContext copy = new CallContext();
+        copy.id = this.id;
+        copy.currentState = this.currentState;
+        copy.lastStateChange = this.lastStateChange;
+        copy.isComplete = this.isComplete;
+        // Note: Related entities are not copied (shallow copy of references)
+        copy.call = this.call;
+        copy.cdr = this.cdr;
+        copy.billInfo = this.billInfo;
+        copy.deviceInfo = this.deviceInfo;
+        return copy;
     }
 
     // Getters and setters
