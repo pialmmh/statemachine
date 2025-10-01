@@ -63,6 +63,12 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
     // Sample logging configuration for registry events
     private SampleLoggingConfig registrySampleLogging = SampleLoggingConfig.ALL;
+
+    // History archival management
+    private com.telcobright.statemachine.history.HistoryArchivalManager historyArchivalManager;
+    private com.telcobright.statemachine.history.RetentionManager retentionManager;
+    private boolean historyEnabled = false;
+    private int historyRetentionDays = 30;
     
     /**
      * Create virtual thread executor sized for target TPS capacity
@@ -366,21 +372,34 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     public void evictIfFinalState(String machineId) {
         GenericStateMachine<?, ?> machine = activeMachines.get(machineId);
         if (machine != null) {
-            // Check if current state is marked as final
-            if (isFinalState(machine.getCurrentState())) {
-                System.out.println("[Registry-" + registryId + "] Machine " + machineId + " reached final state: " + machine.getCurrentState() + " - evicting from memory");
-                
+            // Check if current state is marked as final using proper state config check
+            if (isMachineInFinalState(machine)) {
+                System.out.println("[Registry-" + registryId + "] Machine " + machineId + " reached final state: " + machine.getCurrentState() + " - archiving and evicting");
+
                 // Mark machine as complete before eviction
                 if (machine.getPersistingEntity() != null) {
                     machine.getPersistingEntity().setComplete(true);
                 }
-                
+
+                // Archive to history database if enabled
+                if (historyEnabled && historyArchivalManager != null) {
+                    try {
+                        // TODO: Load entity graph for this machine
+                        java.util.Map<Class<?>, java.util.List<Object>> entityGraph = new java.util.HashMap<>();
+                        historyArchivalManager.archiveMachine(machineId, entityGraph);
+                        System.out.println("[Registry-" + registryId + "] Machine " + machineId + " queued for archival to history");
+                    } catch (Exception e) {
+                        org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                            "Failed to queue machine for archival: {}", machineId, e);
+                    }
+                }
+
                 // Log eviction to registry table
                 logRegistryEvent(RegistryEventType.EVICT, machineId, "Final state: " + machine.getCurrentState(), "Machine reached final state and was evicted");
-                
+
                 // Remove from active machines
                 removeMachine(machineId);
-                
+
                 System.out.println("[Registry-" + registryId + "] Machine " + machineId + " evicted successfully");
             }
         }
@@ -388,17 +407,38 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
     
     /**
      * Check if a state is marked as final
+     * Now properly checks the state configuration from the machine
      */
     private boolean isFinalState(String stateName) {
-        // For now, check if state name contains "FINAL" or specific final state names
         if (stateName == null) return false;
-        
+
+        // Fallback to name-based check if no machine context available
         String upperState = stateName.toUpperCase();
-        return upperState.contains("FINAL") || 
-               upperState.equals("HUNGUP") || 
-               upperState.equals("COMPLETED") || 
-               upperState.equals("TERMINATED") || 
+        return upperState.contains("FINAL") ||
+               upperState.equals("HUNGUP") ||
+               upperState.equals("COMPLETED") ||
+               upperState.equals("TERMINATED") ||
                upperState.equals("FINISHED");
+    }
+
+    /**
+     * Check if a machine is in a final state by checking its state configuration
+     */
+    private boolean isMachineInFinalState(GenericStateMachine<?, ?> machine) {
+        if (machine == null || machine.getCurrentState() == null) {
+            return false;
+        }
+
+        // Check machine's state configuration
+        com.telcobright.statemachine.state.EnhancedStateConfig stateConfig =
+            machine.getStateConfig(machine.getCurrentState());
+
+        if (stateConfig != null && stateConfig.isFinal()) {
+            return true;
+        }
+
+        // Fallback to string-based check
+        return isFinalState(machine.getCurrentState());
     }
     
     /**
@@ -1712,11 +1752,138 @@ public class StateMachineRegistry extends AbstractStateMachineRegistry {
                 asyncExecutor.shutdownNow();
             }
         }
-        
+
+        // Shutdown history managers
+        if (historyArchivalManager != null) {
+            historyArchivalManager.shutdown();
+            System.out.println("[Registry-" + registryId + "] History archival manager shutdown complete");
+        }
+        if (retentionManager != null) {
+            retentionManager.shutdown();
+            System.out.println("[Registry-" + registryId + "] Retention manager shutdown complete");
+        }
+
         // Call parent shutdown which handles WebSocket and other cleanup
         super.shutdown();
-        
+
         // Additional cleanup specific to this implementation
         System.out.println("StateMachineRegistry shutdown complete.");
+    }
+
+    /**
+     * Enable history archival with default configuration
+     */
+    public StateMachineRegistry enableHistory() {
+        return enableHistory(30);
+    }
+
+    /**
+     * Enable history archival with custom retention period
+     *
+     * @param retentionDays Number of days to retain history (will be ±days/2 in SplitVerse)
+     */
+    public StateMachineRegistry enableHistory(int retentionDays) {
+        this.historyEnabled = true;
+        this.historyRetentionDays = retentionDays;
+
+        org.slf4j.LoggerFactory.getLogger(getClass()).info(
+            "History archival enabled for registry: {} with {}-day retention",
+            registryId, retentionDays);
+
+        return this;
+    }
+
+    /**
+     * Initialize history managers (must be called after persistence is configured)
+     */
+    public void initializeHistoryManagers(com.telcobright.splitverse.config.ShardConfig shardConfig,
+                                         com.telcobright.splitverse.config.RepositoryMode repositoryMode,
+                                         com.telcobright.statewalk.persistence.EntityGraphMapper graphMapper) {
+        if (!historyEnabled) {
+            return;
+        }
+
+        org.slf4j.LoggerFactory.getLogger(getClass()).info(
+            "Initializing history managers for registry: {}", registryId);
+
+        // Initialize history archival manager
+        historyArchivalManager = new com.telcobright.statemachine.history.HistoryArchivalManager(
+            registryId, shardConfig, graphMapper);
+
+        // Set critical failure callback to shutdown registry
+        historyArchivalManager.setOnCriticalFailure(() -> {
+            org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                "CRITICAL: History archival failed - shutting down registry: {}", registryId);
+            shutdown();
+            System.exit(1);
+        });
+
+        // Initialize retention manager
+        retentionManager = new com.telcobright.statemachine.history.RetentionManager(
+            registryId + "-history", shardConfig, repositoryMode, historyRetentionDays);
+
+        // Start scheduled cleanup
+        retentionManager.startScheduledCleanup();
+
+        org.slf4j.LoggerFactory.getLogger(getClass()).info(
+            "History managers initialized successfully for registry: {}", registryId);
+    }
+
+    /**
+     * Perform startup scan to move all finished machines to history
+     * Must be called after history managers are initialized
+     */
+    public void performStartupHistoryScan() throws java.sql.SQLException {
+        if (!historyEnabled || historyArchivalManager == null) {
+            return;
+        }
+
+        org.slf4j.LoggerFactory.getLogger(getClass()).info(
+            "Performing startup history scan for registry: {}", registryId);
+
+        // Collect all final state names from registered machines
+        java.util.Set<String> finalStateNames = new java.util.HashSet<>();
+
+        // TODO: Collect final state names from all registered machine templates
+        // For now, use common final state names
+        finalStateNames.add("COMPLETED");
+        finalStateNames.add("FAILED");
+        finalStateNames.add("TERMINATED");
+        finalStateNames.add("HUNGUP");
+        finalStateNames.add("FINISHED");
+
+        try {
+            historyArchivalManager.moveAllFinishedMachines(finalStateNames);
+            org.slf4j.LoggerFactory.getLogger(getClass()).info(
+                "Startup history scan completed successfully for registry: {}", registryId);
+        } catch (java.sql.SQLException e) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                "CRITICAL: Startup history scan failed - aborting initialization", e);
+            throw e;
+        }
+    }
+
+    /**
+     * Check if history archival is enabled
+     */
+    public boolean isHistoryEnabled() {
+        return historyEnabled;
+    }
+
+    /**
+     * Get history retention days
+     */
+    public int getHistoryRetentionDays() {
+        return historyRetentionDays;
+    }
+
+    /**
+     * Get history archival statistics
+     */
+    public com.telcobright.statemachine.history.HistoryArchivalManager.ArchivalStats getHistoryStats() {
+        if (historyArchivalManager != null) {
+            return historyArchivalManager.getStats();
+        }
+        return null;
     }
 }
