@@ -356,6 +356,15 @@ public class StateWalkRegistry<T extends StateMachineContextEntity<?>> extends S
         }
 
         @Override
+        public boolean exists(String id) {
+            // Check if entity exists in database
+            if (mapper != null && adapter != null) {
+                return adapter.exists(id);
+            }
+            return false;
+        }
+
+        @Override
         public void delete(String id) {
             // Implementation would delete the entity graph
             System.out.println("[GraphPersistenceProvider] Delete not yet implemented for: " + id);
